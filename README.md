@@ -5,7 +5,7 @@ A high-performance agent router and skill selection tool powered by the **TypeSa
 Instead of polluting agent context windows by loading 70+ skills on startup, Jev evaluates each user prompt against your centralized skill bank in a single parallel tensor pass (~400–700ms) and returns only the 1–3 necessary skills for that specific task.
 
 ```
-git remote: git@github.com:datamonsterr/jev_auto_select_skills.git
+git remote: https://github.com/datamonsterr/jev_auto_select_skills.git
 ```
 
 ---
@@ -22,7 +22,7 @@ We provide automated setup scripts for Linux/macOS (`.sh`) and Windows (`.ps1`).
 
 ```bash
 # 1. Clone repository
-git clone git@github.com:datamonsterr/jev_auto_select_skills.git ~/dev/jev_auto_select_skills
+git clone https://github.com/datamonsterr/jev_auto_select_skills.git ~/dev/jev_auto_select_skills
 cd ~/dev/jev_auto_select_skills
 bun install
 
@@ -35,7 +35,7 @@ chmod +x scripts/backup-and-setup.sh
 
 ```powershell
 # 1. Clone repository
-git clone git@github.com:datamonsterr/jev_auto_select_skills.git $HOME\dev\jev_auto_select_skills
+git clone https://github.com/datamonsterr/jev_auto_select_skills.git $HOME\dev\jev_auto_select_skills
 cd $HOME\dev\jev_auto_select_skills
 bun install
 
