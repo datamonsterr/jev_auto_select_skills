@@ -5,6 +5,7 @@ import {
   type SelectedSkill,
   type SkillSelectionResult,
   type SkillSelectorOptions,
+  type UsageMetrics,
   formatSkillSummary,
 } from "./lib/model";
 import { JevProvider } from "./lib/provider";
@@ -19,7 +20,7 @@ export {
   formatSkillSummary,
   DEFAULT_SYSTEM_PROMPT,
 };
-export type { Skill, SelectedSkill, SkillSelectionResult, SkillSelectorOptions };
+export type { Skill, SelectedSkill, SkillSelectionResult, SkillSelectorOptions, UsageMetrics };
 
 /**
  * High-level programmatic API to select skills using Jev decision model
@@ -156,6 +157,18 @@ Options:
           if (s.description) {
             console.log(`    ${s.description}`);
           }
+        }
+      }
+
+      if (result.usage) {
+        console.log("\n📊 Token Usage Breakdown:");
+        console.log(`  • Total Used Tokens:    ${result.usage.total_tokens}`);
+        console.log(`  • Input Prompt Tokens:  ${result.usage.user_prompt_tokens}`);
+        console.log(`  • System Prompt Tokens: ${result.usage.system_prompt_tokens}`);
+        console.log(`  • API Input Tokens:     ${result.usage.input_tokens} (including skills criteria)`);
+        console.log(`  • Output Tokens:        ${result.usage.output_tokens}`);
+        if (result.usage.cost !== undefined) {
+          console.log(`  • Estimated Cost:       $${result.usage.cost.toFixed(6)}`);
         }
       }
     }

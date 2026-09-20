@@ -79,12 +79,25 @@ export interface SelectedSkill {
 }
 
 /**
+ * Token usage breakdown
+ */
+export interface UsageMetrics {
+  total_tokens: number;
+  input_tokens: number;
+  output_tokens: number;
+  user_prompt_tokens: number;
+  system_prompt_tokens: number;
+  cost?: number;
+}
+
+/**
  * High-level result of skill selection
  */
 export interface SkillSelectionResult {
   selectedSkills: SelectedSkill[];
   primarySkill: string | null;
   answers: Record<string, JevChoiceAnswer>;
+  usage?: UsageMetrics;
   raw?: JevDecisionResponse;
 }
 

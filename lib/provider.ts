@@ -2,6 +2,7 @@ import {
   type Skill,
   type SkillSelectorOptions,
   type SkillSelectionResult,
+  type UsageMetrics,
   type JevDecisionRequest,
   type JevDecisionResponse,
   filterSelectedSkills,
@@ -219,10 +220,29 @@ export class JevProvider {
 
     const primarySkill = primaryChoice && primaryChoice !== "none" ? primaryChoice : null;
 
+    const inputTokens = response.usage?.input_tokens ?? 0;
+    const outputTokens = response.usage?.output_tokens ?? 0;
+    const totalTokens = inputTokens + outputTokens;
+    const activeSystemPrompt = systemPrompt || DEFAULT_SYSTEM_PROMPT;
+
+    const estimateTokens = (text: string) => Math.max(1, Math.ceil(text.trim().length / 3.8));
+    const userPromptTokens = estimateTokens(userPrompt);
+    const systemPromptTokens = estimateTokens(activeSystemPrompt);
+
+    const usage: UsageMetrics = {
+      total_tokens: totalTokens,
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      user_prompt_tokens: userPromptTokens,
+      system_prompt_tokens: systemPromptTokens,
+      cost: response.usage?.cost,
+    };
+
     return {
       selectedSkills,
       primarySkill,
       answers: response.answers,
+      usage,
       raw: response,
     };
   }
