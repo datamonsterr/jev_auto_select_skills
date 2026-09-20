@@ -34,7 +34,11 @@ export class JevProvider {
   private fetchFn: typeof fetch;
 
   constructor(config: JevProviderConfig = {}) {
-    this.apiKey = config.apiKey || process.env.OPENROUTER_API_KEY || "";
+    this.apiKey =
+      config.apiKey ||
+      process.env.OPENROUTER_API_KEY ||
+      process.env.JEV_API_KEY ||
+      "";
     this.model = config.model || process.env.MODEL || DEFAULT_JEV_MODEL;
     this.endpoint = config.endpoint || DEFAULT_OPENROUTER_DECISIONS_URL;
     this.retries = config.retries !== undefined ? config.retries : 3;

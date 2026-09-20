@@ -2,242 +2,231 @@
 
 A high-performance agent router and skill selection tool powered by the **TypeSafe Jev System One** decision model on OpenRouter (`~typesafe/jev-latest`).
 
-It dynamically analyzes user prompts and technical tasks against a bank of agent skills, selecting the most relevant skills with epistemically calibrated probabilities and confidence scores.
-
-## Key Features
-
-- **Decision-Native**: Uses TypeSafe AI's Jev model via OpenRouter's `/api/alpha/decisions` endpoint for sub-second, structured semantic routing without autoregressive chat latency or hallucinations.
-- **Strictly Scoped Decisions**: State includes all skill names, descriptions, and "when to use" triggers; decision choices are strictly limited to valid skill names (+ `none`).
-- **Resilient Execution**: Built-in 3-retry mechanism with exponential backoff to handle API rate limits (15–20 RPM).
-- **Universal Integrations**:
-  - **Codex Hook** (`hooks/codex.ts`)
-  - **Claude Hook** (`hooks/claude.ts`)
-  - **OpenCode Plugin** (`plugins/opencode.ts`)
-  - **Unified Dispatcher** (`scripts/run-hook.ts`)
-  - **Agent Skill** (`skills/jev-skill-selector/SKILL.md`)
-  - **Programmatic TypeScript API** (`index.ts`)
-- **TDD-Backed & 100% Golden Set Accuracy**: Validated on complex software engineering benchmarks covering testing, debugging, git, GitOps, DB design, UI/UX, and business analysis.
-
----
-
-## Architecture
+Instead of polluting agent context windows by loading 70+ skills on startup, Jev evaluates each user prompt against your centralized skill bank in a single parallel tensor pass (~400–700ms) and returns only the 1–3 necessary skills for that specific task.
 
 ```
-jev_skill_selector/
-├── lib/
-│   ├── model.ts           # Types, schemas, filtering, and formatting
-│   ├── provider.ts        # JevProvider with retry backoff & OpenRouter client
-│   ├── system_prompt.ts   # Decision routing prompts and instructions
-│   └── parse_skill.ts     # Markdown frontmatter and trigger parser
-├── hooks/
-│   ├── codex.ts           # Codex pre-prompt & tool hook
-│   └── claude.ts          # Claude Code / Desktop prompt hook
-├── plugins/
-│   └── opencode.ts        # OpenCode plugin with chat:before hook & tool
-├── scripts/
-│   ├── run-hook.ts        # Unified runner with auto environment detection
-│   └── test-golden.ts     # Golden set benchmark test runner
-├── golden_set/
-│   └── testset.json       # 12 complex software engineering evaluation cases
-├── skills/                # 75+ agent skill definitions
-├── tests/                 # Unit and integration test suite
-└── index.ts               # Programmatic API & CLI entrypoint
+git remote: git@github.com:datamonsterr/jev_auto_select_skills.git
 ```
 
 ---
 
-## Installation & Setup
+## ⚡ Quick Machine Setup (Automated)
 
-Requirements: [Bun](https://bun.com) v1.0+
+We provide automated setup scripts for Linux/macOS (`.sh`) and Windows (`.ps1`). These scripts:
+1. Consolidate and back up all existing skills from `~/.agents/skills`, `~/.claude/skills`, `~/.codex/skills` into a centralized bank (`~/.agents/skills_bank`).
+2. Package and install `jev-skill-selector` as the active gatekeeper skill in `~/.agents/skills/jev-skill-selector`.
+3. Configure **Claude Code** and **Codex** hooks to automatically execute Jev on **every user prompt**.
+4. Install the **OpenCode** plugin into `~/.config/opencode/plugins/`.
+
+### Linux / macOS:
 
 ```bash
-# Clone and install dependencies
+# 1. Clone repository
+git clone git@github.com:datamonsterr/jev_auto_select_skills.git ~/dev/jev_auto_select_skills
+cd ~/dev/jev_auto_select_skills
 bun install
+
+# 2. Run automated consolidation & hook setup
+chmod +x scripts/backup-and-setup.sh
+./scripts/backup-and-setup.sh
 ```
 
-Ensure your environment variables are configured in `.env`:
+### Windows (PowerShell):
 
-```env
-OPENROUTER_API_KEY=your_openrouter_api_key_here
-MODEL=~typesafe/jev-latest
+```powershell
+# 1. Clone repository
+git clone git@github.com:datamonsterr/jev_auto_select_skills.git $HOME\dev\jev_auto_select_skills
+cd $HOME\dev\jev_auto_select_skills
+bun install
+
+# 2. Run automated setup
+.\scripts\backup-and-setup.ps1
 ```
 
 ---
 
-## CLI Usage
+## 🛠 Manual Configuration Guide
 
-### Basic Query
+### 1. Environment Variables (`.env` or Shell Profile)
+
+Set the following in your shell profile (`~/.bashrc`, `~/.zshrc`) or create a `.env` in the skill root:
+
+```bash
+# Required: OpenRouter API key for TypeSafe Jev model
+export OPENROUTER_API_KEY="sk-or-v1-your-openrouter-key-here"
+# Optional alias
+# export JEV_API_KEY="sk-or-v1-your-openrouter-key-here"
+
+# Model slug
+export MODEL="~typesafe/jev-latest"
+
+# Centralized Skills Bank path
+export SKILLS_BANK_PATH="$HOME/.agents/skills_bank"
+```
+
+The selector automatically resolves the skills bank in this order:
+1. `--skills-dir <path>` CLI argument or programmatic option
+2. `process.env.SKILLS_BANK_PATH`
+3. `process.env.SKILLS_DIR`
+4. `~/.agents/skills_bank`
+5. `~/.gemini/config/skills`
+6. `./skills`
+
+---
+
+### 2. Claude Code Hook Setup (Runs on Every Prompt)
+
+Claude Code supports event hooks in `~/.claude/settings.json` (or `.claude/settings.json`).
+
+Edit `~/.claude/settings.json` and add the `UserPromptSubmit` hook:
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "command": "bun run /absolute/path/to/jev_auto_select_skills/hooks/claude.ts"
+      }
+    ]
+  }
+}
+```
+
+**How it works:**
+- Every time you submit a prompt in Claude Code, Claude pipes the prompt text to `hooks/claude.ts`.
+- The hook queries Jev against your skills bank and outputs formatted markdown context of the matching skills.
+- Claude Code automatically receives and loads only those skills before generating its answer.
+
+---
+
+### 3. Codex Hook Setup (Runs on Every Prompt)
+
+Codex supports pre-prompt hook execution configured in `~/.codex/config.json`:
+
+```json
+{
+  "hooks": {
+    "pre_prompt": "bun run /absolute/path/to/jev_auto_select_skills/hooks/codex.ts"
+  }
+}
+```
+
+**How it works:**
+- When Codex receives a prompt, it sends `{ "prompt": "<user prompt>" }` to `hooks/codex.ts`.
+- Jev selects the relevant skills and returns:
+  ```json
+  {
+    "prompt": "<user prompt>",
+    "injectedContext": "### Recommended Agent Skills\n- **tdd** ...",
+    "skills": [{ "name": "tdd", "probability": 0.88, "confidence": 0.95 }]
+  }
+  ```
+- Codex injects this context directly into the agent planning phase.
+
+---
+
+### 4. OpenCode Plugin Setup
+
+OpenCode loads TypeScript plugins from `.opencode/plugins/` or `~/.config/opencode/plugins/`.
+
+1. Copy or link [`plugins/opencode.ts`](plugins/opencode.ts) to your OpenCode plugins directory:
+   ```bash
+   mkdir -p ~/.config/opencode/plugins
+   ln -sf /absolute/path/to/jev_auto_select_skills/plugins/opencode.ts ~/.config/opencode/plugins/jev-skill-selector.ts
+   ```
+
+2. Or register it in your `opencode.config.ts`:
+   ```typescript
+   import jevSkillSelectorPlugin from "./plugins/opencode";
+
+   export default {
+     plugins: [
+       jevSkillSelectorPlugin({
+         skillsDir: process.env.SKILLS_BANK_PATH || "~/.agents/skills_bank",
+         threshold: 0.05,
+         autoInject: true,
+       }),
+     ],
+   };
+   ```
+
+**Features in OpenCode:**
+- `"chat:before"` hook: Automatically enriches user messages with matching skill instructions before LLM execution.
+- `select_skill` tool: Allows OpenCode models to dynamically query the skill bank during complex autonomous runs.
+
+---
+
+## ➕ How to Add New Skills to Your Bank
+
+Once your machine is configured, **never worry about skill context bloat again**.
+
+To add a new skill, simply create a directory with a `SKILL.md` inside your centralized skills bank (`~/.agents/skills_bank`):
+
+```bash
+mkdir -p ~/.agents/skills_bank/my-new-tool
+cat <<'EOF' > ~/.agents/skills_bank/my-new-tool/SKILL.md
+---
+name: my-new-tool
+description: Automate database migrations using Liquibase. Use when user asks about database migration or schema versioning.
+---
+
+# Liquibase Migration Skill
+Instructions and guidelines here...
+EOF
+```
+
+On your next prompt:
+- If you ask about *"database migrations"*, Jev will automatically detect and inject `my-new-tool`.
+- If you ask about *"React styling"*, `my-new-tool` is completely ignored, keeping your context clean!
+
+---
+
+## 💻 CLI Usage & Token Inspection
+
+Query skills directly:
 
 ```bash
 bun run index.ts "How do I refactor code using TDD and commit changes?"
 ```
 
 Output:
-```
+```text
 🎯 Jev Skill Selection Result
 Prompt: "How do I refactor code using TDD and commit changes?"
 Primary Choice: tdd
-Confidence: 0.98
+Confidence: 0.88
 
 Selected Skills:
-  • tdd                            Prob: 98.0% | Conf: 98.0%
+  • tdd                            Prob: 59.0% | Conf: 88.0%
     Test-driven development. Use when the user wants to build features or fix bugs test-first...
+  • test-driven-development        Prob: 36.0% | Conf: 88.0%
+    Use when implementing any feature or bugfix, before writing implementation code
+
+📊 Token Usage Breakdown:
+  • Total Used Tokens:    3977
+  • Input Prompt Tokens:  14
+  • System Prompt Tokens: 37
+  • API Input Tokens:     3209 (including skills criteria)
+  • Output Tokens:        768
+  • Estimated Cost:       $0.000135
 ```
 
-### JSON Output
-
+Return JSON for programmatic integration:
 ```bash
-bun run index.ts --json "Configure Kubernetes manifests and ArgoCD application for GitOps"
-```
-
-### Advanced Options
-
-```bash
-bun run index.ts \
-  --prompt "Deploy Kubernetes services via GitOps" \
-  --system "You are a senior DevOps engineer" \
-  --skills-dir ./skills \
-  --threshold 0.05 \
-  --max-skills 3
+bun run index.ts --json "Diagnose memory leak in auth microservice"
 ```
 
 ---
 
-## Hook & Plugin Integrations
-
-### 1. Unified Dispatcher (Auto Environment Detection)
-
-Piping stdin automatically detects whether it is running under Codex, Claude, OpenCode, or CLI:
+## 🧪 Testing & Benchmarks
 
 ```bash
-echo '{"prompt": "Refactor payment service with red-green-refactor loop"}' | bun run hook
-```
-
-You can also explicitly pass `--mode=<codex|claude|opencode|cli>`:
-
-```bash
-bun run hook --mode=claude "Build an accessible data table with shadcn/ui"
-```
-
-### 2. Codex Hook
-
-```bash
-echo '{"prompt": "Generate a conventional commit message for staged changes"}' | bun run hook:codex
-```
-
-Returns JSON:
-```json
-{
-  "prompt": "Generate a conventional commit message for staged changes",
-  "injectedContext": "### Recommended Agent Skills\n- **git-commit** ...",
-  "skills": [{ "name": "git-commit", "probability": 0.94, "confidence": 0.94 }]
-}
-```
-
-### 3. Claude Hook
-
-```bash
-echo '{"prompt": "Build an accessible data table with shadcn/ui"}' | bun run hook:claude
-```
-
-Outputs formatted markdown skill context directly into Claude Code's pre-prompt.
-
-### 4. OpenCode Plugin
-
-Import and add to your OpenCode configuration:
-
-```typescript
-import jevSkillSelectorPlugin from "./plugins/opencode";
-
-export default {
-  plugins: [
-    jevSkillSelectorPlugin({
-      skillsDir: "./skills",
-      threshold: 0.05,
-      autoInject: true,
-    }),
-  ],
-};
-```
-
-This registers:
-- An automatic `"chat:before"` hook that enriches user messages with matching skills.
-- A `select_skill` agent tool that LLMs can call dynamically.
-
----
-
-## Programmatic TypeScript API
-
-```typescript
-import { selectSkills, loadSkillsFromDir, JevProvider } from "./index";
-
-const result = await selectSkills({
-  userPrompt: "Need to run opencode web server and make commits",
-  systemPrompt: "Follow conventional commits",
-  options: {
-    threshold: 0.05,
-    maxSkills: 3,
-  },
-});
-
-console.log(result.primarySkill);
-// => "opencode"
-
-console.log(result.selectedSkills);
-// => [ { name: "opencode", probability: 0.94, confidence: 0.98 }, ... ]
-```
-
----
-
-## Testing & Golden Evaluation
-
-### Unit & Integration Tests
-
-```bash
+# Run unit and integration tests (23/23 passing)
 bun test
-```
 
-Runs all tests in `tests/`:
-- `tests/parse_skill.test.ts`: Frontmatter extraction, "When to Use" parser, state & criteria generation.
-- `tests/model.test.ts`: Skill filtering, thresholds, confidence formatting, system prompts.
-- `tests/provider.test.ts`: Retry mechanism (3 retries on 429/503), error handling, Jev decision responses.
-- `tests/hooks.test.ts`: Codex hook, Claude hook, OpenCode plugin, auto environment detection.
-- `tests/golden_eval.test.ts`: Testset schema verification and live Jev integration.
-
-### Golden Set Benchmark
-
-```bash
+# Run single-focus golden set evaluation (12/12 passing)
 bun run test:golden
-```
 
-Evaluates 12 single-focus complex software engineering test cases against the live TypeSafe Jev model:
-
-| ID | Category | Expected | Result | Confidence |
-| :--- | :--- | :--- | :--- | :--- |
-| `case-01-tdd` | testing | `tdd`, `test-driven-development` | **PASS** (`tdd`) | 92% |
-| `case-02-debugging` | debugging | `diagnosing-bugs`, `systematic-debugging` | **PASS** (`systematic-debugging`) | 95% |
-| `case-03-git-commit` | git | `git-commit`, `conventional-commits` | **PASS** (`git-commit`) | 94% |
-| `case-04-gitops-k8s` | devops | `gitops`, `kubernetes`, `deployment` | **PASS** (`gitops`) | 97% |
-| `case-05-db-schema` | database | `database-schema-design` | **PASS** (`database-schema-design`) | 100% |
-| `case-06-ui-styling` | frontend | `ui-styling`, `ui-ux-pro-max`, `frontend-design` | **PASS** (`ui-styling`) | 100% |
-| `case-07-ba-elicitation` | requirements | `ask-why-ba` | **PASS** (`ask-why-ba`) | 100% |
-| `case-08-opencode-cli` | tooling | `opencode` | **PASS** (`opencode`) | 100% |
-| `case-09-worktrees` | git | `using-git-worktrees` | **PASS** (`using-git-worktrees`) | 100% |
-| `case-10-mermaid` | documentation | `mermaid-diagrams` | **PASS** (`mermaid-diagrams`) | 100% |
-| `case-11-diataxis-docs` | documentation | `documentation-writer`, `documentation` | **PASS** (`documentation-writer`) | 100% |
-| `case-12-verification` | quality | `verification-before-completion`, `quality-checks` | **PASS** (`verification-before-completion`) | 100% |
-
-**Overall Accuracy: 12/12 (100.0%)** with an average latency of ~700ms per decision.
-
-### Complex Multi-Step & Continuation Benchmark
-
-```bash
+# Run complex multi-step and continuation benchmark (12/12 passing)
 bun run test:complex
 ```
-
-Evaluates 12 extensive multi-step workflows and continuation tasks requiring multiple synchronized skills (e.g. Triage → TDD → Verification → Conventional Commit, or Elicitation → Domain Modeling → DB Schema):
-
-- Dataset: `golden_set/complex_testset.json`
-- Tests multi-question parallel decision routing (`primary_skill`, `secondary_skill`, `followup_skill`)
-- Verifies full coverage of multiple required skills per task
-

@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+import fs from "node:fs";
 import path from "node:path";
 import {
   type Skill,
@@ -11,6 +11,39 @@ import {
 import { JevProvider } from "./lib/provider";
 import { loadSkillsFromDir, parseSkillFile, parseSkillContent } from "./lib/parse_skill";
 import { DEFAULT_SYSTEM_PROMPT } from "./lib/system_prompt";
+
+/**
+ * Dynamically resolve the skills bank directory path from environment or defaults
+ */
+export function resolveSkillsBankPath(customPath?: string): string {
+  if (customPath && fs.existsSync(path.resolve(customPath))) {
+    return path.resolve(customPath);
+  }
+  if (process.env.SKILLS_BANK_PATH && fs.existsSync(path.resolve(process.env.SKILLS_BANK_PATH))) {
+    return path.resolve(process.env.SKILLS_BANK_PATH);
+  }
+  if (process.env.SKILLS_DIR && fs.existsSync(path.resolve(process.env.SKILLS_DIR))) {
+    return path.resolve(process.env.SKILLS_DIR);
+  }
+  const homeDir = process.env.HOME || process.env.USERPROFILE || "";
+  const defaultBank = path.join(homeDir, ".agents", "skills_bank");
+  if (fs.existsSync(defaultBank)) {
+    return defaultBank;
+  }
+  const geminiSkills = path.join(homeDir, ".gemini", "config", "skills");
+  if (fs.existsSync(geminiSkills)) {
+    return geminiSkills;
+  }
+  const localSkills = path.resolve(process.cwd(), "skills");
+  if (fs.existsSync(localSkills)) {
+    return localSkills;
+  }
+  const repoSkills = path.resolve(import.meta.dir, "skills");
+  if (fs.existsSync(repoSkills)) {
+    return repoSkills;
+  }
+  return localSkills;
+}
 
 export {
   JevProvider,
@@ -32,7 +65,7 @@ export async function selectSkills(params: {
   options?: SkillSelectorOptions;
 }): Promise<SkillSelectionResult> {
   const { userPrompt, systemPrompt, skillsDir, options = {} } = params;
-  const targetDir = skillsDir || options.skillsDir || path.resolve(process.cwd(), "skills");
+  const targetDir = resolveSkillsBankPath(skillsDir || options.skillsDir);
 
   const skills = loadSkillsFromDir(targetDir);
   if (skills.length === 0) {
@@ -82,7 +115,7 @@ Options:
 
   let prompt = "";
   let systemPrompt: string | undefined;
-  let skillsDir = path.resolve(process.cwd(), "skills");
+  let skillsDir = resolveSkillsBankPath();
   let threshold = 0.05;
   let maxSkills = 3;
   let jsonOutput = false;
@@ -97,7 +130,7 @@ Options:
     } else if (arg === "--system" || arg === "-s") {
       systemPrompt = args[++i];
     } else if (arg === "--skills-dir" || arg === "-d") {
-      skillsDir = path.resolve(args[++i] || "./skills");
+      skillsDir = resolveSkillsBankPath(args[++i]);
     } else if (arg === "--threshold" || arg === "-t") {
       threshold = parseFloat(args[++i]) || 0.05;
     } else if (arg === "--max-skills" || arg === "-m") {
