@@ -210,7 +210,7 @@ Runs all tests in `tests/`:
 bun run test:golden
 ```
 
-Evaluates 12 complex software engineering test cases against the live TypeSafe Jev model:
+Evaluates 12 single-focus complex software engineering test cases against the live TypeSafe Jev model:
 
 | ID | Category | Expected | Result | Confidence |
 | :--- | :--- | :--- | :--- | :--- |
@@ -228,3 +228,16 @@ Evaluates 12 complex software engineering test cases against the live TypeSafe J
 | `case-12-verification` | quality | `verification-before-completion`, `quality-checks` | **PASS** (`verification-before-completion`) | 100% |
 
 **Overall Accuracy: 12/12 (100.0%)** with an average latency of ~700ms per decision.
+
+### Complex Multi-Step & Continuation Benchmark
+
+```bash
+bun run test:complex
+```
+
+Evaluates 12 extensive multi-step workflows and continuation tasks requiring multiple synchronized skills (e.g. Triage → TDD → Verification → Conventional Commit, or Elicitation → Domain Modeling → DB Schema):
+
+- Dataset: `golden_set/complex_testset.json`
+- Tests multi-question parallel decision routing (`primary_skill`, `secondary_skill`, `followup_skill`)
+- Verifies full coverage of multiple required skills per task
+

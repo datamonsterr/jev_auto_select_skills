@@ -1,0 +1,122 @@
+[
+  {
+    "id": "complex-01-incident-resolution",
+    "title": "Production Incident: Triage, TDD Regression, Verification, and Conventional Commit",
+    "type": "multi-step",
+    "prompt": "We have an ongoing critical incident in production where our auth microservice exhausts connections and leaks memory under peak traffic.\nStep 1: First, systematically diagnose the root cause of the connection pool leak and memory spikes without jumping to premature conclusions.\nStep 2: Once diagnosed, write a failing unit/integration regression test using test-driven development (TDD red-green-refactor loop) verifying public seams before applying the fix.\nStep 3: Run the test suite and verify evidence with verification-before-completion before claiming the bug is resolved.\nStep 4: Create a conventional git commit with a well-formatted message documenting the fix.",
+    "requiredSkills": ["diagnosing-bugs", "tdd", "verification-before-completion"],
+    "acceptableSkills": ["systematic-debugging", "test-driven-development", "git-commit", "conventional-commits"],
+    "category": "incident-response",
+    "minSkillsExpected": 2
+  },
+  {
+    "id": "complex-02-auth-docs-continuation",
+    "title": "Continuation Task: Distributed Auth Implementation to Sequence Diagrams and Diataxis Docs",
+    "type": "continuation",
+    "prompt": "Continuing from our previous session: We have finished implementing the JWT token refresh rotation and Redis session cache, and all unit tests are green.\nNow let's continue to the handover and documentation phase:\n1. Create a sequence diagram illustrating the OAuth2/JWT refresh handshake between the frontend client, API gateway, and Redis session store using Mermaid syntax.\n2. Write technical API documentation for external consumers structured according to the Diátaxis framework (tutorials, how-to guides, reference, and conceptual explanations).",
+    "requiredSkills": ["mermaid-diagrams", "documentation-writer"],
+    "acceptableSkills": ["documentation"],
+    "category": "documentation",
+    "minSkillsExpected": 2
+  },
+  {
+    "id": "complex-03-enterprise-warehouse-design",
+    "title": "New System Design: BA Elicitation, Domain Modeling, and Relational Database Schema",
+    "type": "multi-step",
+    "prompt": "A major logistics client requested: 'We need an automated warehouse replenishment and inventory tracking platform'.\nPhase 1: Start with business analysis elicitation to challenge assumptions, ask strategic why questions, and uncover root business problems and KPI drivers.\nPhase 2: Build a formal domain model establishing Ubiquitous Language, bounded contexts, and entity relationships.\nPhase 3: Design a normalized relational database schema with table definitions, foreign key constraints, composite index strategies, and ER diagrams.",
+    "requiredSkills": ["ask-why-ba", "domain-modeling", "database-schema-design"],
+    "acceptableSkills": [],
+    "category": "system-design",
+    "minSkillsExpected": 2
+  },
+  {
+    "id": "complex-04-hotfix-worktree-continuation",
+    "title": "Continuation Task: Feature Branch Interruption, Git Worktree Isolation, and Hotfix",
+    "type": "continuation",
+    "prompt": "Continuing work: I am currently midway through developing a large shopping cart refactor with 15 unstaged files on my feature branch. A severity-1 production bug just arrived that needs urgent attention.\nStep 1: Set up an isolated git worktree so I can switch contexts immediately without dirtying or stashing my active feature workspace.\nStep 2: Systematically investigate the bug and reproduce the failure.\nStep 3: After verifying the fix, finish the hotfix branch and create a conventional commit.",
+    "requiredSkills": ["using-git-worktrees", "systematic-debugging"],
+    "acceptableSkills": ["diagnosing-bugs", "git-commit", "conventional-commits", "finishing-a-development-branch"],
+    "category": "git-workflow",
+    "minSkillsExpected": 2
+  },
+  {
+    "id": "complex-05-analytics-dashboard-ui",
+    "title": "Frontend Development: UI/UX Intelligence, Shadcn Components, and Visual Design",
+    "type": "multi-step",
+    "prompt": "We are building an executive financial analytics dashboard from scratch:\nStep 1: Conduct UI/UX design intelligence to establish the product palette, contrast ratios, typography scale, and responsive layout guidelines.\nStep 2: Implement accessible, reusable UI components using Tailwind CSS and shadcn/ui with dark mode theme support.\nStep 3: Apply intentional visual design polish for cards, badges, data tables, and metrics widgets.",
+    "requiredSkills": ["ui-ux-pro-max", "ui-styling"],
+    "acceptableSkills": ["frontend-design"],
+    "category": "frontend",
+    "minSkillsExpected": 2
+  },
+  {
+    "id": "complex-06-k8s-gitops-continuation",
+    "title": "Continuation Task: Service Refactoring to Kubernetes Manifests and ArgoCD GitOps",
+    "type": "continuation",
+    "prompt": "Continuing from the previous turn: The billing microservice refactoring has finished and passed local unit checks.\nNow we must prepare production deployment:\nStep 1: Author and validate Kubernetes deployment, service, and ingress manifests using Kustomize overlays.\nStep 2: Configure the GitOps deployment pipeline using ArgoCD to sync the manifests to staging and production clusters.\nStep 3: Run pre-release quality checks and verify rollout health.",
+    "requiredSkills": ["kubernetes", "gitops"],
+    "acceptableSkills": ["deployment", "quality-checks"],
+    "category": "devops",
+    "minSkillsExpected": 2
+  },
+  {
+    "id": "complex-07-code-review-cycle",
+    "title": "Code Review Workflow: Review Reception, TDD Remediation, and Review Request",
+    "type": "multi-step",
+    "prompt": "A senior engineer reviewed our pull request and raised several technical questions regarding thread safety and edge-case exceptions:\nStep 1: Receive the code review with technical rigor and verify the reviewer's feedback rather than blindly accepting suggestions.\nStep 2: Reproduce the reported concurrency flaw with a test-first approach using TDD red-green-refactor.\nStep 3: Verify all test suites pass and prepare a comprehensive code review request for the team before merging.",
+    "requiredSkills": ["receiving-code-review", "tdd"],
+    "acceptableSkills": ["test-driven-development", "requesting-code-review", "verification-before-completion"],
+    "category": "code-review",
+    "minSkillsExpected": 2
+  },
+  {
+    "id": "complex-08-opencode-batch-continuation",
+    "title": "Continuation Task: Headless OpenCode Pipeline Execution and Conventional Commits",
+    "type": "continuation",
+    "prompt": "Continuing from earlier setup: We have installed opencode CLI in our continuous integration agent runner.\nNow let's automate the multi-package upgrade:\nStep 1: Run opencode in non-interactive CLI mode (`opencode run`) with automated prompt execution across all monorepo packages.\nStep 2: Inspect git diffs, stage package updates, and generate standardized conventional commits for each change.",
+    "requiredSkills": ["opencode", "git-commit"],
+    "acceptableSkills": ["conventional-commits"],
+    "category": "automation",
+    "minSkillsExpected": 2
+  },
+  {
+    "id": "complex-09-arch-rice-setup",
+    "title": "System Administration: Arch Linux Package Triage and Hyprland Rice Customization",
+    "type": "multi-step",
+    "prompt": "I am configuring a new Arch Linux development environment from scratch:\nStep 1: Triage broken pacman dependencies, orphaned libraries, and failing systemd services.\nStep 2: Install and configure a NieR:Automata themed Hyprland, Quickshell, and Waybar desktop rice with custom QML widgets.",
+    "requiredSkills": ["arch-linux-triage", "unit-3-hyprland-nier-rice"],
+    "acceptableSkills": [],
+    "category": "os-configuration",
+    "minSkillsExpected": 2
+  },
+  {
+    "id": "complex-10-agent-handoff-continuation",
+    "title": "Continuation Task: Context Budget Exceeded, Agent Handoff, and Implementation Plan",
+    "type": "continuation",
+    "prompt": "Continuing session: We have conducted extensive architecture research and the context window is near capacity.\nStep 1: Compact the current conversational transcript and findings into a concise, high-density agent handoff document for the next agent session.\nStep 2: Write a detailed, phased implementation plan with task dependencies and review checkpoints before executing changes.",
+    "requiredSkills": ["handoff", "writing-plans"],
+    "acceptableSkills": [],
+    "category": "agent-orchestration",
+    "minSkillsExpected": 2
+  },
+  {
+    "id": "complex-11-usecase-to-userstory",
+    "title": "Requirements Engineering: Use Case Specification to INVEST User Stories with Gherkin AC",
+    "type": "multi-step",
+    "prompt": "We have an unstructured PRD for an automated recurring billing and invoice generation system:\nStep 1: Structure the core workflows into formal Use Case specifications following the 13-field template with normal, alternative, and exception courses.\nStep 2: Decompose the use cases into INVEST-compliant User Stories with Acceptance Criteria formatted in Given-When-Then Gherkin syntax.",
+    "requiredSkills": ["use-case-writer", "user-story-ac-writer"],
+    "acceptableSkills": [],
+    "category": "requirements",
+    "minSkillsExpected": 2
+  },
+  {
+    "id": "complex-12-subagent-dispatch-execution",
+    "title": "Autonomous Execution: Parallel Subagent Dispatching and Plan Execution",
+    "type": "multi-step",
+    "prompt": "We have an approved migration plan with 3 independent tasks that do not share state:\nStep 1: Dispatch parallel agents to concurrently work on separate modules without shared state or sequential dependencies.\nStep 2: Oversee subagent-driven development execution with review checkpoints, running quality checks at each boundary.",
+    "requiredSkills": ["dispatching-parallel-agents", "subagent-driven-development"],
+    "acceptableSkills": ["executing-plans", "quality-checks"],
+    "category": "agent-orchestration",
+    "minSkillsExpected": 2
+  }
+]

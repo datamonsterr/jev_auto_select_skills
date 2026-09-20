@@ -136,43 +136,90 @@ export class JevProvider {
     );
     const criteria = buildSkillCriteria(skills, includeNone);
 
+    // Determine if multi-step questions should be used
+    const isMultiStep =
+      options.multiStep === true ||
+      (options.multiStep !== false &&
+        /(?:step\s*\d|phase\s*\d|continuing|continue|first.*(?:next|then)|after that|subsequent)/i.test(
+          userPrompt
+        ));
+
+    const questions: Record<string, any> = isMultiStep
+      ? {
+          primary_skill: {
+            type: "choice",
+            instructions:
+              "Select the primary skill required for the initial phase or main objective of this task",
+            criteria,
+          },
+          secondary_skill: {
+            type: "choice",
+            instructions:
+              "Select the secondary skill required for subsequent phases or implementation, or 'none'",
+            criteria,
+          },
+          followup_skill: {
+            type: "choice",
+            instructions:
+              "Select any follow-up, continuation, verification, documentation, or git/deployment skill needed, or 'none'",
+            criteria,
+          },
+        }
+      : {
+          selected_skill: {
+            type: "choice",
+            instructions: buildJevInstructions("single"),
+            criteria,
+          },
+        };
+
     const request: JevDecisionRequest = {
       model: activeModel,
       state,
-      questions: {
-        selected_skill: {
-          type: "choice",
-          instructions: buildJevInstructions("single"),
-          criteria,
-        },
-      },
+      questions,
     };
 
     const response = await this.sendDecisionRequest(request);
-    const choiceAnswer = response.answers?.selected_skill;
+    const skillMap = new Map(skills.map((s) => [s.name, s]));
+    const collectedMap = new Map<string, SelectedSkill>();
 
-    if (!choiceAnswer) {
-      return {
-        selectedSkills: [],
-        primarySkill: null,
-        answers: response.answers || {},
-        raw: response,
-      };
+    // Process all choice answers returned from Jev
+    for (const [, choiceAnswer] of Object.entries(response.answers || {})) {
+      if (choiceAnswer.type !== "choice") continue;
+
+      const skillsFromAns = filterSelectedSkills({
+        choice: choiceAnswer.choice,
+        probabilities: choiceAnswer.probabilities || {},
+        confidence: choiceAnswer.confidence || 0,
+        threshold,
+        maxSkills,
+        skillMap,
+      });
+
+      for (const item of skillsFromAns) {
+        const existing = collectedMap.get(item.name);
+        if (!existing || item.probability > existing.probability) {
+          collectedMap.set(item.name, item);
+        }
+      }
     }
 
-    const skillMap = new Map(skills.map((s) => [s.name, s]));
+    const selectedSkills = Array.from(collectedMap.values())
+      .sort((a, b) => b.probability - a.probability)
+      .slice(0, maxSkills);
 
-    const selectedSkills = filterSelectedSkills({
-      choice: choiceAnswer.choice,
-      probabilities: choiceAnswer.probabilities || {},
-      confidence: choiceAnswer.confidence || 0,
-      threshold,
-      maxSkills,
-      skillMap,
-    });
+    // Primary skill is choice from primary_skill, or selected_skill, or top selected skill
+    const primaryChoice =
+      (response.answers?.primary_skill?.choice !== "none"
+        ? response.answers?.primary_skill?.choice
+        : null) ||
+      (response.answers?.selected_skill?.choice !== "none"
+        ? response.answers?.selected_skill?.choice
+        : null) ||
+      selectedSkills[0]?.name ||
+      null;
 
-    const primarySkill =
-      choiceAnswer.choice && choiceAnswer.choice !== "none" ? choiceAnswer.choice : null;
+    const primarySkill = primaryChoice && primaryChoice !== "none" ? primaryChoice : null;
 
     return {
       selectedSkills,

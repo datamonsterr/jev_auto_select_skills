@@ -123,4 +123,57 @@ describe("JevProvider", () => {
       })
     ).rejects.toThrow("Service Unavailable");
   });
+
+  it("supports multi-step and continuation prompts by evaluating multiple questions and aggregating skills", async () => {
+    const mockFetch = mock(async (_url, opts: any) => {
+      const body = JSON.parse(opts.body);
+      expect(body.questions).toHaveProperty("primary_skill");
+      expect(body.questions).toHaveProperty("secondary_skill");
+      expect(body.questions).toHaveProperty("followup_skill");
+
+      return new Response(
+        JSON.stringify({
+          model: "typesafe/jev-1.13-20260917",
+          answers: {
+            primary_skill: {
+              type: "choice",
+              choice: "tdd",
+              probabilities: { tdd: 0.9, "git-commit": 0.1, none: 0 },
+              confidence: 0.9,
+            },
+            secondary_skill: {
+              type: "choice",
+              choice: "git-commit",
+              probabilities: { "git-commit": 0.85, tdd: 0.15, none: 0 },
+              confidence: 0.85,
+            },
+            followup_skill: {
+              type: "choice",
+              choice: "none",
+              probabilities: { none: 0.9, tdd: 0.05, "git-commit": 0.05 },
+              confidence: 0.9,
+            },
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    });
+
+    const provider = new JevProvider({
+      apiKey: "test-key",
+      fetchFn: mockFetch as any,
+    });
+
+    const result = await provider.selectSkills({
+      userPrompt: "Step 1: Write unit tests with TDD. Step 2: Commit changes using conventional commits.",
+      skills: dummySkills,
+      options: { multiStep: true },
+    });
+
+    expect(result.selectedSkills).toHaveLength(2);
+    const names = result.selectedSkills.map((s) => s.name);
+    expect(names).toContain("tdd");
+    expect(names).toContain("git-commit");
+  });
 });
+

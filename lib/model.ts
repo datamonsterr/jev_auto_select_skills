@@ -101,6 +101,7 @@ export interface SkillSelectorOptions {
   includeNone?: boolean;
   retries?: number;
   retryDelayMs?: number;
+  multiStep?: boolean | "auto";
 }
 
 /**
