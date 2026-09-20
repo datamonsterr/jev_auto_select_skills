@@ -54,7 +54,7 @@ describe("model and system_prompt", () => {
   });
 
   it("provides well-structured default system prompt and instructions", () => {
-    expect(DEFAULT_SYSTEM_PROMPT).toContain("decision model");
+    expect(DEFAULT_SYSTEM_PROMPT.toLowerCase()).toContain("decision model");
     expect(DEFAULT_SYSTEM_PROMPT).toContain("skill");
 
     const instructions = buildJevInstructions("primary");

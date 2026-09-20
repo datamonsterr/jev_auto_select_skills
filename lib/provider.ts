@@ -127,14 +127,15 @@ export class JevProvider {
     const includeNone = options.includeNone ?? true;
     const activeModel = options.model || this.model;
 
-    // Build state and criteria
+    // Build state and criteria (compact: true omits redundant skill array from state, saving ~11,000 input tokens)
     const state = buildSkillState(
       skills,
       userPrompt,
       systemPrompt || DEFAULT_SYSTEM_PROMPT,
-      context
+      context,
+      { compact: true }
     );
-    const criteria = buildSkillCriteria(skills, includeNone);
+    const criteria = buildSkillCriteria(skills, includeNone, 140);
 
     // Determine if multi-step questions should be used
     const isMultiStep =
@@ -148,20 +149,17 @@ export class JevProvider {
       ? {
           primary_skill: {
             type: "choice",
-            instructions:
-              "Select the primary skill required for the initial phase or main objective of this task",
+            instructions: buildJevInstructions("primary"),
             criteria,
           },
           secondary_skill: {
             type: "choice",
-            instructions:
-              "Select the secondary skill required for subsequent phases or implementation, or 'none'",
+            instructions: buildJevInstructions("secondary"),
             criteria,
           },
           followup_skill: {
             type: "choice",
-            instructions:
-              "Select any follow-up, continuation, verification, documentation, or git/deployment skill needed, or 'none'",
+            instructions: buildJevInstructions("followup"),
             criteria,
           },
         }

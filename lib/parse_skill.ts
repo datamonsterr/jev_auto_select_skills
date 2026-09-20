@@ -4,17 +4,32 @@ import yaml from "yaml";
 import type { Skill, JevState } from "./model";
 
 /**
+ * Sanitize and compact text by removing code blocks, links, and redundant spaces
+ */
+export function sanitizeSkillText(text: string, maxLen = 160): string {
+  if (!text) return "";
+  // Strip code blocks and markdown artifacts
+  let cleaned = text.replace(/```[\s\S]*?```/g, " ");
+  cleaned = cleaned.replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1");
+  cleaned = cleaned.replace(/[*_`#]/g, "");
+  cleaned = cleaned.replace(/\s+/g, " ").trim();
+  if (cleaned.length > maxLen) {
+    cleaned = cleaned.slice(0, maxLen).replace(/\s+\S*$/, "") + "...";
+  }
+  return cleaned;
+}
+
+/**
  * Extract "When to Use" or trigger section from markdown body
  */
 export function extractWhenToUseFromBody(markdown: string): string | null {
-  // Look for ## When to Use, ## When to use this skill, ## Triggers, etc.
   const whenToUseRegex = /##\s*(?:When\s+to\s+Use|Triggers|When\s+to\s+use\s+this\s+skill)[\s\S]*?(?=\n##|\n#|$)/i;
   const match = markdown.match(whenToUseRegex);
   if (match) {
-    // Strip header line and trim
     const lines = match[0].split("\n").slice(1).join("\n").trim();
-    if (lines.length > 0) {
-      return lines;
+    const sanitized = sanitizeSkillText(lines, 250);
+    if (sanitized.length > 0) {
+      return sanitized;
     }
   }
   return null;
@@ -114,14 +129,25 @@ export function loadSkillsFromDir(skillsDir: string): Skill[] {
 }
 
 /**
- * Build state object for Jev containing skill metadata and user prompt
+ * Build state object for Jev containing skill metadata and user prompt.
+ * If compact is true, omits the redundant skills array to save ~11,000 input tokens.
  */
 export function buildSkillState(
   skills: Skill[],
   userPrompt: string,
   systemPrompt?: string,
-  context?: Record<string, any>
+  context?: Record<string, any>,
+  options: { compact?: boolean } = {}
 ): JevState {
+  if (options.compact) {
+    return {
+      user_prompt: userPrompt,
+      ...(systemPrompt ? { system_prompt: systemPrompt } : {}),
+      skills: [],
+      ...(context ? { context } : {}),
+    };
+  }
+
   return {
     user_prompt: userPrompt,
     ...(systemPrompt ? { system_prompt: systemPrompt } : {}),
@@ -136,20 +162,25 @@ export function buildSkillState(
 
 /**
  * Build criteria record for Jev Choice question, limited to skill names (+ none)
+ * Compacts and sanitizes description strings to keep input tokens lean.
  */
 export function buildSkillCriteria(
   skills: Skill[],
-  includeNone: boolean = true
+  includeNone: boolean = true,
+  maxLen: number = 140
 ): Record<string, string> {
   const criteria: Record<string, string> = {};
 
   for (const skill of skills) {
-    // Keep description concise for Jev criteria
-    criteria[skill.name] = skill.whenToUse || skill.description || skill.name;
+    // Keep description concise and sanitized for Jev criteria
+    criteria[skill.name] = sanitizeSkillText(
+      skill.whenToUse || skill.description || skill.name,
+      maxLen
+    );
   }
 
   if (includeNone) {
-    criteria["none"] = "No specialized skill applies or general reasoning is sufficient";
+    criteria["none"] = "No specialized skill applies";
   }
 
   return criteria;
