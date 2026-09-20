@@ -1,0 +1,31 @@
+{
+  "name": "jev-skill-selector",
+  "version": "1.0.0",
+  "description": "Agent tool using TypeSafe Jev decision model on OpenRouter to dynamically select skills from a skill bank",
+  "main": "index.ts",
+  "module": "index.ts",
+  "type": "module",
+  "bin": {
+    "jev-skill-selector": "./index.ts"
+  },
+  "scripts": {
+    "start": "bun run index.ts",
+    "test": "bun test tests/",
+    "test:golden": "bun run scripts/test-golden.ts",
+    "hook": "bun run scripts/run-hook.ts",
+    "hook:codex": "bun run hooks/codex.ts",
+    "hook:claude": "bun run hooks/claude.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^4.0.71",
+    "ai": "^7.0.107",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.5"
+  }
+}

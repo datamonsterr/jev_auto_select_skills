@@ -1,0 +1,74 @@
+[
+  {
+    "id": "case-01-tdd",
+    "prompt": "We need to refactor the payment calculation service. I want to use red-green-refactor cycle and write unit tests against public interfaces before touching any implementation code.",
+    "expectedSkills": ["tdd", "test-driven-development"],
+    "category": "testing"
+  },
+  {
+    "id": "case-02-debugging",
+    "prompt": "Our production worker is leaking memory and CPU usage spikes to 100% every 2 hours. Help me systematically diagnose the root cause and inspect the traces before proposing any quick fix.",
+    "expectedSkills": ["diagnosing-bugs", "systematic-debugging"],
+    "category": "debugging"
+  },
+  {
+    "id": "case-03-git-commit",
+    "prompt": "I made several changes across multiple files for fixing the auth token refresh bug. Stage the relevant changes and create a git commit following conventional commits format.",
+    "expectedSkills": ["git-commit", "conventional-commits"],
+    "category": "git"
+  },
+  {
+    "id": "case-04-gitops-k8s",
+    "prompt": "Configure an ArgoCD Application manifest to deploy our microservice to the staging Kubernetes cluster using GitOps principles and Kustomize overlays.",
+    "expectedSkills": ["gitops", "kubernetes", "deployment"],
+    "category": "devops"
+  },
+  {
+    "id": "case-05-db-schema",
+    "prompt": "Design a relational database schema for a subscription SaaS platform including entities, foreign key constraints, composite indexes for query optimization, and an ER diagram.",
+    "expectedSkills": ["database-schema-design"],
+    "category": "database"
+  },
+  {
+    "id": "case-06-ui-styling",
+    "prompt": "Build an accessible data table component using shadcn/ui and Tailwind CSS with sortable headers, search filter, and dark mode palette support.",
+    "expectedSkills": ["ui-styling", "ui-ux-pro-max", "frontend-design"],
+    "category": "frontend"
+  },
+  {
+    "id": "case-07-ba-elicitation",
+    "prompt": "The marketing manager says 'we need an AI search bar on the homepage'. Help me conduct a business analysis discovery workshop, uncover real business needs, and ask strategic why questions to challenge assumptions.",
+    "expectedSkills": ["ask-why-ba"],
+    "category": "requirements"
+  },
+  {
+    "id": "case-08-opencode-cli",
+    "prompt": "How do I run opencode in non-interactive CLI mode with a specific Anthropic model to batch process code refactoring in our GitHub Actions pipeline?",
+    "expectedSkills": ["opencode"],
+    "category": "tooling"
+  },
+  {
+    "id": "case-09-worktrees",
+    "prompt": "I need to work on a high-priority bug fix while keeping my current uncommitted feature branch untouched. Create an isolated git worktree so I can work in parallel.",
+    "expectedSkills": ["using-git-worktrees"],
+    "category": "git"
+  },
+  {
+    "id": "case-10-mermaid",
+    "prompt": "Draw a sequence diagram visualizing the OAuth2 authorization code flow with PKCE between client, authorization server, and resource server using mermaid syntax.",
+    "expectedSkills": ["mermaid-diagrams"],
+    "category": "documentation"
+  },
+  {
+    "id": "case-11-diataxis-docs",
+    "prompt": "Structure our developer documentation following the Diátaxis framework with separate tutorials, how-to guides, reference material, and technical explanations.",
+    "expectedSkills": ["documentation-writer", "documentation"],
+    "category": "documentation"
+  },
+  {
+    "id": "case-12-verification",
+    "prompt": "I am about to claim this bug fix is complete and merge the PR. I must run the test suite and linters to verify evidence before asserting completion.",
+    "expectedSkills": ["verification-before-completion", "quality-checks"],
+    "category": "quality"
+  }
+]
