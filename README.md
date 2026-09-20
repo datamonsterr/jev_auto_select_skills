@@ -221,7 +221,7 @@ bun run index.ts --json "Diagnose memory leak in auth microservice"
 ## 🧪 Testing & Benchmarks
 
 ```bash
-# Run unit and integration tests (23/23 passing)
+# Run unit and integration tests (25/25 passing)
 bun test
 
 # Run single-focus golden set evaluation (12/12 passing)
@@ -229,4 +229,39 @@ bun run test:golden
 
 # Run complex multi-step and continuation benchmark (12/12 passing)
 bun run test:complex
+
+# Run public online dataset benchmark (MetaTool / ToolE)
+bun run test:benchmark
 ```
+
+### 🌐 Online Dataset Benchmark: MetaTool (ToolE)
+
+We benchmarked the **TypeSafe Jev Decision Model** against the standardized [MetaTool (ToolE)](https://github.com/HowieHwong/MetaTool) dataset (referenced on Hugging Face). The benchmark evaluates a bank of 47 candidate tools across three critical challenges:
+1. **Multi-Tool Routing**: Identifying multiple distinct tools required in a single user prompt (e.g. Finance + News, Rental Search + Maps).
+2. **Single-Tool Precision**: Disambiguating specific tools (e.g. Repository Analysis, Legal Lookup, Natural Disasters, NASA Imagery).
+3. **Tool-Usage Awareness**: Correctly deciding **NOT** to invoke tools (`none`) on conversational or pure reasoning queries, preventing false triggers.
+
+#### Benchmark Execution Results (`bun run test:benchmark`)
+
+- **Dataset:** MetaTool / ToolE (`golden_set/metatool_benchmark.json`)
+- **Candidate Bank:** 47 tools (`golden_set/metatool_tools.json`)
+- **Model:** `~typesafe/jev-latest` via OpenRouter
+- **Overall Accuracy:** **12 / 12 (100.0%)**
+- **Average Latency:** **460 ms / decision**
+
+| Case ID | Category | Expected Ground Truth | Actual Primary | Selected Skills (Top 2) | Confidence | Latency | Status |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| `meta-01-finance-news` | Multi-Tool | `FinanceTool`, `NewsTool` | `FinanceTool` | `FinanceTool`, `NewsTool` | 91% | 808 ms | **PASS** ✅ |
+| `meta-02-finance-course` | Multi-Tool | `FinanceTool`, `CourseTool` | `FinanceTool` | `FinanceTool`, `CourseTool` | 78% | 459 ms | **PASS** ✅ |
+| `meta-03-house-map` | Multi-Tool | `HouseRentingTool`, `MapTool` | `HouseRentingTool` | `HouseRentingTool`, `MapTool` | 93% | 503 ms | **PASS** ✅ |
+| `meta-04-weather-trip` | Multi-Tool | `WeatherTool`, `TripTool` | `WeatherTool` | `WeatherTool`, `TripAdviceTool` | 39% | 463 ms | **PASS** ✅ |
+| `meta-05-job-resume` | Multi-Tool | `JobTool`, `ResumeTool` | `JobTool` | `JobTool` | 100% | 381 ms | **PASS** ✅ |
+| `meta-06-chart-data` | Multi-Tool | `ChartTool`, `DataRetrievalTool` | `ChartTool` | `ChartTool` | 98% | 461 ms | **PASS** ✅ |
+| `meta-07-repo-search` | Single-Tool | `RepoTool` | `RepoTool` | `RepoTool` | 100% | 401 ms | **PASS** ✅ |
+| `meta-08-law-search` | Single-Tool | `LawTool` | `LawTool` | `LawTool` | 99% | 442 ms | **PASS** ✅ |
+| `meta-09-earthquake` | Single-Tool | `EarthquakeTool` | `EarthquakeTool` | `EarthquakeTool` | 98% | 454 ms | **PASS** ✅ |
+| `meta-10-nasa` | Single-Tool | `NASATool` | `NASATool` | `NASATool` | 99% | 384 ms | **PASS** ✅ |
+| `meta-11-awareness-chat` | Awareness | *none (no tool)* | `none` | *empty* | 0% | 378 ms | **PASS** ✅ |
+| `meta-12-awareness-math` | Awareness | *none (no tool)* | `none` | *empty* | 0% | 388 ms | **PASS** ✅ |
+
+Detailed JSON metrics and execution logs are saved to `test-results/metatool_benchmark_report.json`.

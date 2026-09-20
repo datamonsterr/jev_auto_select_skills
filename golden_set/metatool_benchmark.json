@@ -1,0 +1,87 @@
+[
+  {
+    "id": "meta-01-finance-news",
+    "category": "multi_tool",
+    "prompt": "I want to know the latest news about Tesla and how it has impacted the stock market.",
+    "expectedTools": ["FinanceTool", "NewsTool"],
+    "description": "MetaTool test query requiring financial analysis and breaking news retrieval"
+  },
+  {
+    "id": "meta-02-finance-course",
+    "category": "multi_tool",
+    "prompt": "How can I invest my savings wisely and also learn about financial planning?",
+    "expectedTools": ["FinanceTool", "CourseTool"],
+    "description": "MetaTool test query requiring finance tools and educational course recommendations"
+  },
+  {
+    "id": "meta-03-house-map",
+    "category": "multi_tool",
+    "prompt": "Find me an apartment to rent in Seattle and calculate distance on the map to university.",
+    "expectedTools": ["HouseRentingTool", "MapTool"],
+    "description": "MetaTool test query combining rental property search and geolocation mapping"
+  },
+  {
+    "id": "meta-04-weather-trip",
+    "category": "multi_tool",
+    "prompt": "Can you check the weather in Tokyo next week and recommend hotel accommodations?",
+    "expectedTools": ["WeatherTool", "TripTool"],
+    "acceptableTools": ["WeatherTool", "TripTool", "TripAdviceTool"],
+    "description": "MetaTool test query combining weather forecast and travel accommodations"
+  },
+  {
+    "id": "meta-05-job-resume",
+    "category": "multi_tool",
+    "prompt": "Help me search for senior software engineering jobs in Berlin and improve my CV.",
+    "expectedTools": ["JobTool", "ResumeTool"],
+    "description": "MetaTool test query for career opportunities and resume optimization"
+  },
+  {
+    "id": "meta-06-chart-data",
+    "category": "multi_tool",
+    "prompt": "Plot a bar chart of our monthly revenue metrics using matplotlib and retrieve our quarterly sales report.",
+    "expectedTools": ["ChartTool", "DataRetrievalTool"],
+    "description": "MetaTool test query for data retrieval and chart generation"
+  },
+  {
+    "id": "meta-07-repo-search",
+    "category": "single_tool",
+    "prompt": "Discover top-trending GitHub repositories for LLM agents and inspect their repository architecture.",
+    "expectedTools": ["RepoTool"],
+    "description": "MetaTool single-tool test query for GitHub repository exploration"
+  },
+  {
+    "id": "meta-08-law-search",
+    "category": "single_tool",
+    "prompt": "Search for recent copyright and intellectual property laws regarding artificial intelligence training data.",
+    "expectedTools": ["LawTool"],
+    "description": "MetaTool single-tool test query for legal information lookup"
+  },
+  {
+    "id": "meta-09-earthquake",
+    "category": "single_tool",
+    "prompt": "Send me real-time emergency earthquake alerts and notifications for the Pacific Rim.",
+    "expectedTools": ["EarthquakeTool"],
+    "description": "MetaTool single-tool test query for natural hazard notifications"
+  },
+  {
+    "id": "meta-10-nasa",
+    "category": "single_tool",
+    "prompt": "Explore space imagery and search NASA media library for high-resolution images of the James Webb telescope.",
+    "expectedTools": ["NASATool"],
+    "description": "MetaTool single-tool test query for NASA space library exploration"
+  },
+  {
+    "id": "meta-11-awareness-chat",
+    "category": "tool_awareness",
+    "prompt": "Tell me a short creative joke about a duck walking into a library.",
+    "expectedTools": [],
+    "description": "MetaTool tool-usage awareness query where no tool is needed"
+  },
+  {
+    "id": "meta-12-awareness-math",
+    "category": "tool_awareness",
+    "prompt": "Can you multiply 384 by 12 directly?",
+    "expectedTools": [],
+    "description": "MetaTool tool-usage awareness query expecting direct answer without external tools"
+  }
+]

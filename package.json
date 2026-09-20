@@ -13,6 +13,7 @@
     "test": "bun test tests/",
     "test:golden": "bun run scripts/test-golden.ts",
     "test:complex": "bun run scripts/test-complex.ts",
+    "test:benchmark": "bun run scripts/benchmark-online.ts",
     "hook": "bun run scripts/run-hook.ts",
     "hook:codex": "bun run hooks/codex.ts",
     "hook:claude": "bun run hooks/claude.ts"
