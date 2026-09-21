@@ -51,7 +51,14 @@ elif [ -d "$SCRIPT_DIR/skills" ]; then
   while IFS= read -r -d '' item; do copy_skill_tree "$item"; done \
     < <(find -P "$SCRIPT_DIR/skills" -mindepth 1 -maxdepth 1 -type d -print0)
 fi
-mkdir -p "$HOME/.agents/skills"
+# Fallback skill for harnesses that do not support hooks:
+# Install jev-skill-selector as the ONLY skill in standard agent directories
+mkdir -p "$HOME/.agents/skills/jev-skill-selector"
+cp -aL "$SCRIPT_DIR/SKILL.md" "$HOME/.agents/skills/jev-skill-selector/SKILL.md"
+mkdir -p "$HOME/.claude/skills/jev-skill-selector"
+cp -aL "$SCRIPT_DIR/SKILL.md" "$HOME/.claude/skills/jev-skill-selector/SKILL.md"
+mkdir -p "$HOME/.codex/skills/jev-skill-selector"
+cp -aL "$SCRIPT_DIR/SKILL.md" "$HOME/.codex/skills/jev-skill-selector/SKILL.md"
 mkdir -p "$SKILLS_BANK/jev-skill-selector"
 cp -aL "$SCRIPT_DIR/SKILL.md" "$SKILLS_BANK/jev-skill-selector/SKILL.md"
 
@@ -80,7 +87,7 @@ bun -e '
   if (!group) { group = { hooks: [] }; data.hooks.UserPromptSubmit.push(group); }
   group.hooks ??= [];
   if (!group.hooks.some((hook) => hook.command === command)) {
-    group.hooks.push({ type: "command", command, timeout: 30, additionalContextLimit: 5000 });
+    group.hooks.push({ type: "command", command, timeout: 30, additionalContextLimit: 50000 });
   }
   fs.writeFileSync(path, JSON.stringify(data, null, 2) + "\n");
 ' "$CODEX_HOOKS" "bun run $SCRIPT_DIR/hooks/codex.ts"

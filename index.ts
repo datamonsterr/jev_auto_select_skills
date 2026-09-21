@@ -7,6 +7,7 @@ import {
   type SkillSelectorOptions,
   type UsageMetrics,
   formatSkillSummary,
+  formatSkillContent,
 } from "./lib/model";
 import { JevProvider } from "./lib/provider";
 import { loadSkillsFromDir, parseSkillFile, parseSkillContent } from "./lib/parse_skill";
@@ -123,6 +124,7 @@ export {
   parseSkillFile,
   parseSkillContent,
   formatSkillSummary,
+  formatSkillContent,
   DEFAULT_SYSTEM_PROMPT,
 };
 export type { Skill, SelectedSkill, SkillSelectionResult, SkillSelectorOptions, UsageMetrics };
@@ -161,22 +163,19 @@ export async function selectSkills(params: {
   });
 }
 
-/**
- * CLI Handler
- */
-async function main() {
-  const args = process.argv.slice(2);
-
-  if (args.length === 0 && process.stdin.isTTY) {
-    console.log(`
+function printHelp(): void {
+  console.log(`
 Jev Skill Selector (TypeSafe Jev System One Model)
 Usage:
   bun run index.ts "<user prompt>" [options]
-  bun run index.ts --prompt "<user prompt>" [options]
+  bun run index.ts --prompt "<user prompt>" --content
+  bun run index.ts --skill "<skill-name>"
   echo '{"userPrompt": "..."}' | bun run index.ts
 
 Options:
   --prompt, -p <text>      The user prompt / task to evaluate
+  --content, -c            Output full SKILL.md instructions for selected skills (use if harness cannot use hooks)
+  --skill, -k <name>       Fetch and print content of a specific skill directly by name
   --system, -s <text>      Optional system prompt or instructions
   --skills-dir, -d <path>  Path to skills directory (default: agent ./.agents/jev_skills and global ~/.agents/jev_skills)
   --threshold, -t <num>    Probability threshold (default: 0.05)
@@ -184,23 +183,39 @@ Options:
   --json                   Output results as JSON
   --help, -h               Show this help message
 `);
+}
+
+/**
+ * CLI Handler
+ */
+async function main() {
+  const args = process.argv.slice(2);
+
+  if (args.length === 0 && process.stdin.isTTY) {
+    printHelp();
     process.exit(0);
   }
 
   let prompt = "";
+  let directSkillName: string | undefined;
   let systemPrompt: string | undefined;
   let customSkillsDir: string | undefined;
   let threshold = 0.05;
   let maxSkills = 3;
   let jsonOutput = false;
+  let showContent = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === "--help" || arg === "-h") {
-      main();
+      printHelp();
       return;
     } else if (arg === "--prompt" || arg === "-p") {
       prompt = args[++i] || "";
+    } else if (arg === "--content" || arg === "-c") {
+      showContent = true;
+    } else if (arg === "--skill" || arg === "-k") {
+      directSkillName = args[++i];
     } else if (arg === "--system" || arg === "-s") {
       systemPrompt = args[++i];
     } else if (arg === "--skills-dir" || arg === "-d") {
@@ -216,6 +231,26 @@ Options:
     }
   }
 
+  // Handle direct skill lookup
+  if (directSkillName) {
+    const searchDirs = resolveSkillsSearchPaths({ skillsDir: customSkillsDir });
+    const allSkills = loadSkillsFromDir(searchDirs);
+    const found = allSkills.find(
+      (s) => s.name.toLowerCase() === directSkillName!.toLowerCase()
+    );
+    if (!found) {
+      console.error(`Skill "${directSkillName}" not found in search paths: ${searchDirs.join(", ")}`);
+      process.exit(1);
+    }
+    const content = found.path && fs.existsSync(found.path) ? fs.readFileSync(found.path, "utf-8") : found.description;
+    if (jsonOutput) {
+      console.log(JSON.stringify({ skill: found, content }, null, 2));
+    } else {
+      console.log(`\n### Skill: ${found.name}\n*Path: ${found.path || "embedded"}*\n\n${content}`);
+    }
+    return;
+  }
+
   // Handle stdin if no prompt provided via args
   if (!prompt && !process.stdin.isTTY) {
     const chunks: Buffer[] = [];
@@ -228,6 +263,7 @@ Options:
         const parsed = JSON.parse(input);
         prompt = parsed.userPrompt || parsed.prompt || parsed.task || input;
         if (parsed.systemPrompt) systemPrompt = parsed.systemPrompt;
+        if (parsed.content || parsed.showContent) showContent = true;
       } catch {
         prompt = input;
       }
@@ -244,11 +280,13 @@ Options:
       userPrompt: prompt,
       systemPrompt,
       skillsDir: customSkillsDir,
-      options: { threshold, maxSkills },
+      options: { threshold, maxSkills, includeContent: showContent },
     });
 
     if (jsonOutput) {
       console.log(JSON.stringify(result, null, 2));
+    } else if (showContent) {
+      console.log("\n" + formatSkillContent(result.selectedSkills, { userPrompt: prompt }));
     } else {
       console.log("\n🎯 Jev Skill Selection Result");
       console.log(`Prompt: "${prompt}"`);

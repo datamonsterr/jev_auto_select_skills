@@ -1,8 +1,8 @@
 # Jev Skill Selector
 
-A high-performance agent router and skill selection tool powered by the **TypeSafe Jev System One** decision model on OpenRouter (`~typesafe/jev-latest`).
+High-performance, calibrated agent router powered by the **TypeSafe Jev System One** decision model on OpenRouter (`~typesafe/jev-latest`).
 
-Instead of polluting agent context windows by loading 70+ skills on startup, Jev evaluates each user prompt against your centralized skill bank in a single parallel tensor pass (~400–700ms) and returns only the 1–3 necessary skills for that specific task.
+Instead of polluting your agent's context window by loading 70+ skills on startup, Jev evaluates each prompt against your skill bank in a single parallel tensor pass (~400–700ms) and dynamically injects **only the necessary skills and their complete instructions** for that specific task.
 
 ```
 git remote: https://github.com/datamonsterr/jev_auto_select_skills.git
@@ -10,85 +10,46 @@ git remote: https://github.com/datamonsterr/jev_auto_select_skills.git
 
 ---
 
-## ⚡ Quick Machine Setup (Automated)
+## 🏛 Architecture: Hooks vs. Skills
 
-We provide automated setup scripts for Linux/macOS (`.sh`) and Windows (`.ps1`). These scripts:
-1. Consolidate and back up all existing skills from `~/.agents/skills`, `~/.claude/skills`, `~/.codex/skills` into a centralized bank (`~/.agents/skills_bank`).
-2. Package and install `jev-skill-selector` as the active gatekeeper skill in `~/.agents/skills/jev-skill-selector`.
-3. Configure **Claude Code** and **Codex** hooks to automatically execute Jev on **every user prompt**.
-4. Install the **OpenCode** plugin into `~/.config/opencode/plugin/`.
+We prioritize a **two-tier architecture** for agent harnesses:
 
-### Linux / macOS:
+| Priority | Strategy | How It Works | Context Bloat | Supported Harnesses |
+| :--- | :--- | :--- | :--- | :--- |
+| **Priority 1 (Recommended)** | **Lifecycle Hooks & Plugins** | Intercepts user prompt before LLM plans, runs Jev inference (~400ms), and injects matching `SKILL.md` content directly into context. | **0 static skills loaded.** Only relevant skill(s) injected per turn. | Claude Code, Codex, OpenCode, Antigravity |
+| **Priority 2 (Fallback)** | **Router Agent Skill** | For harnesses without lifecycle hooks. Install only `jev-skill-selector` into the agent's skills folder. The agent invokes `bun run index.ts "<prompt>" --content` on demand. | **Only 1 skill loaded.** Dynamic retrieval of content when required. | Any agent supporting skills / CLI tools |
+
+---
+
+## ⚡ 1-Step Automated Setup
+
+We provide automated setup scripts for Linux/macOS and Windows:
 
 ```bash
-# 1. Clone repository
-git clone https://github.com/datamonsterr/jev_auto_select_skills.git ~/dev/jev_auto_select_skills
-cd ~/dev/jev_auto_select_skills
-bun install
-
-# 2. Run automated consolidation & hook setup
+# Linux / macOS
 chmod +x scripts/backup-and-setup.sh
 ./scripts/backup-and-setup.sh
 ```
 
-### Windows (PowerShell):
-
 ```powershell
-# 1. Clone repository
-git clone https://github.com/datamonsterr/jev_auto_select_skills.git $HOME\dev\jev_auto_select_skills
-cd $HOME\dev\jev_auto_select_skills
-bun install
-
-# 2. Run automated setup
+# Windows (PowerShell)
 .\scripts\backup-and-setup.ps1
 ```
 
----
-
-## 🛠 Manual Configuration Guide
-
-### 1. Environment Variables (`.env` or Shell Profile)
-
-Set the following in your shell profile (`~/.bashrc`, `~/.zshrc`) or create a `.env` in the skill root:
-
-```bash
-# Required: OpenRouter API key for TypeSafe Jev model
-export OPENROUTER_API_KEY="sk-or-v1-your-openrouter-key-here"
-# Optional alias
-# export JEV_API_KEY="sk-or-v1-your-openrouter-key-here"
-
-# Model slug
-export MODEL="~typesafe/jev-latest"
-
-# Skills Bank path configuration (optional)
-# By default reads both:
-#  - Agent skills: ./.agents/jev_skills
-#  - Global skills: ~/.agents/jev_skills/
-#
-# Override global skills directory:
-# export GLOBAL_SKILLS_PATH="$HOME/.agents/jev_skills"
-#
-# Override agent skills directory:
-# export AGENT_SKILLS_PATH="./.agents/jev_skills"
-#
-# Override all search paths with a single custom bank:
-# export SKILLS_BANK_PATH="/custom/path/to/skills"
-```
-
-The selector automatically resolves and merges skills with project-level precedence:
-1. `--skills-dir <path>` CLI argument or programmatic option
-2. `process.env.SKILLS_BANK_PATH` / `process.env.SKILLS_DIR`
-3. Agent skills directory: `process.env.AGENT_SKILLS_PATH` or `./.agents/jev_skills`
-4. Global skills directory: `process.env.GLOBAL_SKILLS_PATH` or `~/.agents/jev_skills/`
-5. Legacy fallbacks: `~/.agents/skills_bank`, `~/.gemini/config/skills`, `./skills`
+**What the setup script automates:**
+1. **Backs up & consolidates skills:** Copies existing skills from `~/.agents/skills`, `~/.claude/skills`, `~/.codex/skills` into a centralized bank (`~/.agents/jev_skills/`).
+2. **Configures Priority 1 Hooks:** Registers `UserPromptSubmit` hooks in Claude Code (`~/.claude/settings.json`) and Codex (`~/.codex/hooks.json`), OpenCode plugin, and Antigravity plugin.
+3. **Installs Priority 2 Fallback Skill:** Leaves only `jev-skill-selector` in `~/.agents/skills/jev-skill-selector` so harnesses without hooks don't load 70+ static skills.
 
 ---
 
-### 2. Claude Code Hook & Plugin Setup
+## 🔌 Priority 1: Agent Harness Hook Configurations
 
-Claude Code supports event hooks in `~/.claude/settings.json` and agent plugins via `.claude-plugin/plugin.json`.
+Hooks automatically trigger on prompt submission, run Jev decision inference, and inject the full `SKILL.md` content into the agent's turn.
 
-#### Option A: Hook Configuration (`~/.claude/settings.json`)
+### 1. Claude Code Hook (`~/.claude/settings.json`)
+Add the `UserPromptSubmit` command hook:
+
 ```json
 {
   "hooks": {
@@ -97,7 +58,7 @@ Claude Code supports event hooks in `~/.claude/settings.json` and agent plugins 
         "hooks": [
           {
             "type": "command",
-            "command": "bun run /path/to/jev_skill_selector/hooks/claude.ts",
+            "command": "bun run /absolute/path/to/jev_skill_selector/hooks/claude.ts",
             "timeout": 30
           }
         ]
@@ -106,28 +67,10 @@ Claude Code supports event hooks in `~/.claude/settings.json` and agent plugins 
   }
 }
 ```
+*Alternatively, install via plugin spec: `.claude-plugin/plugin.json`.*
 
-#### Option B: Agent Plugin (`.claude-plugin/plugin.json`)
-This repo includes a validated Claude Code plugin. Install it via `claude plugin install` or point to `plugins/claude/plugin.json`.
-
-**How it works:**
-- When a prompt is submitted in Claude Code, Claude provides the prompt event JSON on stdin.
-- `hooks/claude.ts` queries Jev against your skills bank and returns the Claude hook wire format:
-  ```json
-  {
-    "hookSpecificOutput": {
-      "hookEventName": "UserPromptSubmit",
-      "additionalContext": "### Recommended Agent Skills\n- **database-schema-design** ..."
-    }
-  }
-  ```
-- Claude Code automatically injects the matching skills into the context.
-
----
-
-### 3. Codex Hook & Plugin Setup
-
-Codex supports hooks via `~/.codex/hooks.json` and agent plugins via `.codex-plugin/plugin.json`.
+### 2. Codex Hook (`~/.codex/hooks.json`)
+Add the `UserPromptSubmit` hook with ample context limit for full skill content:
 
 ```json
 {
@@ -138,9 +81,9 @@ Codex supports hooks via `~/.codex/hooks.json` and agent plugins via `.codex-plu
         "hooks": [
           {
             "type": "command",
-            "command": "bun run /path/to/jev_skill_selector/hooks/codex.ts",
+            "command": "bun run /absolute/path/to/jev_skill_selector/hooks/codex.ts",
             "timeout": 30,
-            "additionalContextLimit": 5000
+            "additionalContextLimit": 50000
           }
         ]
       }
@@ -148,82 +91,123 @@ Codex supports hooks via `~/.codex/hooks.json` and agent plugins via `.codex-plu
   }
 }
 ```
+*Alternatively, install via plugin spec: `.codex-plugin/plugin.json`.*
 
-**How it works:**
-- When Codex receives a prompt, it sends `{ "prompt": "<user prompt>" }` to `hooks/codex.ts`.
-- Jev selects the relevant skills and returns the wire contract:
-  ```json
-  {
-    "hookSpecificOutput": {
-      "hookEventName": "UserPromptSubmit",
-      "additionalContext": "### Recommended Agent Skills\n- **tdd** ..."
-    }
-  }
-  ```
-- Codex injects this context directly into the agent planning phase.
-
----
-
-### 4. OpenCode Plugin Setup
-
-OpenCode loads TypeScript plugins from `.opencode/plugin/` or `~/.config/opencode/plugin/`, or via `"plugin"` in `opencode.json`.
-
-1. Copy [`plugins/opencode.ts`](plugins/opencode.ts) to your OpenCode plugin directory:
+### 3. OpenCode Plugin
+1. Copy [`plugins/opencode.ts`](plugins/opencode.ts) to OpenCode's plugin directory:
    ```bash
    mkdir -p ~/.config/opencode/plugin
-   cp /path/to/jev_skill_selector/plugins/opencode.ts ~/.config/opencode/plugin/jev-skill-selector.ts
+   cp /absolute/path/to/jev_skill_selector/plugins/opencode.ts ~/.config/opencode/plugin/jev-skill-selector.ts
    ```
-
-2. Or register it in `~/.config/opencode/opencode.json`:
+2. Or register in `~/.config/opencode/opencode.json`:
    ```json
    {
-     "plugin": [
-       "/path/to/jev_skill_selector/plugins/opencode.ts"
-     ],
-     "skills": {
-       "paths": [
-         "~/.agents/jev_skills"
-       ]
-     }
+     "plugin": ["/absolute/path/to/jev_skill_selector/plugins/opencode.ts"],
+     "skills": { "paths": ["~/.agents/jev_skills"] }
    }
    ```
+*Includes `messages.transform` hook and `select_skill` tool.*
 
-**Features in OpenCode:**
-- `"experimental.chat.messages.transform"` hook: Automatically enriches model-visible messages with matching skill instructions before LLM execution.
-- `"experimental.chat.system.transform"` hook: Supports system prompt transformation.
-- `select_skill` tool: Allows OpenCode models to dynamically query the skill bank during complex autonomous runs.
+### 4. Antigravity Hook
+Antigravity automatically executes `hooks/antigravity.ts` on prompt invocation and receives an ephemeral context message with the selected skill instructions.
 
 ---
 
-## ➕ How to Add New Skills to Your Bank
+## 📦 Priority 2: Fallback Skill (When Harness Cannot Use Hooks)
 
-Once your machine is configured, **never worry about skill context bloat again**.
+If an agent harness does not support lifecycle hooks, install `jev-skill-selector` as a skill in your harness's skill folder (`~/.agents/skills/jev-skill-selector`):
 
-To add a new skill, create a directory with a `SKILL.md` inside your global skills bank (`~/.agents/jev_skills`) or project-local bank (`./.agents/jev_skills`):
+### Get Full Skill Content for a Task
+When the agent needs specialized guidance for a prompt, run:
+```bash
+bun run index.ts "<user prompt or task>" --content
+```
+
+**Output:**
+```markdown
+### Recommended Agent Skills
+🎯 **[Jev Dynamic Skill Routing]**
+Task: "Refactor payment service with TDD and make a git commit"
+The following specialized skills have been selected for this prompt:
+
+• **tdd** (Probability: 65.0% | Confidence: 88%)
+  - Path: `/home/dat/.agents/jev_skills/tdd/SKILL.md`
+• **git-commit** (Probability: 32.0% | Confidence: 88%)
+  - Path: `/home/dat/.agents/jev_skills/git-commit/SKILL.md`
+
+---
+## Skill: tdd
+*Location: `/home/dat/.agents/jev_skills/tdd/SKILL.md`*
+
+<full content of tdd/SKILL.md>
+
+---
+## Skill: git-commit
+*Location: `/home/dat/.agents/jev_skills/git-commit/SKILL.md`*
+
+<full content of git-commit/SKILL.md>
+```
+
+### Direct Skill Inspection by Name
+```bash
+bun run index.ts --skill tdd
+```
+
+---
+
+## ⚙️ Skills Directory Resolution & Precedence
+
+Skills are automatically resolved and merged from two standard locations:
+1. **Agent Skills (Project-Level)**: `./.agents/jev_skills`
+2. **Global Skills (User-Level)**: `~/.agents/jev_skills/`
+3. **Precedence**: Local project skills override global skills with the same name.
+
+### Environment Variable Overrides
+Configure in your `.env` or shell profile:
 
 ```bash
-mkdir -p ~/.agents/jev_skills/my-new-tool
-cat <<'EOF' > ~/.agents/jev_skills/my-new-tool/SKILL.md
----
-name: my-new-tool
-description: Automate database migrations using Liquibase. Use when user asks about database migration or schema versioning.
+# Required: OpenRouter API Key
+export OPENROUTER_API_KEY="sk-or-v1-your-key-here"
+
+# Model slug (defaults to ~typesafe/jev-latest)
+export MODEL="~typesafe/jev-latest"
+
+# Optional: Override global skills directory
+export GLOBAL_SKILLS_PATH="$HOME/.agents/jev_skills"
+
+# Optional: Override agent skills directory
+export AGENT_SKILLS_PATH="./.agents/jev_skills"
+
+# Optional: Toggle hook injection of full SKILL.md content (default: true)
+export JEV_INJECT_CONTENT="true"
+```
+
 ---
 
-# Liquibase Migration Skill
-Instructions and guidelines here...
+## ➕ Adding New Skills
+
+Add a directory with a `SKILL.md` in `~/.agents/jev_skills/` (global) or `./.agents/jev_skills/` (project-local):
+
+```bash
+mkdir -p ~/.agents/jev_skills/my-skill
+cat <<'EOF' > ~/.agents/jev_skills/my-skill/SKILL.md
+---
+name: my-skill
+description: Automate database migrations. Use when user asks about schema versioning or migrations.
+---
+
+# Migration Guidelines
+Step 1...
 EOF
 ```
 
-On your next prompt:
-- If you ask about *"database migrations"*, Jev will automatically detect and inject `my-new-tool`.
-- If you ask about *"React styling"*, `my-new-tool` is completely ignored, keeping your context clean!
+Jev will automatically route this skill when relevant, and keep it completely unloaded when not needed!
 
 ---
 
-## 💻 CLI Usage & Token Inspection
+## 💻 CLI Usage & Token Metrics
 
-Query skills directly:
-
+Fast probability inspection without dumping full files:
 ```bash
 bun run index.ts "How do I refactor code using TDD and commit changes?"
 ```
@@ -237,9 +221,7 @@ Confidence: 0.88
 
 Selected Skills:
   • tdd                            Prob: 59.0% | Conf: 88.0%
-    Test-driven development. Use when the user wants to build features or fix bugs test-first...
   • test-driven-development        Prob: 36.0% | Conf: 88.0%
-    Use when implementing any feature or bugfix, before writing implementation code
 
 📊 Token Usage Breakdown:
   • Total Used Tokens:    3977
@@ -250,7 +232,7 @@ Selected Skills:
   • Estimated Cost:       $0.000135
 ```
 
-Return JSON for programmatic integration:
+Return JSON for programmatic consumers:
 ```bash
 bun run index.ts --json "Diagnose memory leak in auth microservice"
 ```
@@ -260,7 +242,7 @@ bun run index.ts --json "Diagnose memory leak in auth microservice"
 ## 🧪 Testing & Benchmarks
 
 ```bash
-# Run unit and integration tests (25/25 passing)
+# Run unit and integration tests (31/31 passing)
 bun test
 
 # Run single-focus golden set evaluation (12/12 passing)
@@ -275,20 +257,14 @@ bun run test:benchmark
 
 ### 🌐 Online Dataset Benchmark: MetaTool (ToolE)
 
-We benchmarked the **TypeSafe Jev Decision Model** against the standardized [MetaTool (ToolE)](https://github.com/HowieHwong/MetaTool) dataset (referenced on Hugging Face). The benchmark evaluates a bank of 47 candidate tools across three critical challenges:
-1. **Multi-Tool Routing**: Identifying multiple distinct tools required in a single user prompt (e.g. Finance + News, Rental Search + Maps).
-2. **Single-Tool Precision**: Disambiguating specific tools (e.g. Repository Analysis, Legal Lookup, Natural Disasters, NASA Imagery).
-3. **Tool-Usage Awareness**: Correctly deciding **NOT** to invoke tools (`none`) on conversational or pure reasoning queries, preventing false triggers.
+Benchmarked against the standardized [MetaTool (ToolE)](https://github.com/HowieHwong/MetaTool) dataset across multi-tool routing, single-tool precision, and tool awareness:
 
-#### Benchmark Execution Results (`bun run test:benchmark`)
-
-- **Dataset:** MetaTool / ToolE (`golden_set/metatool_benchmark.json`)
 - **Candidate Bank:** 47 tools (`golden_set/metatool_tools.json`)
 - **Model:** `~typesafe/jev-latest` via OpenRouter
-- **Overall Accuracy:** **12 / 12 (100.0%)**
-- **Average Latency:** **460 ms / decision**
+- **Accuracy:** **12 / 12 (100.0%)**
+- **Latency:** **460 ms / decision**
 
-| Case ID | Category | Expected Ground Truth | Actual Primary | Selected Skills (Top 2) | Confidence | Latency | Status |
+| Case ID | Category | Expected Ground Truth | Actual Primary | Selected Skills | Confidence | Latency | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | `meta-01-finance-news` | Multi-Tool | `FinanceTool`, `NewsTool` | `FinanceTool` | `FinanceTool`, `NewsTool` | 91% | 808 ms | **PASS** ✅ |
 | `meta-02-finance-course` | Multi-Tool | `FinanceTool`, `CourseTool` | `FinanceTool` | `FinanceTool`, `CourseTool` | 78% | 459 ms | **PASS** ✅ |
@@ -302,5 +278,3 @@ We benchmarked the **TypeSafe Jev Decision Model** against the standardized [Met
 | `meta-10-nasa` | Single-Tool | `NASATool` | `NASATool` | `NASATool` | 99% | 384 ms | **PASS** ✅ |
 | `meta-11-awareness-chat` | Awareness | *none (no tool)* | `none` | *empty* | 0% | 378 ms | **PASS** ✅ |
 | `meta-12-awareness-math` | Awareness | *none (no tool)* | `none` | *empty* | 0% | 388 ms | **PASS** ✅ |
-
-Detailed JSON metrics and execution logs are saved to `test-results/metatool_benchmark_report.json`.

@@ -11,7 +11,20 @@ Instead of polluting the agent's context window by loading 70+ skills on startup
 
 ## Quick Start
 
-Run skill selection from the CLI:
+### 1. Run Jev and Get Full Skill Content (When Cannot Use Hooks)
+If your agent harness cannot use lifecycle hooks, invoke `jev-skill-selector` CLI to select skills and output their complete `SKILL.md` instructions:
+
+```bash
+bun run index.ts "Refactor the payment gateway with TDD and make a git commit" --content
+```
+
+Directly inspect a skill by name:
+```bash
+bun run index.ts --skill tdd
+```
+
+### 2. Fast Skill Selection Overview
+To inspect routing probabilities without full file dumps:
 
 ```bash
 bun run index.ts "Refactor the payment gateway with TDD and make a git commit"
@@ -36,38 +49,63 @@ Selected Skills:
   • Output Tokens:        768
 ```
 
-Programmatic TypeScript API:
+### 3. Programmatic TypeScript API:
 
 ```typescript
-import { selectSkills } from "./index";
+import { selectSkills, formatSkillContent } from "./index";
 
 const result = await selectSkills({
   userPrompt: "Diagnose database connection leaks and write regression tests",
-  options: { maxSkills: 3, threshold: 0.05 },
+  options: { maxSkills: 3, threshold: 0.05, includeContent: true },
 });
 
 console.log(result.selectedSkills);
-// => [ { name: "diagnosing-bugs", probability: 0.61 }, { name: "tdd", probability: 0.38 } ]
+// => [ { name: "diagnosing-bugs", probability: 0.61, content: "..." }, { name: "tdd", probability: 0.38, content: "..." } ]
+
+// Format full instructions for prompt injection
+const injection = formatSkillContent(result.selectedSkills, {
+  userPrompt: "Diagnose database connection leaks and write regression tests",
+});
 ```
 
 ---
 
 ## Workflows
 
-### 1. Pre-Prompt Hook Workflow (Automatic Routing)
+### 1. Pre-Prompt Hook Workflow (Priority 1: Automatic Routing)
 
 The tool acts as a gatekeeper before your agent starts planning:
-1. User submits a prompt (e.g., in Codex or Claude Code).
-2. The pre-prompt hook intercepts the prompt via stdin.
-3. Jev matches the task against the centralized skills bank (`SKILLS_BANK_PATH`).
-4. Hook outputs the matching skill instructions directly into the agent's context.
+1. User submits a prompt (in Claude Code, Codex, Antigravity, or OpenCode).
+2. The hook intercepts the prompt via stdin or lifecycle event.
+3. Jev evaluates candidate skills against the prompt (~400–700ms).
+4. Hook outputs the matching skill instructions (`SKILL.md` contents) directly into the agent's context for that turn.
 
-### 2. Multi-Step & Continuation Tasks
+### 2. Standalone Skill Workflow (Priority 2: Fallback When Cannot Use Hooks)
+
+When the agent harness does not support lifecycle hooks:
+1. Only `jev-skill-selector` is installed into the harness's skill folder (`~/.agents/skills/jev-skill-selector`).
+2. The agent calls:
+   ```bash
+   bun run index.ts "<task description>" --content
+   ```
+3. The full instructions of only the necessary skills are returned directly for execution.
+
+### 3. Multi-Step & Continuation Tasks
 
 For complex tasks (e.g. "Phase 1: investigate, Phase 2: test, Phase 3: deploy"), Jev automatically activates parallel decision questions:
 - `primary_skill`: Core/initial action
 - `secondary_skill`: Subsequent implementation
 - `followup_skill`: Verification, documentation, git, or deployment
+
+---
+
+## Skills Directory Precedence
+
+Skills are automatically discovered and merged from two standard locations:
+1. **Agent Skills (Project-Level)**: `./.agents/jev_skills` (or `AGENT_SKILLS_PATH`)
+2. **Global Skills (User-Level)**: `~/.agents/jev_skills/` (or `GLOBAL_SKILLS_PATH`)
+3. **Precedence**: Project-level skills override global skills with the same name.
+4. **Custom Bank**: Set `SKILLS_BANK_PATH` to specify a custom bank.
 
 ---
 
@@ -84,16 +122,19 @@ OPENROUTER_API_KEY=sk-or-v1-your-key-here
 # Optional: Jev model slug (defaults to ~typesafe/jev-latest)
 MODEL=~typesafe/jev-latest
 
-# Optional: Centralized Skills Bank Directory (defaults to ~/.agents/skills_bank or ./skills)
-SKILLS_BANK_PATH=/home/dat/.agents/skills_bank
+# Optional: Global skills bank directory (defaults to ~/.agents/jev_skills/)
+GLOBAL_SKILLS_PATH=~/.agents/jev_skills
+
+# Optional: Project/agent skills directory (defaults to ./.agents/jev_skills)
+AGENT_SKILLS_PATH=./.agents/jev_skills
 ```
 
 ---
 
 ## Bundled Hooks & Tools
 
-- **Codex Hook**: [`hooks/codex.ts`](hooks/codex.ts) - Reads JSON or raw text, outputs formatted injection.
-- **Claude Code Hook**: [`hooks/claude.ts`](hooks/claude.ts) - Intercepts `UserPromptSubmit` in Claude settings.
-- **OpenCode Plugin**: [`plugins/opencode.ts`](plugins/opencode.ts) - Adds `chat:before` hook and `select_skill` tool.
-- **Unified Dispatcher**: [`scripts/run-hook.ts`](scripts/run-hook.ts) - Auto-detects caller environment.
-- **Backup & Setup Script**: [`scripts/backup-and-setup.sh`](scripts/backup-and-setup.sh) & [`scripts/backup-and-setup.ps1`](scripts/backup-and-setup.ps1).
+- **Codex Hook**: [`hooks/codex.ts`](hooks/codex.ts) - Injects `UserPromptSubmitCommandOutputWire` with full skill instructions.
+- **Claude Code Hook**: [`hooks/claude.ts`](hooks/claude.ts) - Intercepts `UserPromptSubmit` in Claude settings and injects full skill instructions.
+- **OpenCode Plugin**: [`plugins/opencode.ts`](plugins/opencode.ts) - Intercepts `messages.transform` and provides `select_skill` tool.
+- **Antigravity Hook**: [`hooks/antigravity.ts`](hooks/antigravity.ts) - Pre-invocation ephemeral message with skill instructions.
+- **Automated Setup Script**: [`scripts/backup-and-setup.sh`](scripts/backup-and-setup.sh) & [`scripts/backup-and-setup.ps1`](scripts/backup-and-setup.ps1).

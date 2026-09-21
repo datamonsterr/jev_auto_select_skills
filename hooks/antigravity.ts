@@ -123,15 +123,22 @@ function findTranscriptPath(input: AntigravityHookInput): string | null {
  */
 export function formatAntigravityEphemeral(
   skills: SelectedSkill[],
-  skillsDir: string
+  skillsDir: string,
+  options?: { userPrompt?: string; includeContent?: boolean }
 ): string {
   if (skills.length === 0) return "";
+
+  const shouldIncludeContent = options?.includeContent ?? (process.env.JEV_INJECT_CONTENT !== "false");
 
   const lines = [
     "🎯 **[Jev Dynamic Skill Routing]**",
     "Recommended skill(s) for this user prompt:",
     "",
   ];
+
+  if (options?.userPrompt) {
+    lines.push(`Task: "${options.userPrompt}"`, "");
+  }
 
   for (const skill of skills) {
     const prob = (skill.probability * 100).toFixed(1);
@@ -148,8 +155,26 @@ export function formatAntigravityEphemeral(
     }
   }
 
-  lines.push("");
-  lines.push("*Instruction:* If relevant, use `view_file` to read the skill instructions and follow its workflow.");
+  if (shouldIncludeContent) {
+    lines.push("", "---", "");
+    for (const skill of skills) {
+      const skillFile = skill.path || path.join(skillsDir, skill.name, "SKILL.md");
+      lines.push(`### Skill Instructions: ${skill.name}`);
+      if (fs.existsSync(skillFile)) {
+        lines.push(`*Source: \`${skillFile}\`*`, "");
+        try {
+          lines.push(fs.readFileSync(skillFile, "utf-8").trim());
+        } catch {
+          // ignore
+        }
+      }
+      lines.push("", "---", "");
+    }
+    lines.push("*Instruction:* Follow the skill instructions above directly to execute this task.");
+  } else {
+    lines.push("");
+    lines.push("*Instruction:* If relevant, use `view_file` to read the skill instructions and follow its workflow.");
+  }
 
   return lines.join("\n");
 }
@@ -230,7 +255,9 @@ export async function handleAntigravityHook(
     return emptyOutput;
   }
 
-  const ephemeralMessage = formatAntigravityEphemeral(result.selectedSkills, primaryDir);
+  const ephemeralMessage = formatAntigravityEphemeral(result.selectedSkills, primaryDir, {
+    userPrompt: prompt,
+  });
   if (!ephemeralMessage) {
     return emptyOutput;
   }

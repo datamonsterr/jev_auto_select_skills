@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import {
   type Skill,
   type SkillSelectorOptions,
@@ -210,6 +211,18 @@ export class JevProvider {
     const selectedSkills = Array.from(collectedMap.values())
       .sort((a, b) => b.probability - a.probability)
       .slice(0, maxSkills);
+
+    if (options?.includeContent) {
+      for (const skill of selectedSkills) {
+        if (skill.path && fs.existsSync(skill.path)) {
+          try {
+            skill.content = fs.readFileSync(skill.path, "utf-8");
+          } catch {
+            // Keep content undefined
+          }
+        }
+      }
+    }
 
     // Primary skill is choice from primary_skill, or selected_skill, or top selected skill
     const primaryChoice =

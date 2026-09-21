@@ -8,7 +8,7 @@
             "type": "command",
             "command": "bun run ./hooks/codex.ts",
             "timeout": 30,
-            "additionalContextLimit": 5000
+            "additionalContextLimit": 50000
           }
         ]
       }

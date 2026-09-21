@@ -1,13 +1,13 @@
 #!/usr/bin/env bun
 import { selectSkills } from "../index";
-import { formatSkillSummary } from "../lib/model";
+import { formatSkillSummary, formatSkillContent } from "../lib/model";
 
 /**
  * Handle Claude hook input (stdin or string prompt)
  */
 export async function handleClaudeHook(
   rawInput: string | { prompt?: string; userPrompt?: string; message?: string },
-  options: { selectSkillsFn?: typeof selectSkills; skillsDir?: string | string[] } = {}
+  options: { selectSkillsFn?: typeof selectSkills; skillsDir?: string | string[]; includeContent?: boolean } = {}
 ): Promise<string> {
   const selectFn = options.selectSkillsFn || selectSkills;
   let prompt = "";
@@ -33,9 +33,13 @@ export async function handleClaudeHook(
   const result = await selectFn({
     userPrompt: prompt,
     skillsDir: options.skillsDir,
+    options: { includeContent: true },
   });
 
-  return formatSkillSummary(result.selectedSkills);
+  const shouldIncludeContent = options.includeContent ?? (process.env.JEV_INJECT_CONTENT !== "false");
+  return shouldIncludeContent
+    ? formatSkillContent(result.selectedSkills, { userPrompt: prompt })
+    : formatSkillSummary(result.selectedSkills);
 }
 
 // CLI invocation

@@ -184,4 +184,55 @@ describe("hooks and plugin", () => {
 
     expect(output).toContain("tdd");
   });
+
+  it("injects full skill instructions and user prompt in Codex hook output", async () => {
+    const mockSelectSkills = mock(async () => ({
+      primarySkill: "tdd",
+      selectedSkills: [
+        {
+          name: "tdd",
+          probability: 0.95,
+          confidence: 0.95,
+          description: "Test driven development",
+          content: "# Complete TDD Guide\nRed green refactor loop",
+          path: "/tmp/tdd/SKILL.md",
+        },
+      ],
+      answers: {},
+    }));
+
+    const result = await handleCodexHook(
+      JSON.stringify({ prompt: "Refactor payment module test-first" }),
+      { selectSkillsFn: mockSelectSkills as any }
+    );
+
+    expect(result.injectedContext).toContain("Refactor payment module test-first");
+    expect(result.injectedContext).toContain("## Skill: tdd");
+    expect(result.injectedContext).toContain("Red green refactor loop");
+  });
+
+  it("injects full skill instructions and user prompt in Claude hook output", async () => {
+    const mockSelectSkills = mock(async () => ({
+      primarySkill: "git-commit",
+      selectedSkills: [
+        {
+          name: "git-commit",
+          probability: 0.92,
+          confidence: 0.92,
+          description: "Conventional git commits",
+          content: "# Git Commit Standard\nFollow conventional commits",
+          path: "/tmp/git-commit/SKILL.md",
+        },
+      ],
+      answers: {},
+    }));
+
+    const output = await handleClaudeHook("Commit the auth feature branch", {
+      selectSkillsFn: mockSelectSkills as any,
+    });
+
+    expect(output).toContain("Commit the auth feature branch");
+    expect(output).toContain("## Skill: git-commit");
+    expect(output).toContain("Follow conventional commits");
+  });
 });

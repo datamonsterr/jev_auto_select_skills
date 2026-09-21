@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { selectSkills } from "../index";
-import { formatSkillSummary } from "../lib/model";
+import { formatSkillSummary, formatSkillContent } from "../lib/model";
 
 export interface CodexHookInput {
   prompt?: string;
@@ -24,7 +24,7 @@ export interface CodexHookOutput {
  */
 export async function handleCodexHook(
   rawInput: string | CodexHookInput,
-  options: { selectSkillsFn?: typeof selectSkills; skillsDir?: string | string[] } = {}
+  options: { selectSkillsFn?: typeof selectSkills; skillsDir?: string | string[]; includeContent?: boolean } = {}
 ): Promise<CodexHookOutput> {
   const selectFn = options.selectSkillsFn || selectSkills;
   let inputData: CodexHookInput = {};
@@ -60,9 +60,13 @@ export async function handleCodexHook(
   const result = await selectFn({
     userPrompt: prompt,
     skillsDir: options.skillsDir,
+    options: { includeContent: true },
   });
 
-  const injectedContext = formatSkillSummary(result.selectedSkills);
+  const shouldIncludeContent = options.includeContent ?? (process.env.JEV_INJECT_CONTENT !== "false");
+  const injectedContext = shouldIncludeContent
+    ? formatSkillContent(result.selectedSkills, { userPrompt: prompt })
+    : formatSkillSummary(result.selectedSkills);
 
   return {
     prompt,

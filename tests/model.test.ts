@@ -2,6 +2,7 @@ import { describe, it, expect } from "bun:test";
 import {
   filterSelectedSkills,
   formatSkillSummary,
+  formatSkillContent,
 } from "../lib/model";
 import { DEFAULT_SYSTEM_PROMPT, buildJevInstructions } from "../lib/system_prompt";
 
@@ -51,6 +52,25 @@ describe("model and system_prompt", () => {
     ]);
     expect(summary).toContain("**tdd** (probability: 0.90, confidence: 0.90)");
     expect(summary).toContain("Test driven dev");
+  });
+
+  it("formats full skill content for hook injection and standalone runs", () => {
+    const output = formatSkillContent(
+      [
+        {
+          name: "tdd",
+          probability: 0.9,
+          confidence: 0.9,
+          description: "Test driven dev",
+          content: "# TDD Guide\nAlways write red before green.",
+          path: "/tmp/tdd/SKILL.md",
+        },
+      ],
+      { userPrompt: "Build user signup test-first" }
+    );
+    expect(output).toContain("Build user signup test-first");
+    expect(output).toContain("## Skill: tdd");
+    expect(output).toContain("Always write red before green.");
   });
 
   it("provides well-structured default system prompt and instructions", () => {

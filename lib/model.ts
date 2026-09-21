@@ -76,6 +76,8 @@ export interface SelectedSkill {
   probability: number;
   description?: string;
   whenToUse?: string;
+  path?: string;
+  content?: string;
 }
 
 /**
@@ -109,12 +111,13 @@ export interface SkillSelectorOptions {
   apiKey?: string;
   threshold?: number;
   maxSkills?: number;
-  skillsDir?: string;
+  skillsDir?: string | string[];
   systemPrompt?: string;
   includeNone?: boolean;
   retries?: number;
   retryDelayMs?: number;
   multiStep?: boolean | "auto";
+  includeContent?: boolean;
 }
 
 /**
@@ -141,6 +144,7 @@ export function filterSelectedSkills(params: {
         confidence: Number(confidence.toFixed(4)),
         description: skill?.description,
         whenToUse: skill?.whenToUse,
+        path: skill?.path,
       };
     })
     .sort((a, b) => b.probability - a.probability);
@@ -159,6 +163,7 @@ export function filterSelectedSkills(params: {
         confidence: Number(confidence.toFixed(4)),
         description: skill?.description,
         whenToUse: skill?.whenToUse,
+        path: skill?.path,
       });
     }
   }
@@ -189,6 +194,79 @@ export function formatSkillSummary(skills: SelectedSkill[]): string {
       lines.push(`  *When to use:* ${skill.whenToUse}`);
     }
   }
+
+  return lines.join("\n");
+}
+
+/**
+ * Format selected skills with full SKILL.md contents included.
+ * Designed for hook injections (UserPromptSubmit, pre-invocation) and standalone skill runs.
+ */
+export function formatSkillContent(
+  skills: SelectedSkill[],
+  options?: { userPrompt?: string }
+): string {
+  if (skills.length === 0) {
+    return "No specialized skills required for this request.";
+  }
+
+  const lines: string[] = [
+    "### Recommended Agent Skills",
+    "🎯 **[Jev Dynamic Skill Routing]**",
+  ];
+
+  if (options?.userPrompt) {
+    lines.push(`Task: "${options.userPrompt}"`);
+  }
+
+  lines.push("The following specialized skills have been selected for this prompt:", "");
+
+  for (const skill of skills) {
+    const prob = (skill.probability * 100).toFixed(1);
+    const conf = (skill.confidence * 100).toFixed(0);
+    lines.push(`• **${skill.name}** (Probability: ${prob}% | Confidence: ${conf}%)`);
+    if (skill.path) {
+      lines.push(`  - Path: \`${skill.path}\``);
+    }
+    if (skill.description) {
+      lines.push(`  - Description: ${skill.description}`);
+    }
+  }
+
+  lines.push("", "---", "");
+
+  for (const skill of skills) {
+    lines.push(`## Skill: ${skill.name}`);
+    if (skill.path) {
+      lines.push(`*Location: \`${skill.path}\`*`, "");
+    }
+
+    let content = skill.content;
+    if (!content && skill.path) {
+      try {
+        const fs = require("node:fs");
+        if (fs.existsSync(skill.path)) {
+          content = fs.readFileSync(skill.path, "utf-8");
+        }
+      } catch {
+        // Fallback
+      }
+    }
+
+    if (content) {
+      lines.push(content.trim());
+    } else {
+      lines.push(`### Description`);
+      lines.push(skill.description || skill.name);
+      if (skill.whenToUse && skill.whenToUse !== skill.description) {
+        lines.push("", `### When to Use`, skill.whenToUse);
+      }
+    }
+
+    lines.push("", "---", "");
+  }
+
+  lines.push("*Instruction:* Apply the above skill instructions and workflows directly to fulfill the user prompt.");
 
   return lines.join("\n");
 }

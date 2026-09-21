@@ -88,19 +88,21 @@ export default function jevSkillSelectorPlugin(options: OpenCodePluginOptions = 
         if (!prompt) return;
 
         try {
-          const { selectSkills, formatSkillSummary } = await getSelectSkillsFn();
+          const { selectSkills, formatSkillSummary, formatSkillContent } = await getSelectSkillsFn();
           const result = await selectSkills({
             userPrompt: prompt,
             skillsDir: options.skillsDir,
-            options: { threshold: options.threshold ?? 0.05 },
+            options: { threshold: options.threshold ?? 0.05, includeContent: true },
           });
 
           if (result.selectedSkills.length > 0) {
             // Add a model-visible system message without mutating the user text
-            const summary = formatSkillSummary(result.selectedSkills);
+            const content = formatSkillContent
+              ? formatSkillContent(result.selectedSkills, { userPrompt: prompt })
+              : formatSkillSummary(result.selectedSkills);
             messages.push({
               info: { role: "system", synthetic: true },
-              parts: [{ type: "text", text: summary }],
+              parts: [{ type: "text", text: content }],
             });
           }
         } catch (err: any) {
@@ -125,19 +127,25 @@ export default function jevSkillSelectorPlugin(options: OpenCodePluginOptions = 
         parameters: z.object({
           task: z.string().describe("The user task or engineering request to evaluate"),
           threshold: z.number().optional().describe("Probability threshold (default 0.05)"),
+          content: z.boolean().optional().describe("Include full SKILL.md instructions in response"),
         }),
-        execute: async ({ task, threshold }: { task: string; threshold?: number }) => {
-          const { selectSkills, formatSkillSummary } = await getSelectSkillsFn();
+        execute: async ({ task, threshold, content }: { task: string; threshold?: number; content?: boolean }) => {
+          const { selectSkills, formatSkillSummary, formatSkillContent } = await getSelectSkillsFn();
           const result = await selectSkills({
             userPrompt: task,
             skillsDir: options.skillsDir,
-            options: { threshold: threshold || 0.05 },
+            options: { threshold: threshold || 0.05, includeContent: true },
           });
+
+          const formattedContent = formatSkillContent
+            ? formatSkillContent(result.selectedSkills, { userPrompt: task })
+            : formatSkillSummary(result.selectedSkills);
 
           return {
             primarySkill: result.primarySkill,
             skills: result.selectedSkills,
             summary: formatSkillSummary(result.selectedSkills),
+            content: formattedContent,
           };
         },
       },
