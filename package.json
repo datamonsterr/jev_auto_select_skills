@@ -10,6 +10,11 @@
   },
   "scripts": {
     "start": "bun run index.ts",
+    "setup": "bun run scripts/setup-agent.ts",
+    "setup:claude": "bun run scripts/setup-agent.ts claude",
+    "setup:codex": "bun run scripts/setup-agent.ts codex",
+    "setup:agy": "bun run scripts/setup-agent.ts agy",
+    "setup:opencode": "bun run scripts/setup-agent.ts opencode",
     "test": "bun test tests/",
     "test:golden": "bun run scripts/test-golden.ts",
     "test:complex": "bun run scripts/test-complex.ts",

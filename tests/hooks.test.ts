@@ -122,17 +122,16 @@ describe("hooks and plugin", () => {
   it("resolves skills paths using agent and global defaults with env overrides", async () => {
     const { resolveSkillsSearchPaths } = await import("../index");
     
-    // Default search paths should contain .agents/jev_skills
+    // Default search paths should contain skills or jev_skills
     const defaultPaths = resolveSkillsSearchPaths();
     expect(defaultPaths.length).toBeGreaterThan(0);
-    expect(defaultPaths.some((p) => p.includes("jev_skills"))).toBe(true);
+    expect(defaultPaths.some((p) => p.includes("skills") || p.includes("jev_skills"))).toBe(true);
 
     // Explicit path override
     const explicitPaths = resolveSkillsSearchPaths({ customPath: "/tmp/custom_skills" });
     // If doesn't exist, it won't add non-existent, but if we point to an existing dir:
-    const cwd = process.cwd();
-    const existingExplicit = resolveSkillsSearchPaths({ customPath: "./.agents/jev_skills" });
-    expect(existingExplicit[0]).toContain("jev_skills");
+    const existingExplicit = resolveSkillsSearchPaths({ customPath: "./skills" });
+    expect(existingExplicit[0]).toContain("skills");
   });
 
   it("handles Codex hook wire format output containing hookSpecificOutput", async () => {

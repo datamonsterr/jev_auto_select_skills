@@ -6,7 +6,7 @@ import fs from "node:fs";
 describe("assess.ts skill placement", () => {
   it("classifies task-specific skills as JEV_ROUTED", async () => {
     const result = await assessSkill({
-      skillPathOrName: "tdd",
+      skillPathOrName: path.resolve(__dirname, "../skills/jev-skill-selector"),
     });
 
     expect(result.classification).toBe("JEV_ROUTED");

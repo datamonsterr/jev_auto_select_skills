@@ -51,16 +51,20 @@ elif [ -d "$SCRIPT_DIR/skills" ]; then
   while IFS= read -r -d '' item; do copy_skill_tree "$item"; done \
     < <(find -P "$SCRIPT_DIR/skills" -mindepth 1 -maxdepth 1 -type d -print0)
 fi
+# Register global binary in PATH
+echo "Linking jev-skill-selector CLI globally..."
+(cd "$SCRIPT_DIR" && bun link 2>/dev/null || true)
+
 # Fallback skill for harnesses that do not support hooks:
 # Install jev-skill-selector as the ONLY skill in standard agent directories
-mkdir -p "$HOME/.agents/skills/jev-skill-selector"
-cp -aL "$SCRIPT_DIR/SKILL.md" "$HOME/.agents/skills/jev-skill-selector/SKILL.md"
-mkdir -p "$HOME/.claude/skills/jev-skill-selector"
-cp -aL "$SCRIPT_DIR/SKILL.md" "$HOME/.claude/skills/jev-skill-selector/SKILL.md"
-mkdir -p "$HOME/.codex/skills/jev-skill-selector"
-cp -aL "$SCRIPT_DIR/SKILL.md" "$HOME/.codex/skills/jev-skill-selector/SKILL.md"
-mkdir -p "$SKILLS_BANK/jev-skill-selector"
-cp -aL "$SCRIPT_DIR/SKILL.md" "$SKILLS_BANK/jev-skill-selector/SKILL.md"
+for dir in "$HOME/.agents/skills/jev-skill-selector" \
+           "$HOME/.claude/skills/jev-skill-selector" \
+           "$HOME/.codex/skills/jev-skill-selector" \
+           "$SKILLS_BANK/jev-skill-selector"; do
+  mkdir -p "$dir"
+  cp -aL "$SCRIPT_DIR/SKILL.md" "$dir/SKILL.md"
+  [ -f "$SCRIPT_DIR/skills/jev-skill-selector/run.sh" ] && cp -aL "$SCRIPT_DIR/skills/jev-skill-selector/run.sh" "$dir/run.sh"
+done
 
 echo "Configuring Claude Code UserPromptSubmit hook..."
 CLAUDE_SETTINGS="$HOME/.claude/settings.json"

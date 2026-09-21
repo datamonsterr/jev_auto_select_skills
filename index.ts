@@ -1,3 +1,4 @@
+#!/usr/bin/env bun
 import fs from "node:fs";
 import path from "node:path";
 import {
@@ -77,7 +78,9 @@ export function resolveSkillsSearchPaths(options?: {
   const agentEnv = process.env.AGENT_SKILLS_PATH || process.env.SKILLS_AGENT_DIR;
   const agentCandidates = [
     agentEnv ? (agentEnv.startsWith("~") ? path.join(homeDir, agentEnv.slice(1)) : path.resolve(cwd, agentEnv)) : null,
+    path.resolve(cwd, "skills"),
     path.resolve(cwd, ".agents", "jev_skills"),
+    path.resolve(import.meta.dir, "skills"),
     path.resolve(import.meta.dir, ".agents", "jev_skills"),
   ].filter((p): p is string => Boolean(p));
 
@@ -143,6 +146,15 @@ export {
   DEFAULT_SYSTEM_PROMPT,
   loadEnvironment,
 };
+export {
+  setupClaude,
+  setupCodex,
+  setupAntigravity,
+  setupOpenCode,
+  setupAll,
+  checkAgentStatus,
+  runSetupCli,
+} from "./scripts/setup-agent";
 export type { Skill, SelectedSkill, SkillSelectionResult, SkillSelectorOptions, UsageMetrics };
 
 /**
@@ -183,10 +195,14 @@ function printHelp(): void {
   console.log(`
 Jev Skill Selector (TypeSafe Jev System One Model)
 Usage:
-  bun run index.ts "<user prompt>" [options]
-  bun run index.ts --prompt "<user prompt>" --content
-  bun run index.ts --skill "<skill-name>"
-  echo '{"userPrompt": "..."}' | bun run index.ts
+  jev-skill-selector "<user prompt>" [options]
+  jev-skill-selector setup [agent] [options]
+  jev-skill-selector --prompt "<user prompt>" --content
+  jev-skill-selector --skill "<skill-name>"
+  echo '{"userPrompt": "..."}' | jev-skill-selector
+
+Commands:
+  setup [agent]            Configure agent harness (claude, codex, agy, opencode, all)
 
 Options:
   --prompt, -p <text>      The user prompt / task to evaluate
@@ -210,6 +226,13 @@ async function main() {
   if (args.length === 0 && process.stdin.isTTY) {
     printHelp();
     process.exit(0);
+  }
+
+  // Delegate to setup command if requested
+  if (args[0] === "setup") {
+    const { runSetupCli } = await import("./scripts/setup-agent");
+    runSetupCli(args.slice(1));
+    return;
   }
 
   let prompt = "";

@@ -17,13 +17,45 @@ We prioritize a **two-tier architecture** for agent harnesses:
 | Priority | Strategy | How It Works | Context Bloat | Supported Harnesses |
 | :--- | :--- | :--- | :--- | :--- |
 | **Priority 1 (Recommended)** | **Lifecycle Hooks & Plugins** | Intercepts user prompt before LLM plans, runs Jev inference (~400ms), and injects matching `SKILL.md` content directly into context. | **0 static skills loaded.** Only relevant skill(s) injected per turn. | Claude Code, Codex, OpenCode, Antigravity |
-| **Priority 2 (Fallback)** | **Router Agent Skill** | For harnesses without lifecycle hooks. Install only `jev-skill-selector` into the agent's skills folder. The agent invokes `bun run index.ts "<prompt>" --content` on demand. | **Only 1 skill loaded.** Dynamic retrieval of content when required. | Any agent supporting skills / CLI tools |
+| **Priority 2 (Fallback)** | **Router Agent Skill** | For harnesses without lifecycle hooks. Install `jev-skill-selector` into the agent's skills folder. The agent invokes `jev-skill-selector "<prompt>" --content` on demand. | **Only 1 skill loaded.** Dynamic retrieval of content when required. | Any agent supporting skills / CLI tools |
 
 ---
 
-## ⚡ 1-Step Automated Setup
+## ⚡ 1-Step Automated Agent Setup
 
-We provide automated setup scripts for Linux/macOS and Windows:
+Configure hooks (Priority 1) and fallback skills (Priority 2) across any or all agent harnesses with a single command:
+
+```bash
+# Setup all supported agents and link binary globally (recommended)
+bun run setup
+# Or after linking:
+jev-skill-selector setup
+
+# Target a specific agent harness:
+bun run setup claude       # Claude Code (~/.claude/settings.json hook + skill)
+bun run setup codex        # Codex CLI (~/.codex/hooks.json hook + skill)
+bun run setup agy          # Google Antigravity CLI plugin & skill (~/.gemini/config)
+bun run setup opencode     # OpenCode plugin & skill (~/.config/opencode)
+
+# Check configuration status across all harnesses:
+bun run setup --status
+
+# Dry-run preview without modifying files:
+bun run setup --dry-run
+```
+
+### CLI Setup Flags:
+| Flag | Description |
+| :--- | :--- |
+| `[agent]` | Target agent: `claude`, `codex`, `agy`, `opencode`, or `all` (default) |
+| `--status` | Show live configuration status of hooks and skills across all agents |
+| `--hooks-only` | Only configure lifecycle hooks (Priority 1) |
+| `--skill-only` | Only install fallback skill (Priority 2) |
+| `--dry-run` | Preview actions without modifying filesystem |
+| `--help` | Display setup usage instructions |
+
+### Initial Migration Scripts (Bash / PowerShell):
+If you have an existing directory of 50+ skills you wish to back up and consolidate into `~/.agents/jev_skills/` on first install:
 
 ```bash
 # Linux / macOS
@@ -36,10 +68,11 @@ chmod +x scripts/backup-and-setup.sh
 .\scripts\backup-and-setup.ps1
 ```
 
-**What the setup script automates:**
-1. **Backs up & consolidates skills:** Copies existing skills from `~/.agents/skills`, `~/.claude/skills`, `~/.codex/skills` into a centralized bank (`~/.agents/jev_skills/`).
-2. **Configures Priority 1 Hooks:** Registers `UserPromptSubmit` hooks in Claude Code (`~/.claude/settings.json`) and Codex (`~/.codex/hooks.json`), OpenCode plugin, and Antigravity plugin.
-3. **Installs Priority 2 Fallback Skill:** Leaves only `jev-skill-selector` in `~/.agents/skills/jev-skill-selector` so harnesses without hooks don't load 70+ static skills.
+**What the setup automates:**
+1. **Links `jev-skill-selector` globally:** Runs `bun link` so `jev-skill-selector` is available in `$PATH` across all terminal workspaces.
+2. **Backs up & consolidates skills:** Copies existing skills from `~/.agents/skills`, `~/.claude/skills`, `~/.codex/skills` into a centralized bank (`~/.agents/jev_skills/`).
+3. **Configures Priority 1 Hooks:** Registers `UserPromptSubmit` hooks in Claude Code (`~/.claude/settings.json`) and Codex (`~/.codex/hooks.json`), OpenCode plugin, and Antigravity plugin.
+4. **Installs Priority 2 Fallback Skill:** Leaves only `jev-skill-selector` in `~/.agents/skills/jev-skill-selector` (with runner `run.sh`) so harnesses without hooks don't load 70+ static skills.
 
 ---
 
@@ -115,12 +148,32 @@ Antigravity automatically executes `hooks/antigravity.ts` on prompt invocation a
 
 ## 📦 Priority 2: Fallback Skill (When Harness Cannot Use Hooks)
 
-If an agent harness does not support lifecycle hooks, install `jev-skill-selector` as a skill in your harness's skill folder (`~/.agents/skills/jev-skill-selector`):
+If an agent harness does not support lifecycle hooks, copy `skills/jev-skill-selector` into your harness's skills folder:
+
+```bash
+# Standard agent harnesses (~/.agents/skills)
+cp -r skills/jev-skill-selector ~/.agents/skills/
+
+# Claude Code (~/.claude/skills)
+cp -r skills/jev-skill-selector ~/.claude/skills/
+
+# Codex (~/.codex/skills)
+cp -r skills/jev-skill-selector ~/.codex/skills/
+```
+
+### How the Copied Skill Resolves the Path
+When the skill is copied to an external project, it resolves the `jev_skill_selector` runtime via:
+1. **Global Binary (Recommended):** Run `bun link` in your cloned repository. `jev-skill-selector` is symlinked to `~/.bun/bin` and works globally across all workspaces.
+2. **Included Runner (`run.sh`):** The copied folder contains `run.sh`, which automatically checks `$PATH`, `$JEV_PATH`, and standard clone directories.
+3. **Environment Variable:** Set `export JEV_PATH="/path/to/cloned/jev_skill_selector"`.
 
 ### Get Full Skill Content for a Task
 When the agent needs specialized guidance for a prompt, run:
 ```bash
-bun run index.ts "<user prompt or task>" --content
+jev-skill-selector "<user prompt or task>" --content
+
+# Or using the copied skill's runner:
+./run.sh "<user prompt or task>" --content
 ```
 
 **Output:**
@@ -150,15 +203,15 @@ The following specialized skills have been selected for this prompt:
 
 ### Direct Skill Inspection by Name
 ```bash
-bun run index.ts --skill tdd
+jev-skill-selector --skill tdd
 ```
 
 ---
 
 ## ⚙️ Skills Directory Resolution & Precedence
 
-Skills are automatically resolved and merged from two standard locations:
-1. **Agent Skills (Project-Level)**: `./.agents/jev_skills`
+Skills are automatically resolved and merged from standard locations:
+1. **Agent Skills (Project-Level)**: `./skills` or `./.agents/jev_skills`
 2. **Global Skills (User-Level)**: `~/.agents/jev_skills/`
 3. **Precedence**: Local project skills override global skills with the same name.
 
@@ -275,7 +328,7 @@ bun run index.ts --json "Diagnose memory leak in auth microservice"
 ## 🧪 Testing & Benchmarks
 
 ```bash
-# Run unit and integration tests (31/31 passing)
+# Run unit and integration tests (45/45 passing)
 bun test
 
 # Run single-focus golden set evaluation (12/12 passing)

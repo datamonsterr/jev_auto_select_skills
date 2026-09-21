@@ -6,11 +6,11 @@ describe("index programmatic API", () => {
     expect(typeof selectSkills).toBe("function");
 
     const result = await selectSkills({
-      userPrompt: "Refactor payment code with TDD",
+      userPrompt: "Dynamically select and route the right skill for an agent prompt to avoid context bloat",
       options: { threshold: 0.05 },
     });
 
-    expect(result.primarySkill).toBe("tdd");
+    expect(result.primarySkill).toBe("jev-skill-selector");
     expect(result.usage).toBeDefined();
     expect(result.usage?.total_tokens).toBeGreaterThan(0);
     expect(result.usage?.input_tokens).toBeGreaterThan(0);

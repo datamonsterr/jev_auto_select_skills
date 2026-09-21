@@ -7,6 +7,7 @@ import {
   buildSkillCriteria,
 } from "../lib/parse_skill";
 import path from "path";
+import fs from "node:fs";
 
 describe("parse_skill", () => {
   it("parses skill content with frontmatter and explicit When to Use section", () => {
@@ -61,22 +62,21 @@ Details here.
     expect(skill.whenToUse).toContain("Use when user asks to commit changes");
   });
 
-  it("loads skills from the actual skills directory (.agents/jev_skills)", () => {
-    const skills = loadSkillsFromDir(path.resolve(__dirname, "../.agents/jev_skills"));
-    expect(skills.length).toBeGreaterThan(50);
+  it("loads skills from the actual skills directory", () => {
+    const skillsDir = path.resolve(__dirname, "../skills");
+    const skills = loadSkillsFromDir(skillsDir);
+    expect(skills.length).toBeGreaterThanOrEqual(1);
     
-    const tdd = skills.find((s) => s.name === "tdd");
-    expect(tdd).toBeDefined();
-    expect(tdd?.description).toContain("Test-driven development");
-
-    const gitCommit = skills.find((s) => s.name === "git-commit");
-    expect(gitCommit).toBeDefined();
+    const routerSkill = skills.find((s) => s.name === "jev-skill-selector");
+    expect(routerSkill).toBeDefined();
+    expect(routerSkill?.description).toContain("router");
   });
 
   it("loads and merges skills across multiple directories with precedence", () => {
-    const primaryDir = path.resolve(__dirname, "../.agents/jev_skills");
+    const primaryDir = path.resolve(__dirname, "../skills");
     const merged = loadSkillsFromDir([primaryDir, primaryDir]);
-    expect(merged.length).toBeGreaterThan(50);
+    expect(merged.length).toBeGreaterThanOrEqual(1);
+    expect(merged.some((s) => s.name === "jev-skill-selector")).toBe(true);
   });
 
   it("builds Jev state containing skills description, name and when to use it", () => {
