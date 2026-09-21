@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import { dirnameCompat } from "../lib/compat";
 import {
   setupClaude,
   setupCodex,
@@ -18,7 +19,7 @@ describe("agent setup scripts", () => {
 
   beforeEach(() => {
     tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "jev-setup-test-"));
-    repoDir = path.resolve(import.meta.dir, "..");
+    repoDir = path.resolve(dirnameCompat(import.meta), "..");
   });
 
   afterEach(() => {

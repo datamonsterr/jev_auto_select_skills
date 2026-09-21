@@ -2,6 +2,7 @@ import { describe, it, expect } from "bun:test";
 import { assessSkill } from "../scripts/assess";
 import path from "node:path";
 import fs from "node:fs";
+import { dirnameCompat } from "../lib/compat";
 
 describe("assess.ts skill placement", () => {
   it("classifies task-specific skills as JEV_ROUTED", async () => {
@@ -14,7 +15,7 @@ describe("assess.ts skill placement", () => {
   });
 
   it("classifies caveman persona skill as ALWAYS_ON", async () => {
-    const tmpDir = path.join(import.meta.dir, "fixtures", "mock_caveman");
+    const tmpDir = path.join(dirnameCompat(import.meta), "fixtures", "mock_caveman");
     fs.mkdirSync(tmpDir, { recursive: true });
     fs.writeFileSync(
       path.join(tmpDir, "SKILL.md"),
@@ -40,7 +41,7 @@ Me speak short.
   });
 
   it("classifies docker deployment skill as JEV_ROUTED", async () => {
-    const tmpDir = path.join(import.meta.dir, "fixtures", "mock_docker");
+    const tmpDir = path.join(dirnameCompat(import.meta), "fixtures", "mock_docker");
     fs.mkdirSync(tmpDir, { recursive: true });
     fs.writeFileSync(
       path.join(tmpDir, "SKILL.md"),

@@ -2,6 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import { dirnameCompat } from "../lib/compat";
 import { selectSkills, resolveSkillsBankPath, resolveSkillsSearchPaths } from "../index";
 import type { SelectedSkill } from "../lib/model";
 
@@ -208,7 +209,7 @@ export async function handleAntigravityHook(
   // Load environment variables (.env) from candidate paths
   const home = os.homedir();
   const envCandidates = [
-    path.resolve(import.meta.dir, "..", ".env"),
+    path.resolve(dirnameCompat(import.meta), "..", ".env"),
     ...(inputData.workspacePaths?.map((w) => path.resolve(w, ".env")) || []),
     path.join(home, ".gemini", "config", ".env"),
     path.join(home, ".env"),
@@ -265,24 +266,26 @@ export async function handleAntigravityHook(
 
 // CLI execution
 if (import.meta.main) {
-  let input = "";
-  if (!process.stdin.isTTY) {
-    const chunks: Buffer[] = [];
-    for await (const chunk of process.stdin) {
-      chunks.push(Buffer.from(chunk));
+  (async () => {
+    let input = "";
+    if (!process.stdin.isTTY) {
+      const chunks: Buffer[] = [];
+      for await (const chunk of process.stdin) {
+        chunks.push(Buffer.from(chunk));
+      }
+      input = Buffer.concat(chunks).toString("utf-8").trim();
+    } else {
+      input = process.argv.slice(2).join(" ");
     }
-    input = Buffer.concat(chunks).toString("utf-8").trim();
-  } else {
-    input = process.argv.slice(2).join(" ");
-  }
 
-  handleAntigravityHook(input)
-    .then((output) => {
-      console.log(JSON.stringify(output, null, 2));
-    })
-    .catch((err) => {
-      // Safe fallback: never crash the agent turn
-      console.error(`[jev-antigravity] Error: ${err.message}`);
-      console.log(JSON.stringify({ injectSteps: [] }));
-    });
+    handleAntigravityHook(input)
+      .then((output) => {
+        console.log(JSON.stringify(output, null, 2));
+      })
+      .catch((err) => {
+        // Safe fallback: never crash the agent turn
+        console.error(`[jev-antigravity] Error: ${err.message}`);
+        console.log(JSON.stringify({ injectSteps: [] }));
+      });
+  })();
 }

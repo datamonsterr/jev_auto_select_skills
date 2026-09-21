@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import { dirnameCompat } from "./compat";
 
 /**
  * Automatically discover and load environment variables from candidate .env files
@@ -9,7 +10,7 @@ import os from "node:os";
 export function loadEnvironment(options: { cwd?: string; workspacePaths?: string[] } = {}): void {
   const home = os.homedir();
   const cwd = options.cwd || process.cwd();
-  const scriptDir = path.resolve(import.meta.dir, "..");
+  const scriptDir = path.resolve(dirnameCompat(import.meta), "..");
 
   const candidates = [
     // 1. Current workspace / working directory .env

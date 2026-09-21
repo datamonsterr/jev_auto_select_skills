@@ -87,29 +87,31 @@ export async function handleCodexHook(
 
 // CLI invocation
 if (import.meta.main) {
-  let input = "";
-  if (!process.stdin.isTTY) {
-    const chunks: Buffer[] = [];
-    for await (const chunk of process.stdin) {
-      chunks.push(Buffer.from(chunk));
+  (async () => {
+    let input = "";
+    if (!process.stdin.isTTY) {
+      const chunks: Buffer[] = [];
+      for await (const chunk of process.stdin) {
+        chunks.push(Buffer.from(chunk));
+      }
+      input = Buffer.concat(chunks).toString("utf-8").trim();
+    } else {
+      input = process.argv.slice(2).join(" ");
     }
-    input = Buffer.concat(chunks).toString("utf-8").trim();
-  } else {
-    input = process.argv.slice(2).join(" ");
-  }
 
-  handleCodexHook(input)
-    .then((out) => {
-      // Emit full wire contract on stdout
-      console.log(JSON.stringify({
-        hookSpecificOutput: {
-          hookEventName: "UserPromptSubmit",
-          additionalContext: out.injectedContext,
-        },
-      }, null, 2));
-    })
-    .catch((err) => {
-      console.error(JSON.stringify({ error: err.message }));
-      process.exit(1);
-    });
+    handleCodexHook(input)
+      .then((out) => {
+        // Emit full wire contract on stdout
+        console.log(JSON.stringify({
+          hookSpecificOutput: {
+            hookEventName: "UserPromptSubmit",
+            additionalContext: out.injectedContext,
+          },
+        }, null, 2));
+      })
+      .catch((err) => {
+        console.error(JSON.stringify({ error: err.message }));
+        process.exit(1);
+      });
+  })();
 }

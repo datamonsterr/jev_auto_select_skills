@@ -14,6 +14,7 @@ import { JevProvider } from "./lib/provider";
 import { loadSkillsFromDir, parseSkillFile, parseSkillContent } from "./lib/parse_skill";
 import { DEFAULT_SYSTEM_PROMPT } from "./lib/system_prompt";
 import { loadEnvironment } from "./lib/env";
+import { dirnameCompat } from "./lib/compat";
 
 // Ensure environment variables (.env) are automatically loaded across harnesses & workspaces
 loadEnvironment();
@@ -80,8 +81,8 @@ export function resolveSkillsSearchPaths(options?: {
     agentEnv ? (agentEnv.startsWith("~") ? path.join(homeDir, agentEnv.slice(1)) : path.resolve(cwd, agentEnv)) : null,
     path.resolve(cwd, "skills"),
     path.resolve(cwd, ".agents", "jev_skills"),
-    path.resolve(import.meta.dir, "skills"),
-    path.resolve(import.meta.dir, ".agents", "jev_skills"),
+    path.resolve(dirnameCompat(import.meta), "skills"),
+    path.resolve(dirnameCompat(import.meta), ".agents", "jev_skills"),
   ].filter((p): p is string => Boolean(p));
 
   for (const cand of agentCandidates) {
@@ -110,7 +111,7 @@ export function resolveSkillsSearchPaths(options?: {
   // 5. Legacy fallbacks
   const legacyCandidates = [
     path.resolve(cwd, "skills"),
-    path.resolve(import.meta.dir, "skills"),
+    path.resolve(dirnameCompat(import.meta), "skills"),
     path.join(homeDir, ".agents", "skills"),
   ];
   for (const cand of legacyCandidates) {

@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { execSync } from "node:child_process";
+import { dirnameCompat } from "../lib/compat";
 
 export interface SetupOptions {
   repoDir?: string;
@@ -25,7 +26,7 @@ export interface SetupResult {
 
 export function getRepoDir(customRepo?: string): string {
   if (customRepo) return path.resolve(customRepo);
-  return path.resolve(import.meta.dir, "..");
+  return path.resolve(dirnameCompat(import.meta), "..");
 }
 
 export function getHomeDir(customHome?: string): string {

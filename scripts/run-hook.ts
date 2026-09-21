@@ -88,25 +88,27 @@ export async function runHookDispatcher(
 
 // CLI runner
 if (import.meta.main) {
-  let input = "";
-  if (!process.stdin.isTTY) {
-    const chunks: Buffer[] = [];
-    for await (const chunk of process.stdin) {
-      chunks.push(Buffer.from(chunk));
+  (async () => {
+    let input = "";
+    if (!process.stdin.isTTY) {
+      const chunks: Buffer[] = [];
+      for await (const chunk of process.stdin) {
+        chunks.push(Buffer.from(chunk));
+      }
+      input = Buffer.concat(chunks).toString("utf-8").trim();
+    } else {
+      // Collect non-flag arguments
+      input = process.argv.slice(2).filter((a) => !a.startsWith("--")).join(" ");
     }
-    input = Buffer.concat(chunks).toString("utf-8").trim();
-  } else {
-    // Collect non-flag arguments
-    input = process.argv.slice(2).filter((a) => !a.startsWith("--")).join(" ");
-  }
 
-  const env = detectEnvironment(process.argv, process.env, input);
-  runHookDispatcher(input, env)
-    .then((out) => {
-      if (out) console.log(out);
-    })
-    .catch((err) => {
-      console.error(`Hook Dispatcher Error [${env}]: ${err.message}`);
-      process.exit(1);
-    });
+    const env = detectEnvironment(process.argv, process.env, input);
+    runHookDispatcher(input, env)
+      .then((out) => {
+        if (out) console.log(out);
+      })
+      .catch((err) => {
+        console.error(`Hook Dispatcher Error [${env}]: ${err.message}`);
+        process.exit(1);
+      });
+  })();
 }
