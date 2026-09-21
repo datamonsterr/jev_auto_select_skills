@@ -1,197 +1,112 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
-# ==============================================================================
-# Jev Skill Selector: Centralized Skills Bank Setup & Hook Installer
-# ==============================================================================
-# This script:
-# 1. Backs up existing skills in ~/.agents/skills, ~/.claude/skills, ~/.codex/skills
-# 2. Moves skills into a centralized skills bank (~/.agents/skills_bank)
-# 3. Packages and installs jev-skill-selector into ~/.agents/skills
-# 4. Configures Claude Code and Codex hooks to auto-route every prompt with Jev
-# ==============================================================================
-
+# Consolidate user skills into one real directory and install the selector's
+# supported integrations. Existing data is copied to a timestamped backup
+# before any consumer directory is cleaned.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SKILLS_BANK="${SKILLS_BANK_PATH:-$HOME/.agents/skills_bank}"
+SKILLS_BANK="${SKILLS_BANK_PATH:-/home/dat/dev/vinuni_aia/P-063/.agents/jev_skills}"
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 BACKUP_DIR="$HOME/.agents/skills_backup_$TIMESTAMP"
 
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m' # No Color
+command -v bun >/dev/null || { echo "Error: bun is required." >&2; exit 1; }
+mkdir -p "$SKILLS_BANK" "$BACKUP_DIR"
+echo "Central skills bank: $SKILLS_BANK"
+echo "Backup: $BACKUP_DIR"
 
-echo -e "\n${BLUE}======================================================${NC}"
-echo -e "${BLUE}  🚀 Jev Skill Selector: Automated Machine Setup      ${NC}"
-echo -e "${BLUE}======================================================${NC}\n"
+copy_skill_tree() {
+  local source="$1" name target
+  name="$(basename "$source")"
+  target="$SKILLS_BANK/$name"
+  cp -aL "$source" "$BACKUP_DIR/$name"
+  [ -e "$target" ] || cp -aL "$source" "$target"
+}
 
-# 1. Verify Bun runtime
-if ! command -v bun &> /dev/null; then
-    echo -e "${RED}Error: 'bun' runtime is not installed.${NC}"
-    echo "Please install Bun first: curl -fsSL https://bun.sh/install | bash"
-    exit 1
-fi
-echo -e "${GREEN}✓ Bun runtime detected:${NC} $(bun --version)"
-
-# 2. Create Skills Bank and Backup Directories
-echo -e "\n${YELLOW}Step 1: Setting up centralized skills bank & backup directory...${NC}"
-mkdir -p "$SKILLS_BANK"
-mkdir -p "$BACKUP_DIR"
-echo -e "Skills Bank Path : ${GREEN}$SKILLS_BANK${NC}"
-echo -e "Backup Directory : ${GREEN}$BACKUP_DIR${NC}"
-
-# 3. Collect and Move Skills from Agents, Claude, and Codex directories
-echo -e "\n${YELLOW}Step 2: Consolidating skills into skills bank...${NC}"
-
-SOURCE_DIRS=(
-    "$HOME/.agents/skills"
-    "$HOME/.claude/skills"
-    "$HOME/.codex/skills"
-    "$SCRIPT_DIR/skills"
-)
-
-MOVED_COUNT=0
-for src in "${SOURCE_DIRS[@]}"; do
-    if [ -d "$src" ]; then
-        echo "Scanning $src..."
-        for item in "$src"/*; do
-            if [ -d "$item" ]; then
-                SKILL_NAME="$(basename "$item")"
-                # Do not move jev-skill-selector itself
-                if [ "$SKILL_NAME" == "jev-skill-selector" ]; then
-                    continue
-                fi
-                
-                # Copy to backup
-                cp -r "$item" "$BACKUP_DIR/"
-                
-                # Move to centralized skills bank if not already present
-                if [ ! -d "$SKILLS_BANK/$SKILL_NAME" ]; then
-                    cp -r "$item" "$SKILLS_BANK/"
-                    MOVED_COUNT=$((MOVED_COUNT + 1))
-                fi
-                
-                # Remove from original agent folder if it's not the repo's skills folder
-                if [[ "$src" != "$SCRIPT_DIR/skills" ]]; then
-                    rm -rf "$item"
-                fi
-            fi
-        done
+consolidate_dir() {
+  local dir="$1" preserve_system="${2:-false}"
+  [ -d "$dir" ] || return 0
+  while IFS= read -r -d '' item; do
+    [ "$preserve_system" = true ] && [ "$(basename "$item")" = ".system" ] && continue
+    if [ -L "$item" ] && [ ! -e "$item" ]; then
+      rm -f -- "$item"
+      continue
     fi
-done
+    copy_skill_tree "$item"
+    rm -rf -- "$item"
+  done < <(find -P "$dir" -mindepth 1 -maxdepth 1 -print0)
+}
 
-echo -e "${GREEN}✓ Consolidated and backed up skills.${NC} Bank now contains: $(ls -1 "$SKILLS_BANK" | wc -l) skills."
+echo "Consolidating existing user skills..."
+consolidate_dir "$HOME/.agents/skills"
+consolidate_dir "$HOME/.claude/skills"
+consolidate_dir "$HOME/.codex/skills" true
+consolidate_dir "$HOME/.gemini/config/skills"
+consolidate_dir "$HOME/.config/opencode/skills"
 
-# 4. Install jev-skill-selector into ~/.agents/skills
-echo -e "\n${YELLOW}Step 3: Installing jev-skill-selector as the active router skill...${NC}"
+# Add bundled skills without deleting the source checkout.
+while IFS= read -r -d '' item; do copy_skill_tree "$item"; done \
+  < <(find -P "$SCRIPT_DIR/skills" -mindepth 1 -maxdepth 1 -type d -print0)
 mkdir -p "$HOME/.agents/skills"
-TARGET_SKILL_DIR="$HOME/.agents/skills/jev-skill-selector"
+mkdir -p "$SKILLS_BANK/jev-skill-selector"
+cp -aL "$SCRIPT_DIR/SKILL.md" "$SKILLS_BANK/jev-skill-selector/SKILL.md"
 
-rm -rf "$TARGET_SKILL_DIR"
-ln -sf "$SCRIPT_DIR" "$TARGET_SKILL_DIR" 2>/dev/null || cp -r "$SCRIPT_DIR" "$TARGET_SKILL_DIR"
-echo -e "${GREEN}✓ Linked jev-skill-selector to:${NC} $TARGET_SKILL_DIR"
+echo "Configuring Claude Code UserPromptSubmit hook..."
+CLAUDE_SETTINGS="$HOME/.claude/settings.json"
+mkdir -p "$HOME/.claude"
+bun -e '
+  const fs = require("fs"), path = process.argv[1], command = process.argv[2];
+  let data = {}; try { data = JSON.parse(fs.readFileSync(path, "utf8")); } catch {}
+  data.hooks ??= {}; data.hooks.UserPromptSubmit ??= [];
+  const exists = data.hooks.UserPromptSubmit.some((x) =>
+    (x?.hooks ?? []).some((hook) => hook.command === command) || x?.command === command);
+  if (!exists) data.hooks.UserPromptSubmit.push({ hooks: [{ type: "command", command, timeout: 30 }] });
+  fs.writeFileSync(path, JSON.stringify(data, null, 2) + "\n");
+' "$CLAUDE_SETTINGS" "bun run $SCRIPT_DIR/hooks/claude.ts"
 
-# 5. Environment configuration
-echo -e "\n${YELLOW}Step 4: Checking environment configuration...${NC}"
-ENV_FILE="$SCRIPT_DIR/.env"
-if [ ! -f "$ENV_FILE" ]; then
-    if [ -f "$SCRIPT_DIR/.env.example" ]; then
-        cp "$SCRIPT_DIR/.env.example" "$ENV_FILE"
-        echo -e "${YELLOW}Created .env from .env.example.${NC} Please update OPENROUTER_API_KEY in: $ENV_FILE"
-    fi
-else
-    echo -e "${GREEN}✓ .env found:${NC} $ENV_FILE"
-fi
-
-# 6. Configure Claude Code Hook (~/.claude/settings.json)
-echo -e "\n${YELLOW}Step 5: Configuring Claude Code Hook...${NC}"
-CLAUDE_CONFIG_DIR="$HOME/.claude"
-CLAUDE_SETTINGS="$CLAUDE_CONFIG_DIR/settings.json"
-mkdir -p "$CLAUDE_CONFIG_DIR"
-
-CLAUDE_HOOK_CMD="bun run $SCRIPT_DIR/hooks/claude.ts"
-
-if [ -f "$CLAUDE_SETTINGS" ]; then
-    # Use node/bun to cleanly merge hook into json
-    bun -e '
-    const fs = require("fs");
-    const path = "'"$CLAUDE_SETTINGS"'";
-    let data = {};
-    try { data = JSON.parse(fs.readFileSync(path, "utf8")); } catch(e){}
-    data.hooks = data.hooks || {};
-    data.hooks.UserPromptSubmit = data.hooks.UserPromptSubmit || [];
-    const cmd = "'"$CLAUDE_HOOK_CMD"'";
-    const exists = data.hooks.UserPromptSubmit.some(h => (typeof h === "string" ? h === cmd : h.command === cmd));
-    if (!exists) {
-        data.hooks.UserPromptSubmit.push({ command: cmd });
-        fs.writeFileSync(path, JSON.stringify(data, null, 2));
-        console.log("Hook added to Claude settings.json");
-    } else {
-        console.log("Hook already present in Claude settings.json");
-    }
-    '
-else
-    cat <<EOF > "$CLAUDE_SETTINGS"
-{
-  "hooks": {
-    "UserPromptSubmit": [
-      {
-        "command": "$CLAUDE_HOOK_CMD"
-      }
-    ]
+echo "Configuring Codex UserPromptSubmit hook..."
+CODEX_HOOKS="$HOME/.codex/hooks.json"
+mkdir -p "$HOME/.codex"
+bun -e '
+  const fs = require("fs"), path = process.argv[1], command = process.argv[2];
+  let data = {}; try { data = JSON.parse(fs.readFileSync(path, "utf8")); } catch {}
+  data.description ??= "Jev skill routing"; data.hooks ??= {};
+  data.hooks.UserPromptSubmit ??= [];
+  let group = data.hooks.UserPromptSubmit.find((x) => !x.matcher);
+  if (!group) { group = { hooks: [] }; data.hooks.UserPromptSubmit.push(group); }
+  group.hooks ??= [];
+  if (!group.hooks.some((hook) => hook.command === command)) {
+    group.hooks.push({ type: "command", command, timeout: 30, additionalContextLimit: 5000 });
   }
-}
-EOF
-    echo -e "${GREEN}✓ Created Claude settings with UserPromptSubmit hook:${NC} $CLAUDE_SETTINGS"
-fi
+  fs.writeFileSync(path, JSON.stringify(data, null, 2) + "\n");
+' "$CODEX_HOOKS" "bun run $SCRIPT_DIR/hooks/codex.ts"
 
-# 7. Configure Codex Hook (~/.codex/config.json)
-echo -e "\n${YELLOW}Step 6: Configuring Codex Hook...${NC}"
-CODEX_CONFIG_DIR="$HOME/.codex"
-CODEX_CONFIG="$CODEX_CONFIG_DIR/config.json"
-mkdir -p "$CODEX_CONFIG_DIR"
-CODEX_HOOK_CMD="bun run $SCRIPT_DIR/hooks/codex.ts"
-
-if [ -f "$CODEX_CONFIG" ]; then
-    bun -e '
-    const fs = require("fs");
-    const path = "'"$CODEX_CONFIG"'";
-    let data = {};
-    try { data = JSON.parse(fs.readFileSync(path, "utf8")); } catch(e){}
-    data.hooks = data.hooks || {};
-    data.hooks.pre_prompt = "'"$CODEX_HOOK_CMD"'";
-    fs.writeFileSync(path, JSON.stringify(data, null, 2));
-    console.log("Hook configured in Codex config.json");
-    '
-else
-    cat <<EOF > "$CODEX_CONFIG"
-{
-  "hooks": {
-    "pre_prompt": "$CODEX_HOOK_CMD"
-  }
-}
-EOF
-    echo -e "${GREEN}✓ Created Codex config with pre_prompt hook:${NC} $CODEX_CONFIG"
-fi
-
-# 8. Configure OpenCode Plugin
-echo -e "\n${YELLOW}Step 7: Configuring OpenCode Plugin...${NC}"
-OPENCODE_PLUGIN_DIR="$HOME/.config/opencode/plugins"
+echo "Installing OpenCode plugin (real file, no symlink)..."
+OPENCODE_PLUGIN_DIR="$HOME/.config/opencode/plugin"
 mkdir -p "$OPENCODE_PLUGIN_DIR"
-ln -sf "$SCRIPT_DIR/plugins/opencode.ts" "$OPENCODE_PLUGIN_DIR/jev-skill-selector.ts" 2>/dev/null || cp "$SCRIPT_DIR/plugins/opencode.ts" "$OPENCODE_PLUGIN_DIR/jev-skill-selector.ts"
-echo -e "${GREEN}✓ Linked OpenCode plugin to:${NC} $OPENCODE_PLUGIN_DIR/jev-skill-selector.ts"
+cp "$SCRIPT_DIR/plugins/opencode.ts" "$OPENCODE_PLUGIN_DIR/jev-skill-selector.ts"
 
-echo -e "\n${GREEN}======================================================${NC}"
-echo -e "${GREEN}  🎉 Setup Complete!                                  ${NC}"
-echo -e "${GREEN}======================================================${NC}"
-echo -e "Centralized Skills Bank : ${BLUE}$SKILLS_BANK${NC}"
-echo -e "Backup Location        : ${BLUE}$BACKUP_DIR${NC}"
-echo -e "Router Skill           : ${BLUE}$TARGET_SKILL_DIR${NC}"
-echo ""
-echo -e "${YELLOW}How to add new skills in the future:${NC}"
-echo -e "  Simply create a folder with a SKILL.md in your skills bank:"
-echo -e "  ${BLUE}mkdir -p $SKILLS_BANK/my-new-skill${NC}"
-echo -e "  ${BLUE}touch $SKILLS_BANK/my-new-skill/SKILL.md${NC}"
-echo -e "  Jev will automatically discover and route to it on your next prompt!"
-echo ""
+if [ -f "$HOME/.config/opencode/opencode.json" ]; then
+  bun -e '
+    const fs = require("fs"), path = process.argv[1], skills = process.argv[2];
+    const data = JSON.parse(fs.readFileSync(path, "utf8"));
+    data.skills ??= {};
+    data.skills.paths = [skills];
+    fs.writeFileSync(path, JSON.stringify(data, null, 2) + "\n");
+  ' "$HOME/.config/opencode/opencode.json" "$SKILLS_BANK"
+fi
+
+echo "Configuring Antigravity skills fallback and plugin hook..."
+GEMINI_CONFIG="$HOME/.gemini/config"
+mkdir -p "$GEMINI_CONFIG/plugins/jev-skill-selector"
+cp "$SCRIPT_DIR/plugins/antigravity/plugin.json" "$GEMINI_CONFIG/plugins/jev-skill-selector/plugin.json"
+cp "$SCRIPT_DIR/plugins/antigravity/hooks.json" "$GEMINI_CONFIG/plugins/jev-skill-selector/hooks.json"
+cat > "$GEMINI_CONFIG/skills.json" <<EOF
+{
+  "entries": [{ "path": "$SKILLS_BANK" }]
+}
+EOF
+chmod 600 "$SCRIPT_DIR/.env" 2>/dev/null || true
+
+echo
+echo "Setup complete. Restart Claude Code, Codex, and OpenCode to load changes."
+echo "Codex may ask you to review/trust the new hook via /hooks."

@@ -85,7 +85,7 @@ OPENROUTER_API_KEY=sk-or-v1-your-key-here
 MODEL=~typesafe/jev-latest
 
 # Optional: Centralized Skills Bank Directory (defaults to ~/.agents/skills_bank or ./skills)
-SKILLS_BANK_PATH=/home/dat/.agents/skills_bank
+SKILLS_BANK_PATH=/home/dat/dev/vinuni_aia/P-063/.agents/jev_skills
 ```
 
 ---

@@ -47,12 +47,25 @@ if (import.meta.main) {
     input = process.argv.slice(2).join(" ");
   }
 
-  handleClaudeHook(input)
-    .then((out) => {
-      if (out) console.log(out);
-    })
-    .catch((err) => {
-      console.error(`Claude Hook Error: ${err.message}`);
-      process.exit(1);
-    });
+  // If invoked by Antigravity CLI lifecycle hook
+  if (input.startsWith("{") && (input.includes('"invocationNum"') || input.includes('"conversationId"') || input.includes('"transcriptPath"'))) {
+    const { handleAntigravityHook } = await import("./antigravity");
+    handleAntigravityHook(input)
+      .then((out) => {
+        console.log(JSON.stringify(out, null, 2));
+      })
+      .catch((err) => {
+        console.error(`[jev-antigravity] Error: ${err.message}`);
+        console.log(JSON.stringify({ injectSteps: [] }));
+      });
+  } else {
+    handleClaudeHook(input)
+      .then((out) => {
+        if (out) console.log(out);
+      })
+      .catch((err) => {
+        console.error(`Claude Hook Error: ${err.message}`);
+        process.exit(1);
+      });
+  }
 }

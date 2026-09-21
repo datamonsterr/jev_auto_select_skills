@@ -20,40 +20,40 @@ export default function jevSkillSelectorPlugin(options: OpenCodePluginOptions = 
     description: "Dynamically selects and loads skills using TypeSafe Jev decision model",
 
     hooks: {
-      /**
-       * Runs before chat message is dispatched to the LLM
-       */
-      "chat:before": async (context: { messages: Array<{ role: string; content: string }>; systemPrompt?: string }) => {
-        if (!autoInject || !context.messages || context.messages.length === 0) {
-          return context;
-        }
+      // OpenCode 1.x lifecycle hook. The old `chat:before` event is not loaded
+      // by current OpenCode releases.
+      "experimental.chat.messages.transform": async (_input: unknown, output: any) => {
+        if (!autoInject || !Array.isArray(output?.messages)) return;
 
-        const lastUser = [...context.messages].reverse().find((m) => m.role === "user");
-        if (!lastUser || !lastUser.content) {
-          return context;
-        }
+        const messages = output.messages;
+        const lastUser = [...messages].reverse().find((entry: any) => entry?.info?.role === "user");
+        const parts = lastUser?.parts ?? [];
+        const prompt = parts
+          .filter((part: any) => part?.type === "text" && typeof part.text === "string")
+          .map((part: any) => part.text)
+          .join("\n")
+          .trim();
+        if (!prompt) return;
 
         try {
           const result = await selectSkills({
-            userPrompt: lastUser.content,
+            userPrompt: prompt,
             skillsDir: options.skillsDir,
-            options: { threshold: options.threshold || 0.05 },
+            options: { threshold: options.threshold ?? 0.05 },
           });
-
           if (result.selectedSkills.length > 0) {
-            const skillContext = formatSkillSummary(result.selectedSkills);
-            if (context.systemPrompt) {
-              context.systemPrompt = `${context.systemPrompt}\n\n${skillContext}`;
-            } else {
-              context.systemPrompt = skillContext;
-            }
+            // Add a model-visible system message without mutating the user text.
+            messages.push({
+              info: { role: "system", synthetic: true },
+              parts: [{ type: "text", text: formatSkillSummary(result.selectedSkills) }],
+            });
           }
         } catch (err: any) {
           console.warn(`[jev-skill-selector] Plugin hook error: ${err.message}`);
         }
-
-        return context;
       },
+      // Kept as a compatibility alias for older OpenCode 1.x builds.
+      "chat:before": async (context: any) => context,
     },
 
     tools: [

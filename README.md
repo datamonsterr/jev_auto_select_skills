@@ -16,7 +16,7 @@ We provide automated setup scripts for Linux/macOS (`.sh`) and Windows (`.ps1`).
 1. Consolidate and back up all existing skills from `~/.agents/skills`, `~/.claude/skills`, `~/.codex/skills` into a centralized bank (`~/.agents/skills_bank`).
 2. Package and install `jev-skill-selector` as the active gatekeeper skill in `~/.agents/skills/jev-skill-selector`.
 3. Configure **Claude Code** and **Codex** hooks to automatically execute Jev on **every user prompt**.
-4. Install the **OpenCode** plugin into `~/.config/opencode/plugins/`.
+4. Install the **OpenCode** plugin into `~/.config/opencode/plugin/`.
 
 ### Linux / macOS:
 
@@ -101,12 +101,17 @@ Edit `~/.claude/settings.json` and add the `UserPromptSubmit` hook:
 
 ### 3. Codex Hook Setup (Runs on Every Prompt)
 
-Codex supports pre-prompt hook execution configured in `~/.codex/config.json`:
+Current Codex releases use `~/.codex/hooks.json`:
 
 ```json
 {
   "hooks": {
-    "pre_prompt": "bun run /absolute/path/to/jev_auto_select_skills/hooks/codex.ts"
+    "UserPromptSubmit": [{
+      "hooks": [{
+        "type": "command",
+        "command": "bun run /absolute/path/to/jev_auto_select_skills/hooks/codex.ts"
+      }]
+    }]
   }
 }
 ```
@@ -116,9 +121,10 @@ Codex supports pre-prompt hook execution configured in `~/.codex/config.json`:
 - Jev selects the relevant skills and returns:
   ```json
   {
-    "prompt": "<user prompt>",
-    "injectedContext": "### Recommended Agent Skills\n- **tdd** ...",
-    "skills": [{ "name": "tdd", "probability": 0.88, "confidence": 0.95 }]
+    "hookSpecificOutput": {
+      "hookEventName": "UserPromptSubmit",
+      "additionalContext": "### Recommended Agent Skills\n- **tdd** ..."
+    }
   }
   ```
 - Codex injects this context directly into the agent planning phase.
@@ -127,12 +133,12 @@ Codex supports pre-prompt hook execution configured in `~/.codex/config.json`:
 
 ### 4. OpenCode Plugin Setup
 
-OpenCode loads TypeScript plugins from `.opencode/plugins/` or `~/.config/opencode/plugins/`.
+OpenCode loads TypeScript plugins from `.opencode/plugin/` or `~/.config/opencode/plugin/`.
 
-1. Copy or link [`plugins/opencode.ts`](plugins/opencode.ts) to your OpenCode plugins directory:
+1. Copy [`plugins/opencode.ts`](plugins/opencode.ts) to your OpenCode plugin directory:
    ```bash
-   mkdir -p ~/.config/opencode/plugins
-   ln -sf /absolute/path/to/jev_auto_select_skills/plugins/opencode.ts ~/.config/opencode/plugins/jev-skill-selector.ts
+   mkdir -p ~/.config/opencode/plugin
+   cp /absolute/path/to/jev_auto_select_skills/plugins/opencode.ts ~/.config/opencode/plugin/jev-skill-selector.ts
    ```
 
 2. Or register it in your `opencode.config.ts`:
@@ -151,7 +157,7 @@ OpenCode loads TypeScript plugins from `.opencode/plugins/` or `~/.config/openco
    ```
 
 **Features in OpenCode:**
-- `"chat:before"` hook: Automatically enriches user messages with matching skill instructions before LLM execution.
+- `"experimental.chat.messages.transform"` hook: Automatically enriches model-visible messages with matching skill instructions before LLM execution.
 - `select_skill` tool: Allows OpenCode models to dynamically query the skill bank during complex autonomous runs.
 
 ---

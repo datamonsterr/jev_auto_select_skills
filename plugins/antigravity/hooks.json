@@ -1,0 +1,11 @@
+{
+  "jev-skill-selector": {
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "bun run /home/dat/dev/jev_skill_selector/hooks/antigravity.ts",
+        "timeout": 30
+      }
+    ]
+  }
+}

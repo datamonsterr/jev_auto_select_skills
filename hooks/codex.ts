@@ -9,9 +9,14 @@ export interface CodexHookInput {
 }
 
 export interface CodexHookOutput {
+  /** Legacy fields retained for callers using the standalone hook API. */
   prompt: string;
   injectedContext: string;
   skills: Array<{ name: string; probability: number; confidence: number }>;
+  hookSpecificOutput: {
+    hookEventName: "UserPromptSubmit";
+    additionalContext: string;
+  };
 }
 
 /**
@@ -45,6 +50,10 @@ export async function handleCodexHook(
       prompt: "",
       injectedContext: "",
       skills: [],
+      hookSpecificOutput: {
+        hookEventName: "UserPromptSubmit",
+        additionalContext: "",
+      },
     };
   }
 
@@ -63,6 +72,10 @@ export async function handleCodexHook(
       probability: s.probability,
       confidence: s.confidence,
     })),
+    hookSpecificOutput: {
+      hookEventName: "UserPromptSubmit",
+      additionalContext: injectedContext,
+    },
   };
 }
 
@@ -81,7 +94,9 @@ if (import.meta.main) {
 
   handleCodexHook(input)
     .then((out) => {
-      console.log(JSON.stringify(out, null, 2));
+      // Emit only Codex's current hook contract on stdout. The richer legacy
+      // fields remain available to programmatic callers and older tests.
+      console.log(JSON.stringify(out.hookSpecificOutput, null, 2));
     })
     .catch((err) => {
       console.error(JSON.stringify({ error: err.message }));

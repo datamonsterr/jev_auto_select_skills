@@ -1,6 +1,7 @@
 import { describe, it, expect, mock } from "bun:test";
 import { handleCodexHook } from "../hooks/codex";
 import { handleClaudeHook } from "../hooks/claude";
+import { handleAntigravityHook } from "../hooks/antigravity";
 import jevSkillSelectorPlugin from "../plugins/opencode";
 import { detectEnvironment, runHookDispatcher } from "../scripts/run-hook";
 
@@ -59,13 +60,62 @@ describe("hooks and plugin", () => {
     expect(plugin.tools[0].name).toBe("select_skill");
   });
 
+  it("handles Antigravity hook input and injects ephemeral message", async () => {
+    const mockSelectSkills = mock(async () => ({
+      primarySkill: "writing-srs",
+      selectedSkills: [
+        {
+          name: "writing-srs",
+          probability: 0.89,
+          confidence: 0.88,
+          description: "Generate Software Requirements Specification",
+        },
+      ],
+      answers: {},
+    }));
+
+    const result = await handleAntigravityHook(
+      JSON.stringify({
+        invocationNum: 1,
+        prompt: "viết tài liệu SRS cho hệ thống",
+      }),
+      { selectSkillsFn: mockSelectSkills as any }
+    );
+
+    expect(result.injectSteps).toHaveLength(1);
+    expect(result.injectSteps[0].ephemeralMessage).toContain("Jev Dynamic Skill Routing");
+    expect(result.injectSteps[0].ephemeralMessage).toContain("writing-srs");
+  });
+
+  it("skips invocation when invocationNum > 1 in Antigravity hook", async () => {
+    const mockSelectSkills = mock(async () => ({
+      primarySkill: "writing-srs",
+      selectedSkills: [],
+      answers: {},
+    }));
+
+    const result = await handleAntigravityHook(
+      JSON.stringify({
+        invocationNum: 2,
+        prompt: "some tool output",
+      }),
+      { selectSkillsFn: mockSelectSkills as any }
+    );
+
+    expect(result.injectSteps).toHaveLength(0);
+    expect(mockSelectSkills).not.toHaveBeenCalled();
+  });
+
   it("detects environment from arguments or env vars", () => {
     expect(detectEnvironment(["--mode=codex"])).toBe("codex");
     expect(detectEnvironment(["--mode=claude"])).toBe("claude");
     expect(detectEnvironment(["--mode=opencode"])).toBe("opencode");
+    expect(detectEnvironment(["--mode=antigravity"])).toBe("antigravity");
+    expect(detectEnvironment([], { ANTIGRAVITY: "1" })).toBe("antigravity");
     expect(detectEnvironment([], { OPENCODE: "1" })).toBe("opencode");
     expect(detectEnvironment([], { CLAUDE_CODE: "1" })).toBe("claude");
     expect(detectEnvironment([], { CODEX_RUNNER: "1" })).toBe("codex");
+    expect(detectEnvironment([], {}, '{"invocationNum": 1}')).toBe("antigravity");
     expect(detectEnvironment([], {})).toBe("cli");
   });
 });
