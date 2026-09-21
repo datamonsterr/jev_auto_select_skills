@@ -1,0 +1,11 @@
+{
+  "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
+  "name": "jev-skill-selector",
+  "version": "1.0.0",
+  "description": "Agent tool using TypeSafe Jev decision model to dynamically select skills",
+  "author": {
+    "name": "datamonsterr",
+    "email": "phamthanhdat17092004@gmail.com"
+  },
+  "hooks": "./hooks.json"
+}

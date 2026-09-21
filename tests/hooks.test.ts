@@ -118,4 +118,70 @@ describe("hooks and plugin", () => {
     expect(detectEnvironment([], {}, '{"invocationNum": 1}')).toBe("antigravity");
     expect(detectEnvironment([], {})).toBe("cli");
   });
+
+  it("resolves skills paths using agent and global defaults with env overrides", async () => {
+    const { resolveSkillsSearchPaths } = await import("../index");
+    
+    // Default search paths should contain .agents/jev_skills
+    const defaultPaths = resolveSkillsSearchPaths();
+    expect(defaultPaths.length).toBeGreaterThan(0);
+    expect(defaultPaths.some((p) => p.includes("jev_skills"))).toBe(true);
+
+    // Explicit path override
+    const explicitPaths = resolveSkillsSearchPaths({ customPath: "/tmp/custom_skills" });
+    // If doesn't exist, it won't add non-existent, but if we point to an existing dir:
+    const cwd = process.cwd();
+    const existingExplicit = resolveSkillsSearchPaths({ customPath: "./.agents/jev_skills" });
+    expect(existingExplicit[0]).toContain("jev_skills");
+  });
+
+  it("handles Codex hook wire format output containing hookSpecificOutput", async () => {
+    const mockSelectSkills = mock(async () => ({
+      primarySkill: "git-commit",
+      selectedSkills: [
+        {
+          name: "git-commit",
+          probability: 0.95,
+          confidence: 0.95,
+          description: "Conventional git commits",
+        },
+      ],
+      answers: {},
+    }));
+
+    const result = await handleCodexHook(
+      JSON.stringify({ prompt: "Please commit the changes" }),
+      { selectSkillsFn: mockSelectSkills as any }
+    );
+
+    expect(result.hookSpecificOutput).toBeDefined();
+    expect(result.hookSpecificOutput.hookEventName).toBe("UserPromptSubmit");
+    expect(result.hookSpecificOutput.additionalContext).toContain("git-commit");
+  });
+
+  it("handles Claude structured JSON event input and extracts prompt", async () => {
+    const mockSelectSkills = mock(async () => ({
+      primarySkill: "tdd",
+      selectedSkills: [
+        {
+          name: "tdd",
+          probability: 0.95,
+          confidence: 0.95,
+          description: "Test driven development",
+        },
+      ],
+      answers: {},
+    }));
+
+    const output = await handleClaudeHook(
+      JSON.stringify({
+        prompt: "Write unit tests first with TDD",
+        hook_event_name: "UserPromptSubmit",
+        session_id: "test-session-123",
+      }),
+      { selectSkillsFn: mockSelectSkills as any }
+    );
+
+    expect(output).toContain("tdd");
+  });
 });

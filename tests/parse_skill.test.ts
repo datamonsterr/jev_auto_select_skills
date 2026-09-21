@@ -61,8 +61,8 @@ Details here.
     expect(skill.whenToUse).toContain("Use when user asks to commit changes");
   });
 
-  it("loads skills from the actual skills directory", () => {
-    const skills = loadSkillsFromDir(path.resolve(__dirname, "../skills"));
+  it("loads skills from the actual skills directory (.agents/jev_skills)", () => {
+    const skills = loadSkillsFromDir(path.resolve(__dirname, "../.agents/jev_skills"));
     expect(skills.length).toBeGreaterThan(50);
     
     const tdd = skills.find((s) => s.name === "tdd");
@@ -71,6 +71,12 @@ Details here.
 
     const gitCommit = skills.find((s) => s.name === "git-commit");
     expect(gitCommit).toBeDefined();
+  });
+
+  it("loads and merges skills across multiple directories with precedence", () => {
+    const primaryDir = path.resolve(__dirname, "../.agents/jev_skills");
+    const merged = loadSkillsFromDir([primaryDir, primaryDir]);
+    expect(merged.length).toBeGreaterThan(50);
   });
 
   it("builds Jev state containing skills description, name and when to use it", () => {

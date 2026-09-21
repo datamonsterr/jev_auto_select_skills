@@ -60,32 +60,89 @@ export OPENROUTER_API_KEY="sk-or-v1-your-openrouter-key-here"
 # Model slug
 export MODEL="~typesafe/jev-latest"
 
-# Centralized Skills Bank path
-export SKILLS_BANK_PATH="$HOME/.agents/skills_bank"
+# Skills Bank path configuration (optional)
+# By default reads both:
+#  - Agent skills: ./.agents/jev_skills
+#  - Global skills: ~/.agents/jev_skills/
+#
+# Override global skills directory:
+# export GLOBAL_SKILLS_PATH="$HOME/.agents/jev_skills"
+#
+# Override agent skills directory:
+# export AGENT_SKILLS_PATH="./.agents/jev_skills"
+#
+# Override all search paths with a single custom bank:
+# export SKILLS_BANK_PATH="/custom/path/to/skills"
 ```
 
-The selector automatically resolves the skills bank in this order:
+The selector automatically resolves and merges skills with project-level precedence:
 1. `--skills-dir <path>` CLI argument or programmatic option
-2. `process.env.SKILLS_BANK_PATH`
-3. `process.env.SKILLS_DIR`
-4. `~/.agents/skills_bank`
-5. `~/.gemini/config/skills`
-6. `./skills`
+2. `process.env.SKILLS_BANK_PATH` / `process.env.SKILLS_DIR`
+3. Agent skills directory: `process.env.AGENT_SKILLS_PATH` or `./.agents/jev_skills`
+4. Global skills directory: `process.env.GLOBAL_SKILLS_PATH` or `~/.agents/jev_skills/`
+5. Legacy fallbacks: `~/.agents/skills_bank`, `~/.gemini/config/skills`, `./skills`
 
 ---
 
-### 2. Claude Code Hook Setup (Runs on Every Prompt)
+### 2. Claude Code Hook & Plugin Setup
 
-Claude Code supports event hooks in `~/.claude/settings.json` (or `.claude/settings.json`).
+Claude Code supports event hooks in `~/.claude/settings.json` and agent plugins via `.claude-plugin/plugin.json`.
 
-Edit `~/.claude/settings.json` and add the `UserPromptSubmit` hook:
-
+#### Option A: Hook Configuration (`~/.claude/settings.json`)
 ```json
 {
   "hooks": {
     "UserPromptSubmit": [
       {
-        "command": "bun run /absolute/path/to/jev_auto_select_skills/hooks/claude.ts"
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run /path/to/jev_skill_selector/hooks/claude.ts",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+#### Option B: Agent Plugin (`.claude-plugin/plugin.json`)
+This repo includes a validated Claude Code plugin. Install it via `claude plugin install` or point to `plugins/claude/plugin.json`.
+
+**How it works:**
+- When a prompt is submitted in Claude Code, Claude provides the prompt event JSON on stdin.
+- `hooks/claude.ts` queries Jev against your skills bank and returns the Claude hook wire format:
+  ```json
+  {
+    "hookSpecificOutput": {
+      "hookEventName": "UserPromptSubmit",
+      "additionalContext": "### Recommended Agent Skills\n- **database-schema-design** ..."
+    }
+  }
+  ```
+- Claude Code automatically injects the matching skills into the context.
+
+---
+
+### 3. Codex Hook & Plugin Setup
+
+Codex supports hooks via `~/.codex/hooks.json` and agent plugins via `.codex-plugin/plugin.json`.
+
+```json
+{
+  "description": "Jev skill routing",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run /path/to/jev_skill_selector/hooks/codex.ts",
+            "timeout": 30,
+            "additionalContextLimit": 5000
+          }
+        ]
       }
     ]
   }
@@ -93,32 +150,8 @@ Edit `~/.claude/settings.json` and add the `UserPromptSubmit` hook:
 ```
 
 **How it works:**
-- Every time you submit a prompt in Claude Code, Claude pipes the prompt text to `hooks/claude.ts`.
-- The hook queries Jev against your skills bank and outputs formatted markdown context of the matching skills.
-- Claude Code automatically receives and loads only those skills before generating its answer.
-
----
-
-### 3. Codex Hook Setup (Runs on Every Prompt)
-
-Current Codex releases use `~/.codex/hooks.json`:
-
-```json
-{
-  "hooks": {
-    "UserPromptSubmit": [{
-      "hooks": [{
-        "type": "command",
-        "command": "bun run /absolute/path/to/jev_auto_select_skills/hooks/codex.ts"
-      }]
-    }]
-  }
-}
-```
-
-**How it works:**
 - When Codex receives a prompt, it sends `{ "prompt": "<user prompt>" }` to `hooks/codex.ts`.
-- Jev selects the relevant skills and returns:
+- Jev selects the relevant skills and returns the wire contract:
   ```json
   {
     "hookSpecificOutput": {
@@ -133,31 +166,31 @@ Current Codex releases use `~/.codex/hooks.json`:
 
 ### 4. OpenCode Plugin Setup
 
-OpenCode loads TypeScript plugins from `.opencode/plugin/` or `~/.config/opencode/plugin/`.
+OpenCode loads TypeScript plugins from `.opencode/plugin/` or `~/.config/opencode/plugin/`, or via `"plugin"` in `opencode.json`.
 
 1. Copy [`plugins/opencode.ts`](plugins/opencode.ts) to your OpenCode plugin directory:
    ```bash
    mkdir -p ~/.config/opencode/plugin
-   cp /absolute/path/to/jev_auto_select_skills/plugins/opencode.ts ~/.config/opencode/plugin/jev-skill-selector.ts
+   cp /path/to/jev_skill_selector/plugins/opencode.ts ~/.config/opencode/plugin/jev-skill-selector.ts
    ```
 
-2. Or register it in your `opencode.config.ts`:
-   ```typescript
-   import jevSkillSelectorPlugin from "./plugins/opencode";
-
-   export default {
-     plugins: [
-       jevSkillSelectorPlugin({
-         skillsDir: process.env.SKILLS_BANK_PATH || "~/.agents/skills_bank",
-         threshold: 0.05,
-         autoInject: true,
-       }),
+2. Or register it in `~/.config/opencode/opencode.json`:
+   ```json
+   {
+     "plugin": [
+       "/path/to/jev_skill_selector/plugins/opencode.ts"
      ],
-   };
+     "skills": {
+       "paths": [
+         "~/.agents/jev_skills"
+       ]
+     }
+   }
    ```
 
 **Features in OpenCode:**
 - `"experimental.chat.messages.transform"` hook: Automatically enriches model-visible messages with matching skill instructions before LLM execution.
+- `"experimental.chat.system.transform"` hook: Supports system prompt transformation.
 - `select_skill` tool: Allows OpenCode models to dynamically query the skill bank during complex autonomous runs.
 
 ---
@@ -166,11 +199,11 @@ OpenCode loads TypeScript plugins from `.opencode/plugin/` or `~/.config/opencod
 
 Once your machine is configured, **never worry about skill context bloat again**.
 
-To add a new skill, simply create a directory with a `SKILL.md` inside your centralized skills bank (`~/.agents/skills_bank`):
+To add a new skill, create a directory with a `SKILL.md` inside your global skills bank (`~/.agents/jev_skills`) or project-local bank (`./.agents/jev_skills`):
 
 ```bash
-mkdir -p ~/.agents/skills_bank/my-new-tool
-cat <<'EOF' > ~/.agents/skills_bank/my-new-tool/SKILL.md
+mkdir -p ~/.agents/jev_skills/my-new-tool
+cat <<'EOF' > ~/.agents/jev_skills/my-new-tool/SKILL.md
 ---
 name: my-new-tool
 description: Automate database migrations using Liquibase. Use when user asks about database migration or schema versioning.

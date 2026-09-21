@@ -6,19 +6,23 @@ import { formatSkillSummary } from "../lib/model";
  * Handle Claude hook input (stdin or string prompt)
  */
 export async function handleClaudeHook(
-  rawInput: string,
-  options: { selectSkillsFn?: typeof selectSkills; skillsDir?: string } = {}
+  rawInput: string | { prompt?: string; userPrompt?: string; message?: string },
+  options: { selectSkillsFn?: typeof selectSkills; skillsDir?: string | string[] } = {}
 ): Promise<string> {
   const selectFn = options.selectSkillsFn || selectSkills;
-  let prompt = rawInput.trim();
+  let prompt = "";
 
-  // Try parsing JSON if passed as Claude structured event
-  if (prompt.startsWith("{")) {
-    try {
-      const parsed = JSON.parse(prompt);
-      prompt = parsed.prompt || parsed.userPrompt || parsed.message || prompt;
-    } catch {
-      // Keep as string
+  if (typeof rawInput === "object" && rawInput !== null) {
+    prompt = rawInput.prompt || rawInput.userPrompt || rawInput.message || "";
+  } else {
+    prompt = (rawInput || "").trim();
+    if (prompt.startsWith("{")) {
+      try {
+        const parsed = JSON.parse(prompt);
+        prompt = parsed.prompt || parsed.userPrompt || parsed.message || prompt;
+      } catch {
+        // Keep as string
+      }
     }
   }
 
@@ -61,7 +65,26 @@ if (import.meta.main) {
   } else {
     handleClaudeHook(input)
       .then((out) => {
-        if (out) console.log(out);
+        const isClaudeStructured =
+          input.trim().startsWith("{") ||
+          Boolean(process.env.CLAUDE_PLUGIN_ROOT || process.env.CLAUDE_CODE);
+
+        if (isClaudeStructured) {
+          console.log(
+            JSON.stringify(
+              {
+                hookSpecificOutput: {
+                  hookEventName: "UserPromptSubmit",
+                  additionalContext: out,
+                },
+              },
+              null,
+              2
+            )
+          );
+        } else if (out) {
+          console.log(out);
+        }
       })
       .catch((err) => {
         console.error(`Claude Hook Error: ${err.message}`);

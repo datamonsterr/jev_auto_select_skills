@@ -1,11 +1,11 @@
 import { describe, it, expect } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
-import { selectSkills } from "../index";
+import { selectSkills, resolveSkillsBankPath, resolveSkillsSearchPaths, loadSkillsFromDir } from "../index";
 
 describe("complex_testset evaluation", () => {
   const complexTestsetPath = path.resolve(__dirname, "../golden_set/complex_testset.json");
-  const skillsDir = path.resolve(__dirname, "../skills");
+  const skillsDir = resolveSkillsBankPath();
 
   it("validates complex testset schema and verifies all required and acceptable skills exist", () => {
     const raw = fs.readFileSync(complexTestsetPath, "utf-8");
@@ -14,9 +14,8 @@ describe("complex_testset evaluation", () => {
     expect(Array.isArray(testcases)).toBe(true);
     expect(testcases.length).toBeGreaterThanOrEqual(10);
 
-    const availableSkillDirs = new Set(
-      fs.readdirSync(skillsDir).filter((d) => fs.existsSync(path.join(skillsDir, d, "SKILL.md")))
-    );
+    const availableSkills = loadSkillsFromDir(resolveSkillsSearchPaths());
+    const availableSkillDirs = new Set(availableSkills.map((s) => s.name));
 
     for (const tc of testcases) {
       expect(tc.id).toBeDefined();

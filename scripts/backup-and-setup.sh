@@ -5,7 +5,7 @@ set -euo pipefail
 # supported integrations. Existing data is copied to a timestamped backup
 # before any consumer directory is cleaned.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SKILLS_BANK="${SKILLS_BANK_PATH:-/home/dat/dev/vinuni_aia/P-063/.agents/jev_skills}"
+SKILLS_BANK="${SKILLS_BANK_PATH:-$HOME/.agents/jev_skills}"
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 BACKUP_DIR="$HOME/.agents/skills_backup_$TIMESTAMP"
 
@@ -44,8 +44,13 @@ consolidate_dir "$HOME/.gemini/config/skills"
 consolidate_dir "$HOME/.config/opencode/skills"
 
 # Add bundled skills without deleting the source checkout.
-while IFS= read -r -d '' item; do copy_skill_tree "$item"; done \
-  < <(find -P "$SCRIPT_DIR/skills" -mindepth 1 -maxdepth 1 -type d -print0)
+if [ -d "$SCRIPT_DIR/.agents/jev_skills" ]; then
+  while IFS= read -r -d '' item; do copy_skill_tree "$item"; done \
+    < <(find -P "$SCRIPT_DIR/.agents/jev_skills" -mindepth 1 -maxdepth 1 -type d -print0)
+elif [ -d "$SCRIPT_DIR/skills" ]; then
+  while IFS= read -r -d '' item; do copy_skill_tree "$item"; done \
+    < <(find -P "$SCRIPT_DIR/skills" -mindepth 1 -maxdepth 1 -type d -print0)
+fi
 mkdir -p "$HOME/.agents/skills"
 mkdir -p "$SKILLS_BANK/jev-skill-selector"
 cp -aL "$SCRIPT_DIR/SKILL.md" "$SKILLS_BANK/jev-skill-selector/SKILL.md"
@@ -80,19 +85,24 @@ bun -e '
   fs.writeFileSync(path, JSON.stringify(data, null, 2) + "\n");
 ' "$CODEX_HOOKS" "bun run $SCRIPT_DIR/hooks/codex.ts"
 
-echo "Installing OpenCode plugin (real file, no symlink)..."
+echo "Installing OpenCode plugin..."
 OPENCODE_PLUGIN_DIR="$HOME/.config/opencode/plugin"
 mkdir -p "$OPENCODE_PLUGIN_DIR"
 cp "$SCRIPT_DIR/plugins/opencode.ts" "$OPENCODE_PLUGIN_DIR/jev-skill-selector.ts"
+rm -f "$OPENCODE_PLUGIN_DIR/jev-skill-selector.ts.disabled-backup"
 
 if [ -f "$HOME/.config/opencode/opencode.json" ]; then
   bun -e '
-    const fs = require("fs"), path = process.argv[1], skills = process.argv[2];
+    const fs = require("fs"), path = process.argv[1], skills = process.argv[2], pluginPath = process.argv[3];
     const data = JSON.parse(fs.readFileSync(path, "utf8"));
     data.skills ??= {};
-    data.skills.paths = [skills];
+    data.skills.paths = Array.from(new Set([...(data.skills.paths || []), skills]));
+    data.plugin = Array.isArray(data.plugin) ? data.plugin : [];
+    if (!data.plugin.includes(pluginPath)) {
+      data.plugin.push(pluginPath);
+    }
     fs.writeFileSync(path, JSON.stringify(data, null, 2) + "\n");
-  ' "$HOME/.config/opencode/opencode.json" "$SKILLS_BANK"
+  ' "$HOME/.config/opencode/opencode.json" "$SKILLS_BANK" "$SCRIPT_DIR/plugins/opencode.ts"
 fi
 
 echo "Configuring Antigravity skills fallback and plugin hook..."

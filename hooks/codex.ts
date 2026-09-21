@@ -24,7 +24,7 @@ export interface CodexHookOutput {
  */
 export async function handleCodexHook(
   rawInput: string | CodexHookInput,
-  options: { selectSkillsFn?: typeof selectSkills; skillsDir?: string } = {}
+  options: { selectSkillsFn?: typeof selectSkills; skillsDir?: string | string[] } = {}
 ): Promise<CodexHookOutput> {
   const selectFn = options.selectSkillsFn || selectSkills;
   let inputData: CodexHookInput = {};
@@ -94,9 +94,13 @@ if (import.meta.main) {
 
   handleCodexHook(input)
     .then((out) => {
-      // Emit only Codex's current hook contract on stdout. The richer legacy
-      // fields remain available to programmatic callers and older tests.
-      console.log(JSON.stringify(out.hookSpecificOutput, null, 2));
+      // Emit full wire contract on stdout
+      console.log(JSON.stringify({
+        hookSpecificOutput: {
+          hookEventName: "UserPromptSubmit",
+          additionalContext: out.injectedContext,
+        },
+      }, null, 2));
     })
     .catch((err) => {
       console.error(JSON.stringify({ error: err.message }));

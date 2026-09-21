@@ -143,6 +143,72 @@ pnpm dlx ai-elements@latest add message conversation response prompt-input
 
 ---
 
+## Setting Up OpenRouter & Jev Decision Model API Key
+
+To enable intelligent dynamic skill routing and decision evaluation using the **TypeSafe Jev** model (`~typesafe/jev-latest`), you need an OpenRouter API key.
+
+### Step-by-Step Guide to Create Your OpenRouter API Key:
+
+1. **Sign Up / Log In to OpenRouter**:
+   - Visit [https://openrouter.ai/](https://openrouter.ai/) and sign up or sign in using your GitHub or email account.
+
+2. **Navigate to API Keys**:
+   - Go directly to [https://openrouter.ai/settings/keys](https://openrouter.ai/settings/keys) or click your profile avatar in the upper right and select **Keys**.
+
+3. **Create New API Key**:
+   - Click the **"Create Key"** button.
+   - Enter a descriptive name, e.g. `jev-skill-selector` or `ai-elements-decision`.
+   - *(Optional)* Set a credit limit to manage usage (Jev decision queries cost < $0.0002 each).
+
+4. **Copy & Secure Your Key**:
+   - Copy the newly generated token starting with `sk-or-v1-...`.
+   - OpenRouter only displays the full key once; keep it in a safe password manager or environment file.
+
+5. **Configure in Your Environment (`.env`)**:
+   - In your repository root, add your key to `.env`:
+     ```env
+     # OpenRouter API Key for Jev decision model
+     OPENROUTER_API_KEY=sk-or-v1-your_actual_key_here
+
+     # Jev Model Identifier
+     MODEL=~typesafe/jev-latest
+     ```
+   - `JEV_API_KEY` is also supported as an alias.
+
+6. **Verify the Key with Jev**:
+   - Run a test query against Jev:
+     ```bash
+     bun run index.ts "Build a ChatGPT-style conversational chat UI with streaming and citations"
+     ```
+   - Jev will evaluate the task and dynamically select `ai-elements-chatbot`.
+
+### Using OpenRouter with Vercel AI SDK in Next.js:
+
+When powering your AI Elements chat application with OpenRouter models in `app/api/chat/route.ts`:
+
+```typescript
+import { createOpenAI } from "@ai-sdk/openai";
+import { streamText } from "ai";
+
+const openrouter = createOpenAI({
+  baseURL: "https://openrouter.ai/api/v1",
+  apiKey: process.env.OPENROUTER_API_KEY,
+});
+
+export async function POST(req: Request) {
+  const { messages } = await req.json();
+
+  const result = streamText({
+    model: openrouter("anthropic/claude-3.5-sonnet"),
+    messages,
+  });
+
+  return result.toDataStreamResponse();
+}
+```
+
+---
+
 ## Token Efficiency Metrics
 
 | Approach | Tokens Used | Errors Encountered | Time to Complete |

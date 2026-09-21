@@ -16,7 +16,7 @@ if (-not $ScriptDir) {
 }
 
 $HomeDir = [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::UserProfile)
-$SkillsBank = if ($env:SKILLS_BANK_PATH) { $env:SKILLS_BANK_PATH } else { Join-Path $HomeDir ".agents\skills_bank" }
+$SkillsBank = if ($env:SKILLS_BANK_PATH) { $env:SKILLS_BANK_PATH } else { Join-Path $HomeDir ".agents\jev_skills" }
 $Timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $BackupDir = Join-Path $HomeDir ".agents\skills_backup_$Timestamp"
 
@@ -47,6 +47,7 @@ $SourceDirs = @(
     (Join-Path $HomeDir ".agents\skills"),
     (Join-Path $HomeDir ".claude\skills"),
     (Join-Path $HomeDir ".codex\skills"),
+    (Join-Path $ScriptDir ".agents\jev_skills"),
     (Join-Path $ScriptDir "skills")
 )
 

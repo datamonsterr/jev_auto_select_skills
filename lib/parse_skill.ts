@@ -101,31 +101,36 @@ export function parseSkillFile(filePath: string): Skill | null {
 }
 
 /**
- * Load all skills from a skills bank directory
+ * Load all skills from one or multiple skills bank directories.
+ * When multiple directories are provided, earlier directories take precedence over later ones
+ * (e.g. [agentSkillsDir, globalSkillsDir] lets agent skills override global skills with same name).
  */
-export function loadSkillsFromDir(skillsDir: string): Skill[] {
-  const resolvedDir = path.resolve(skillsDir);
-  if (!fs.existsSync(resolvedDir)) {
-    return [];
-  }
+export function loadSkillsFromDir(skillsDir: string | string[]): Skill[] {
+  const dirs = Array.isArray(skillsDir) ? skillsDir : [skillsDir];
+  const skillMap = new Map<string, Skill>();
 
-  const skills: Skill[] = [];
-  const entries = fs.readdirSync(resolvedDir, { withFileTypes: true });
+  // Process in reverse so earlier entries in `dirs` overwrite later ones
+  for (const dir of [...dirs].reverse()) {
+    if (!dir) continue;
+    const resolvedDir = path.resolve(dir);
+    if (!fs.existsSync(resolvedDir)) continue;
 
-  for (const entry of entries) {
-    if (entry.isDirectory()) {
-      const skillPath = path.join(resolvedDir, entry.name, "SKILL.md");
-      if (fs.existsSync(skillPath)) {
-        const skill = parseSkillFile(skillPath);
-        if (skill) skills.push(skill);
+    const entries = fs.readdirSync(resolvedDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        const skillPath = path.join(resolvedDir, entry.name, "SKILL.md");
+        if (fs.existsSync(skillPath)) {
+          const skill = parseSkillFile(skillPath);
+          if (skill) skillMap.set(skill.name, skill);
+        }
+      } else if (entry.isFile() && entry.name.endsWith(".md")) {
+        const skill = parseSkillFile(path.join(resolvedDir, entry.name));
+        if (skill) skillMap.set(skill.name, skill);
       }
-    } else if (entry.isFile() && entry.name.endsWith(".md")) {
-      const skill = parseSkillFile(path.join(resolvedDir, entry.name));
-      if (skill) skills.push(skill);
     }
   }
 
-  return skills.sort((a, b) => a.name.localeCompare(b.name));
+  return Array.from(skillMap.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /**

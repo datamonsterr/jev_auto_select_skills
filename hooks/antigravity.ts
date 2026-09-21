@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { selectSkills, resolveSkillsBankPath } from "../index";
+import { selectSkills, resolveSkillsBankPath, resolveSkillsSearchPaths } from "../index";
 import type { SelectedSkill } from "../lib/model";
 
 export interface AntigravityHookInput {
@@ -136,7 +136,7 @@ export function formatAntigravityEphemeral(
   for (const skill of skills) {
     const prob = (skill.probability * 100).toFixed(1);
     const conf = (skill.confidence * 100).toFixed(0);
-    const skillFile = path.join(skillsDir, skill.name, "SKILL.md");
+    const skillFile = skill.path || path.join(skillsDir, skill.name, "SKILL.md");
     const hasFile = fs.existsSync(skillFile);
 
     lines.push(`• **${skill.name}** (Probability: ${prob}% | Confidence: ${conf}%)`);
@@ -203,42 +203,34 @@ export async function handleAntigravityHook(
     return emptyOutput;
   }
 
-  // Determine skills directory
-  let skillsDir = options.skillsDir || process.env.SKILLS_BANK_PATH || "";
-  if (!skillsDir && inputData.workspacePaths && inputData.workspacePaths.length > 0) {
+  // Determine skills directories
+  let searchDirs: string[] = [];
+  if (options.skillsDir) {
+    searchDirs = resolveSkillsSearchPaths({ skillsDir: options.skillsDir });
+  } else if (inputData.workspacePaths && inputData.workspacePaths.length > 0) {
+    const wsDirs: string[] = [];
     for (const ws of inputData.workspacePaths) {
-      const p1 = path.join(ws, ".agents", "jev_skills");
-      if (fs.existsSync(p1)) {
-        skillsDir = p1;
-        break;
-      }
-      const p2 = path.join(ws, ".agents", "skills");
-      if (fs.existsSync(p2)) {
-        skillsDir = p2;
-        break;
-      }
+      const p = path.join(ws, ".agents", "jev_skills");
+      if (fs.existsSync(p)) wsDirs.push(p);
     }
-  }
-  if (!skillsDir) {
-    skillsDir = resolveSkillsBankPath();
+    searchDirs = resolveSkillsSearchPaths({ skillsDir: wsDirs.length > 0 ? wsDirs : undefined });
+  } else {
+    searchDirs = resolveSkillsSearchPaths();
   }
 
-  if (!fs.existsSync(skillsDir)) {
-    console.error(`[jev-antigravity] Skills directory not found: ${skillsDir}`);
-    return emptyOutput;
-  }
+  const primaryDir = searchDirs[0] || resolveSkillsBankPath();
 
   const selectFn = options.selectSkillsFn || selectSkills;
   const result = await selectFn({
     userPrompt: prompt,
-    skillsDir,
+    skillsDir: searchDirs,
   });
 
   if (!result.selectedSkills || result.selectedSkills.length === 0) {
     return emptyOutput;
   }
 
-  const ephemeralMessage = formatAntigravityEphemeral(result.selectedSkills, skillsDir);
+  const ephemeralMessage = formatAntigravityEphemeral(result.selectedSkills, primaryDir);
   if (!ephemeralMessage) {
     return emptyOutput;
   }

@@ -13,36 +13,108 @@ import { loadSkillsFromDir, parseSkillFile, parseSkillContent } from "./lib/pars
 import { DEFAULT_SYSTEM_PROMPT } from "./lib/system_prompt";
 
 /**
- * Dynamically resolve the skills bank directory path from environment or defaults
+ * Resolve all search paths for skills bank directories.
+ * By default reads:
+ *  - Agent skills: ./.agents/jev_skills (or AGENT_SKILLS_PATH / SKILLS_AGENT_DIR)
+ *  - Global skills: ~/.agents/jev_skills/ (or GLOBAL_SKILLS_PATH / SKILLS_GLOBAL_DIR)
+ *
+ * Can be overridden by environment variables (SKILLS_BANK_PATH, SKILLS_DIR,
+ * GLOBAL_SKILLS_PATH, AGENT_SKILLS_PATH) or explicit arguments.
+ */
+export function resolveSkillsSearchPaths(options?: {
+  customPath?: string | string[];
+  skillsDir?: string | string[];
+  cwd?: string;
+}): string[] {
+  const paths: string[] = [];
+  const homeDir = process.env.HOME || process.env.USERPROFILE || "";
+  const cwd = options?.cwd || process.cwd();
+
+  // 1. Explicit path(s) passed directly
+  const explicit = options?.customPath || options?.skillsDir;
+  if (explicit) {
+    const list = Array.isArray(explicit) ? explicit : [explicit];
+    for (const p of list) {
+      if (!p) continue;
+      const resolved = p.startsWith("~") ? path.join(homeDir, p.slice(1)) : path.resolve(cwd, p);
+      if (fs.existsSync(resolved) && !paths.includes(resolved)) {
+        paths.push(resolved);
+      }
+    }
+    if (paths.length > 0) return paths;
+  }
+
+  // 2. Environment variable overrides (SKILLS_BANK_PATH, SKILLS_DIR)
+  const envPath = process.env.SKILLS_BANK_PATH || process.env.SKILLS_DIR;
+  if (envPath) {
+    const parts = envPath.split(/[:;,]/).map((p) => p.trim()).filter(Boolean);
+    for (const p of parts) {
+      const resolved = p.startsWith("~") ? path.join(homeDir, p.slice(1)) : path.resolve(cwd, p);
+      if (fs.existsSync(resolved) && !paths.includes(resolved)) {
+        paths.push(resolved);
+      }
+    }
+    if (paths.length > 0) return paths;
+  }
+
+  // 3. Agent-specific skills path (default: ./.agents/jev_skills)
+  const agentEnv = process.env.AGENT_SKILLS_PATH || process.env.SKILLS_AGENT_DIR;
+  const agentCandidates = [
+    agentEnv ? (agentEnv.startsWith("~") ? path.join(homeDir, agentEnv.slice(1)) : path.resolve(cwd, agentEnv)) : null,
+    path.resolve(cwd, ".agents", "jev_skills"),
+    path.resolve(import.meta.dir, ".agents", "jev_skills"),
+  ].filter((p): p is string => Boolean(p));
+
+  for (const cand of agentCandidates) {
+    if (fs.existsSync(cand) && !paths.includes(cand)) {
+      paths.push(cand);
+      break;
+    }
+  }
+
+  // 4. Global skills path (default: ~/.agents/jev_skills/)
+  const globalEnv = process.env.GLOBAL_SKILLS_PATH || process.env.SKILLS_GLOBAL_DIR;
+  const globalCandidates = [
+    globalEnv ? (globalEnv.startsWith("~") ? path.join(homeDir, globalEnv.slice(1)) : path.resolve(globalEnv)) : null,
+    path.join(homeDir, ".agents", "jev_skills"),
+    path.join(homeDir, ".agents", "skills_bank"),
+    path.join(homeDir, ".gemini", "config", "skills"),
+  ].filter((p): p is string => Boolean(p));
+
+  for (const cand of globalCandidates) {
+    if (fs.existsSync(cand) && !paths.includes(cand)) {
+      paths.push(cand);
+      break;
+    }
+  }
+
+  // 5. Legacy fallbacks
+  const legacyCandidates = [
+    path.resolve(cwd, "skills"),
+    path.resolve(import.meta.dir, "skills"),
+    path.join(homeDir, ".agents", "skills"),
+  ];
+  for (const cand of legacyCandidates) {
+    if (fs.existsSync(cand) && !paths.includes(cand)) {
+      paths.push(cand);
+      break;
+    }
+  }
+
+  // Default fallback if none exists yet
+  if (paths.length === 0) {
+    paths.push(path.resolve(cwd, ".agents", "jev_skills"));
+  }
+
+  return paths;
+}
+
+/**
+ * Dynamically resolve the primary skills bank directory path from environment or defaults
  */
 export function resolveSkillsBankPath(customPath?: string): string {
-  if (customPath && fs.existsSync(path.resolve(customPath))) {
-    return path.resolve(customPath);
-  }
-  if (process.env.SKILLS_BANK_PATH && fs.existsSync(path.resolve(process.env.SKILLS_BANK_PATH))) {
-    return path.resolve(process.env.SKILLS_BANK_PATH);
-  }
-  if (process.env.SKILLS_DIR && fs.existsSync(path.resolve(process.env.SKILLS_DIR))) {
-    return path.resolve(process.env.SKILLS_DIR);
-  }
-  const homeDir = process.env.HOME || process.env.USERPROFILE || "";
-  const defaultBank = path.join(homeDir, ".agents", "skills_bank");
-  if (fs.existsSync(defaultBank)) {
-    return defaultBank;
-  }
-  const geminiSkills = path.join(homeDir, ".gemini", "config", "skills");
-  if (fs.existsSync(geminiSkills)) {
-    return geminiSkills;
-  }
-  const localSkills = path.resolve(process.cwd(), "skills");
-  if (fs.existsSync(localSkills)) {
-    return localSkills;
-  }
-  const repoSkills = path.resolve(import.meta.dir, "skills");
-  if (fs.existsSync(repoSkills)) {
-    return repoSkills;
-  }
-  return localSkills;
+  const searchPaths = resolveSkillsSearchPaths({ customPath });
+  return searchPaths[0] || path.resolve(process.cwd(), ".agents", "jev_skills");
 }
 
 export {
@@ -61,15 +133,17 @@ export type { Skill, SelectedSkill, SkillSelectionResult, SkillSelectorOptions, 
 export async function selectSkills(params: {
   userPrompt: string;
   systemPrompt?: string;
-  skillsDir?: string;
+  skillsDir?: string | string[];
   options?: SkillSelectorOptions;
 }): Promise<SkillSelectionResult> {
   const { userPrompt, systemPrompt, skillsDir, options = {} } = params;
-  const targetDir = resolveSkillsBankPath(skillsDir || options.skillsDir);
+  const targetDirs = resolveSkillsSearchPaths({
+    skillsDir: skillsDir || options.skillsDir,
+  });
 
-  const skills = loadSkillsFromDir(targetDir);
+  const skills = loadSkillsFromDir(targetDirs);
   if (skills.length === 0) {
-    throw new Error(`No skills found in directory: ${targetDir}`);
+    throw new Error(`No skills found in directories: ${targetDirs.join(", ")}`);
   }
 
   const provider = new JevProvider({
@@ -104,7 +178,7 @@ Usage:
 Options:
   --prompt, -p <text>      The user prompt / task to evaluate
   --system, -s <text>      Optional system prompt or instructions
-  --skills-dir, -d <path>  Path to skills directory (default: ./skills)
+  --skills-dir, -d <path>  Path to skills directory (default: agent ./.agents/jev_skills and global ~/.agents/jev_skills)
   --threshold, -t <num>    Probability threshold (default: 0.05)
   --max-skills, -m <num>   Maximum skills to return (default: 3)
   --json                   Output results as JSON
@@ -115,7 +189,7 @@ Options:
 
   let prompt = "";
   let systemPrompt: string | undefined;
-  let skillsDir = resolveSkillsBankPath();
+  let customSkillsDir: string | undefined;
   let threshold = 0.05;
   let maxSkills = 3;
   let jsonOutput = false;
@@ -130,7 +204,7 @@ Options:
     } else if (arg === "--system" || arg === "-s") {
       systemPrompt = args[++i];
     } else if (arg === "--skills-dir" || arg === "-d") {
-      skillsDir = resolveSkillsBankPath(args[++i]);
+      customSkillsDir = args[++i];
     } else if (arg === "--threshold" || arg === "-t") {
       threshold = parseFloat(args[++i]) || 0.05;
     } else if (arg === "--max-skills" || arg === "-m") {
@@ -169,7 +243,7 @@ Options:
     const result = await selectSkills({
       userPrompt: prompt,
       systemPrompt,
-      skillsDir,
+      skillsDir: customSkillsDir,
       options: { threshold, maxSkills },
     });
 

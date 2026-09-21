@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun ${CLAUDE_PLUGIN_ROOT}/../../hooks/claude.ts",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}
