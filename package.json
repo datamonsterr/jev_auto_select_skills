@@ -16,7 +16,8 @@
     "test:benchmark": "bun run scripts/benchmark-online.ts",
     "hook": "bun run scripts/run-hook.ts",
     "hook:codex": "bun run hooks/codex.ts",
-    "hook:claude": "bun run hooks/claude.ts"
+    "hook:claude": "bun run hooks/claude.ts",
+    "assess": "bun run scripts/assess.ts"
   },
   "devDependencies": {
     "@types/bun": "latest"

@@ -11,26 +11,40 @@ export interface OpenCodePluginOptions {
 let cachedSelectSkills: any = null;
 let cachedFormatSkillSummary: any = null;
 
+let cachedFormatSkillContent: typeof import("../index").formatSkillContent | undefined;
+
 async function getSelectSkillsFn() {
-  if (cachedSelectSkills && cachedFormatSkillSummary) {
-    return { selectSkills: cachedSelectSkills, formatSkillSummary: cachedFormatSkillSummary };
+  const setupModule = (mod: any) => {
+    mod.loadEnvironment?.();
+    cachedSelectSkills = mod.selectSkills;
+    cachedFormatSkillSummary = mod.formatSkillSummary;
+    cachedFormatSkillContent = mod.formatSkillContent;
+    return {
+      selectSkills: cachedSelectSkills,
+      formatSkillSummary: cachedFormatSkillSummary,
+      formatSkillContent: cachedFormatSkillContent,
+    };
+  };
+
+  if (cachedSelectSkills && cachedFormatSkillSummary && cachedFormatSkillContent) {
+    return {
+      selectSkills: cachedSelectSkills,
+      formatSkillSummary: cachedFormatSkillSummary,
+      formatSkillContent: cachedFormatSkillContent,
+    };
   }
 
   // 1. Try local relative import (in-repo execution)
   try {
     const mod = await import("../index");
-    cachedSelectSkills = mod.selectSkills;
-    cachedFormatSkillSummary = mod.formatSkillSummary;
-    return { selectSkills: cachedSelectSkills, formatSkillSummary: cachedFormatSkillSummary };
+    return setupModule(mod);
   } catch {}
 
   // 2. Try JEV_SKILL_SELECTOR_DIR env variable
   if (process.env.JEV_SKILL_SELECTOR_DIR) {
     try {
       const mod = await import(path.resolve(process.env.JEV_SKILL_SELECTOR_DIR, "index.ts"));
-      cachedSelectSkills = mod.selectSkills;
-      cachedFormatSkillSummary = mod.formatSkillSummary;
-      return { selectSkills: cachedSelectSkills, formatSkillSummary: cachedFormatSkillSummary };
+      return setupModule(mod);
     } catch {}
   }
 
@@ -45,9 +59,7 @@ async function getSelectSkillsFn() {
     if (fs.existsSync(cand)) {
       try {
         const mod = await import(cand);
-        cachedSelectSkills = mod.selectSkills;
-        cachedFormatSkillSummary = mod.formatSkillSummary;
-        return { selectSkills: cachedSelectSkills, formatSkillSummary: cachedFormatSkillSummary };
+        return setupModule(mod);
       } catch {}
     }
   }

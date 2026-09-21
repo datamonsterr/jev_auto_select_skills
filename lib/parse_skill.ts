@@ -4,14 +4,21 @@ import yaml from "yaml";
 import type { Skill, JevState } from "./model";
 
 /**
- * Sanitize and compact text by removing code blocks, links, and redundant spaces
+ * Sanitize and compact text by removing code blocks, links, boilerplate phrases, and redundant spaces
  */
-export function sanitizeSkillText(text: string, maxLen = 160): string {
+export function sanitizeSkillText(text: string, maxLen = 120): string {
   if (!text) return "";
   // Strip code blocks and markdown artifacts
   let cleaned = text.replace(/```[\s\S]*?```/g, " ");
   cleaned = cleaned.replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1");
   cleaned = cleaned.replace(/[*_`#]/g, "");
+
+  // Strip redundant repetitive boilerplate prefixes to optimize input tokens
+  cleaned = cleaned.replace(
+    /^(?:Use (?:this skill )?when (?:the user )?(?:wants to |asks to |needs to |is )?|Trigger (?:with|on) |Activate this skill when(?:ever)? |This skill (?:should be used when|provides|helps(?: users)?(?: to)?) )/i,
+    ""
+  );
+
   cleaned = cleaned.replace(/\s+/g, " ").trim();
   if (cleaned.length > maxLen) {
     cleaned = cleaned.slice(0, maxLen).replace(/\s+\S*$/, "") + "...";
@@ -134,6 +141,31 @@ export function loadSkillsFromDir(skillsDir: string | string[]): Skill[] {
 }
 
 /**
+ * Compact user prompt for Jev routing by collapsing massive code blocks or logs
+ * while preserving the essential user request instructions at top and bottom.
+ */
+export function compactUserPromptForJev(prompt: string, maxChars: number = 1800): string {
+  if (!prompt || prompt.length <= maxChars) return prompt;
+
+  let cleaned = prompt.replace(/```[\s\S]*?```/g, (block) => {
+    if (block.length > 250) {
+      const firstLines = block.slice(0, 100);
+      const lastLines = block.slice(-80);
+      return `${firstLines}\n...[code block truncated for routing]...\n${lastLines}`;
+    }
+    return block;
+  });
+
+  if (cleaned.length > maxChars) {
+    const head = cleaned.slice(0, 1100);
+    const tail = cleaned.slice(-600);
+    cleaned = `${head}\n...[prompt truncated for skill routing]...\n${tail}`;
+  }
+
+  return cleaned;
+}
+
+/**
  * Build state object for Jev containing skill metadata and user prompt.
  * If compact is true, omits the redundant skills array to save ~11,000 input tokens.
  */
@@ -144,9 +176,11 @@ export function buildSkillState(
   context?: Record<string, any>,
   options: { compact?: boolean } = {}
 ): JevState {
+  const compactedPrompt = compactUserPromptForJev(userPrompt);
+
   if (options.compact) {
     return {
-      user_prompt: userPrompt,
+      user_prompt: compactedPrompt,
       ...(systemPrompt ? { system_prompt: systemPrompt } : {}),
       skills: [],
       ...(context ? { context } : {}),
@@ -154,7 +188,7 @@ export function buildSkillState(
   }
 
   return {
-    user_prompt: userPrompt,
+    user_prompt: compactedPrompt,
     ...(systemPrompt ? { system_prompt: systemPrompt } : {}),
     skills: skills.map((s) => ({
       name: s.name,
@@ -172,7 +206,7 @@ export function buildSkillState(
 export function buildSkillCriteria(
   skills: Skill[],
   includeNone: boolean = true,
-  maxLen: number = 140
+  maxLen: number = 110
 ): Record<string, string> {
   const criteria: Record<string, string> = {};
 

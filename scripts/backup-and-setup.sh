@@ -122,6 +122,10 @@ cat > "$GEMINI_CONFIG/skills.json" <<EOF
   "entries": [{ "path": "$SKILLS_BANK" }]
 }
 EOF
+if command -v agy >/dev/null 2>&1; then
+  echo "Registering Antigravity CLI plugin..."
+  agy plugin install "$SCRIPT_DIR/plugins/antigravity" 2>/dev/null || true
+fi
 chmod 600 "$SCRIPT_DIR/.env" 2>/dev/null || true
 
 echo

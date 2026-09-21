@@ -123,7 +123,6 @@ Details here.
     const keys = Object.keys(criteria);
     expect(keys).toContain("skill-a");
     expect(keys).toContain("skill-b");
-    expect(keys).toContain("none");
-    expect(criteria["skill-a"]).toBe("Use when task A is requested");
+    expect(criteria["skill-a"]).toBe("task A is requested");
   });
 });

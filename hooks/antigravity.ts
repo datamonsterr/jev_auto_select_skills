@@ -228,20 +228,12 @@ export async function handleAntigravityHook(
     return emptyOutput;
   }
 
-  // Determine skills directories
-  let searchDirs: string[] = [];
-  if (options.skillsDir) {
-    searchDirs = resolveSkillsSearchPaths({ skillsDir: options.skillsDir });
-  } else if (inputData.workspacePaths && inputData.workspacePaths.length > 0) {
-    const wsDirs: string[] = [];
-    for (const ws of inputData.workspacePaths) {
-      const p = path.join(ws, ".agents", "jev_skills");
-      if (fs.existsSync(p)) wsDirs.push(p);
-    }
-    searchDirs = resolveSkillsSearchPaths({ skillsDir: wsDirs.length > 0 ? wsDirs : undefined });
-  } else {
-    searchDirs = resolveSkillsSearchPaths();
-  }
+  // Determine skills directories (workspace-specific skills + global skills bank)
+  const searchDirs = resolveSkillsSearchPaths({
+    skillsDir: options.skillsDir,
+    workspacePaths: inputData.workspacePaths,
+    cwd: inputData.workspacePaths?.[0] || process.cwd(),
+  });
 
   const primaryDir = searchDirs[0] || resolveSkillsBankPath();
 

@@ -103,6 +103,17 @@ npx skills add <owner/repo@skill> -g -y
 
 The `-g` flag installs globally (user-level) and `-y` skips confirmation prompts.
 
+### Step 7: Assess and Move to Jev (`move-to-jev`)
+
+After installing, assess the skill to prevent static context bloat:
+
+```bash
+bun run scripts/assess.ts ~/.agents/skills/<skill-name> --move
+```
+
+- **Task-specific skills** (frameworks, devops, testing): moved to `~/.agents/jev_skills/` for dynamic on-demand routing via Jev.
+- **Universal persona/tone skills** (like `caveman`): kept in `~/.agents/skills/` to load directly into the LLM.
+
 ## Common Skill Categories
 
 When searching, consider these common categories:

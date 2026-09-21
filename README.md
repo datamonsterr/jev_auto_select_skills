@@ -184,8 +184,9 @@ export JEV_INJECT_CONTENT="true"
 
 ---
 
-## ➕ Adding New Skills
+## ➕ Adding & Assessing New Skills
 
+### 1. Adding a Skill
 Add a directory with a `SKILL.md` in `~/.agents/jev_skills/` (global) or `./.agents/jev_skills/` (project-local):
 
 ```bash
@@ -201,7 +202,39 @@ Step 1...
 EOF
 ```
 
-Jev will automatically route this skill when relevant, and keep it completely unloaded when not needed!
+### 2. Assessing Skill Placement: `ALWAYS_ON` vs. `JEV_ROUTED`
+Skills shouldn't all be routed through Jev. We categorize skills into two types:
+- **`ALWAYS_ON`**: Universal personas, output style constraints, or core developer guidelines (e.g. `caveman`, terse-mode, system constraints) that should be active on *every* prompt. Keep these in your harness's normal skills directory (`~/.agents/skills/` or `./.agents/skills/`).
+- **`JEV_ROUTED`**: Task-specific, technology, framework, workflow, or diagnostic skills (e.g. `tdd`, `git-commit`, `supabase`, `kubernetes`) that should only consume context when relevant. Keep these in Jev's bank (`~/.agents/jev_skills/` or `./.agents/jev_skills/`).
+
+Use the included assessment script:
+```bash
+# Quick assessment (heuristic + optional Jev model)
+bun run assess /path/to/skill
+
+# Assess and automatically move to Jev bank if JEV_ROUTED
+bun run assess /path/to/skill --move
+
+# Move to global bank (~/.agents/jev_skills) instead of project-local
+bun run assess /path/to/skill --move --global
+
+# JSON output for integration scripts
+bun run assess /path/to/skill --json
+```
+
+### 3. Integrated into `find-skills` & `skill-creator`
+Both `find-skills` and `skill-creator` skills in `~/.agents/jev_skills/` feature a built-in **`move-to-jev`** step:
+- When creating or installing a skill, the agent runs `bun run scripts/assess.ts <skill-dir> --move` automatically.
+- Prevents context bloat by moving task-specific skills directly to the Jev bank.
+
+---
+
+## 🎯 Input Token Optimization
+
+Jev is specifically engineered to minimize token usage and latency:
+1. **Criteria Sanitization**: Redundant prefixes like *"Use this skill when..."*, *"Activate when the user asks for..."* are stripped to reduce criteria tokens by ~30–40%.
+2. **Prompt Compaction**: Oversized code blocks, huge logs, and diffs in the prompt are automatically collapsed into concise summaries before sending to Jev (`compactUserPromptForJev`), keeping routing inference under 500 tokens.
+3. **Single Parallel Pass**: Jev classifies and returns probabilities for all candidates in one fast tensor call (~400–700ms), eliminating multi-step LLM overhead.
 
 ---
 

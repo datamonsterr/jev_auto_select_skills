@@ -12,6 +12,10 @@ import {
 import { JevProvider } from "./lib/provider";
 import { loadSkillsFromDir, parseSkillFile, parseSkillContent } from "./lib/parse_skill";
 import { DEFAULT_SYSTEM_PROMPT } from "./lib/system_prompt";
+import { loadEnvironment } from "./lib/env";
+
+// Ensure environment variables (.env) are automatically loaded across harnesses & workspaces
+loadEnvironment();
 
 /**
  * Resolve all search paths for skills bank directories.
@@ -25,6 +29,7 @@ import { DEFAULT_SYSTEM_PROMPT } from "./lib/system_prompt";
 export function resolveSkillsSearchPaths(options?: {
   customPath?: string | string[];
   skillsDir?: string | string[];
+  workspacePaths?: string[];
   cwd?: string;
 }): string[] {
   const paths: string[] = [];
@@ -58,7 +63,17 @@ export function resolveSkillsSearchPaths(options?: {
     if (paths.length > 0) return paths;
   }
 
-  // 3. Agent-specific skills path (default: ./.agents/jev_skills)
+  // 3. Workspace-specific paths (e.g. from IDE or multi-root agent)
+  if (options?.workspacePaths) {
+    for (const ws of options.workspacePaths) {
+      const cand = path.resolve(ws, ".agents", "jev_skills");
+      if (fs.existsSync(cand) && !paths.includes(cand)) {
+        paths.push(cand);
+      }
+    }
+  }
+
+  // 4. Agent-specific skills path (default: ./.agents/jev_skills)
   const agentEnv = process.env.AGENT_SKILLS_PATH || process.env.SKILLS_AGENT_DIR;
   const agentCandidates = [
     agentEnv ? (agentEnv.startsWith("~") ? path.join(homeDir, agentEnv.slice(1)) : path.resolve(cwd, agentEnv)) : null,
@@ -126,6 +141,7 @@ export {
   formatSkillSummary,
   formatSkillContent,
   DEFAULT_SYSTEM_PROMPT,
+  loadEnvironment,
 };
 export type { Skill, SelectedSkill, SkillSelectionResult, SkillSelectorOptions, UsageMetrics };
 

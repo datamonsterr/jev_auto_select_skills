@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { selectSkills } from "../index";
 import { formatSkillSummary, formatSkillContent } from "../lib/model";
+import { loadEnvironment } from "../lib/env";
 
 export interface CodexHookInput {
   prompt?: string;
@@ -26,6 +27,7 @@ export async function handleCodexHook(
   rawInput: string | CodexHookInput,
   options: { selectSkillsFn?: typeof selectSkills; skillsDir?: string | string[]; includeContent?: boolean } = {}
 ): Promise<CodexHookOutput> {
+  loadEnvironment();
   const selectFn = options.selectSkillsFn || selectSkills;
   let inputData: CodexHookInput = {};
 

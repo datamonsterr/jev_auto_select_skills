@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { selectSkills } from "../index";
 import { formatSkillSummary, formatSkillContent } from "../lib/model";
+import { loadEnvironment } from "../lib/env";
 
 /**
  * Handle Claude hook input (stdin or string prompt)
@@ -9,6 +10,7 @@ export async function handleClaudeHook(
   rawInput: string | { prompt?: string; userPrompt?: string; message?: string },
   options: { selectSkillsFn?: typeof selectSkills; skillsDir?: string | string[]; includeContent?: boolean } = {}
 ): Promise<string> {
+  loadEnvironment();
   const selectFn = options.selectSkillsFn || selectSkills;
   let prompt = "";
 
