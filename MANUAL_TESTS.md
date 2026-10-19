@@ -12,3 +12,5 @@ Use a fresh isolated home for staging. Do not run tests against live config or c
 Global application requires a normal terminal when the harness mounts `.agents` or `.codex` read-only. Review and apply staged files with the separate configuration migration helper; do not bypass mounts. Retain backups and manifests until all harnesses have been restarted and verified.
 
 Migration and rollback default to preview; `--apply` is required for writes. Use `--legacy-bank /project/.agents/jev_skills` with project sources to include the canonical optional bank. Use `--keep` for additional project-specific always-on skills.
+
+To resolve differing source variants explicitly, add `--prefer-native` to both preview and apply. Review every `selectedSource` and `backupPath` in the plan. Verify all versions in the private backup, selected complete-tree availability, and restoration of all versions after rollback. Differing preexisting destinations must still block with zero writes. See `tests/migration_variants.test.ts` for shared-native precedence, preserved permissions, guarded rollback and partial-failure recovery.

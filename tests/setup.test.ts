@@ -154,6 +154,7 @@ describe("agent setup scripts", () => {
 
     const pluginPath = path.join(tmpHome, ".config", "opencode", "plugin", "skill_selector.ts");
     expect(fs.existsSync(pluginPath)).toBe(true);
+    expect(fs.readFileSync(pluginPath,"utf8")).toBe(`export { default } from ${JSON.stringify(path.join(repoDir,"plugins/opencode.ts"))};\n`);
 
     const configPath = path.join(tmpHome, ".config", "opencode", "opencode.json");
     expect(fs.existsSync(configPath)).toBe(true);

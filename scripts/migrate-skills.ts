@@ -17,6 +17,7 @@ Usage:
   bun run scripts/migrate-skills.ts [options]
 
 Options:
+  --prefer-native     Resolve source variants using shared native, other native, then legacy precedence; all variants backed up
   --apply             Apply changes (default: preview only)
   --legacy-bank <dir> Include a canonical legacy bank (repeatable)
   --rollback <file>   Restore a verified backup manifest (supports --dry-run)
@@ -36,7 +37,7 @@ Default Kept Skills (always preserved in native dirs):
   }
 
   const valueFlags = new Set(["--keep", "-k", "--source", "-s", "--target", "-t", "--backup", "-b", "--rollback", "--legacy-bank"]);
-  const boolFlags = new Set(["--apply", "--dry-run", "-d", "--json", "--no-repair-symlinks"]);
+  const boolFlags = new Set(["--apply", "--dry-run", "-d", "--json", "--no-repair-symlinks", "--prefer-native"]);
   const values = new Map<string, string[]>();
   const flags = new Set<string>();
   for (let i = 0; i < args.length; i++) {
@@ -82,6 +83,7 @@ Default Kept Skills (always preserved in native dirs):
     keepSkills: customKeep,
     dryRun,
     repairSymlinks,
+    conflictPolicy: flags.has("--prefer-native") ? "prefer-native" : "error",
     legacyBankPaths: [...(customSources.length ? [] : [path.join(homeDir, ".agents", "jev_skills")]), ...all("--legacy-bank")],
   };
 

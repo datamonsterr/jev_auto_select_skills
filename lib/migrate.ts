@@ -4,11 +4,11 @@ import crypto from 'node:crypto';
 
 export interface MigrationOptions {
   sourceDirs: string[]; targetDir: string; backupDir?: string; keepSkills?: string[];
-  dryRun?: boolean; legacyBankPaths?: string[]; repairSymlinks?: boolean;
+  dryRun?: boolean; legacyBankPaths?: string[]; repairSymlinks?: boolean; conflictPolicy?: 'error'|'prefer-native';
 }
 export interface MigrationAction {
   skillName: string; action: 'keep'|'move'|'collision'|'skip'|'repair_symlink';
-  sourcePath?: string; targetPath?: string; reason?: string; hash?: string;
+  sourcePath?: string; targetPath?: string; reason?: string; hash?: string; backupPath?: string; selectedSource?: string;
 }
 export interface MigrationResult {
   dryRun: boolean; moved: string[]; kept: string[]; skipped: string[]; collisions: string[];
@@ -87,7 +87,11 @@ export async function migrateSkills(options: MigrationOptions): Promise<Migratio
   const legacyRoots=(options.legacyBankPaths||[]).map(p=>path.resolve(p));
   const groups=new Map<string,{name:string; sources: Source[]; hash?:string; from?:string}>();
   const seen=new Set<string>();
-  for(const dir of [...options.sourceDirs,...(options.legacyBankPaths||[])]) {
+  // Shared native skills take precedence; remaining native roots preserve caller order.
+  // Legacy canonical banks are always last, regardless of input insertion order.
+  const priority=(dir: string)=>legacyRoots.includes(path.resolve(dir))?2:/(?:^|\/)\.agents\/skills\/?$/.test(path.resolve(dir))?0:1;
+  const orderedDirs=[...options.sourceDirs,...(options.legacyBankPaths||[])].sort((a,b)=>priority(a)-priority(b));
+  for(const dir of orderedDirs) {
     const absolute=path.resolve(dir);if(!exists(absolute))continue;
     for(const entry of fs.readdirSync(absolute,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name))) {
       const p=path.join(absolute,entry.name), name=entry.name.replace(/\.md$/,'');
@@ -115,7 +119,7 @@ export async function migrateSkills(options: MigrationOptions): Promise<Migratio
       const src:Source={path:p,backup:path.join(backupDir,'sources',String(seen.size)),originalHash,materialHash:hash,broken,replacement:retargetKept?targetPath:undefined};
       let group=groups.get(targetPath);
       if(!group){group={name,sources:[]};groups.set(targetPath,group);}
-      if(hash && group.hash && hash!==group.hash) result.collisions.push(name);
+      if(hash && group.hash && hash!==group.hash && options.conflictPolicy!=='prefer-native') result.collisions.push(name);
       if(hash&&!group.hash){group.hash=hash;group.from=p;}
       group.sources.push(src);
     }
@@ -131,7 +135,11 @@ export async function migrateSkills(options: MigrationOptions): Promise<Migratio
     if(!group.hash) {result.skipped.push(group.name);result.actions.push({skillName:group.name,action:'skip',reason:'Unresolved broken alias; no canonical skill available'});continue;}
     targets.push({path:dest,hash:group.hash,existed:targetExists,from:group.from});
     for(const src of group.sources) {
-      sources.push(src);result.actions.push({skillName:group.name,action:'move',sourcePath:src.path,targetPath:dest,hash:src.originalHash});
+      sources.push(src);result.actions.push({skillName:group.name,action:'move',sourcePath:src.path,targetPath:dest,hash:src.originalHash,
+        backupPath:src.backup,selectedSource:group.from,
+        reason:src.materialHash && src.materialHash!==group.hash
+          ? 'Explicit prefer-native: differing variant preserved in exact private backup; selected complete tree uses native source precedence'
+          : undefined});
       if(src.broken || fs.lstatSync(src.path).isSymbolicLink()) result.repairedSymlinks.push(src.path);
     }
     result.moved.push(group.name);

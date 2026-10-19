@@ -306,8 +306,9 @@ export function setupOpenCode(options: SetupOptions = {}): SetupResult {
     if (!options.dryRun) {
       fs.mkdirSync(pluginDestDir, { recursive: true });
       if (fs.existsSync(pluginSource)) {
-        fs.copyFileSync(pluginSource, pluginDest);
-        fs.copyFileSync(pluginSource, legacyPluginDest);
+        const entrypoint = `export { default } from ${JSON.stringify(pluginSource)};\n`;
+        fs.writeFileSync(pluginDest, entrypoint);
+        fs.writeFileSync(legacyPluginDest, entrypoint);
         filesModified.push(pluginDest);
       }
 
@@ -455,7 +456,7 @@ export function checkAgentStatus(options: SetupOptions = {}): Record<string, { h
 
 function printUsage(): void {
   console.log(`
-🚀 Jev Skill Selector: Agent Setup Command
+🚀 Skill Selector: Agent Setup Command
 
 Usage:
   bun run setup [agent] [options]
@@ -499,7 +500,7 @@ export function runSetupCli(args: string[] = process.argv.slice(2)): SetupResult
 
   if (statusMode) {
     const status = checkAgentStatus();
-    console.log(`\n🔍 Jev Skill Selector Agent Status:\n`);
+    console.log(`\n🔍 Skill Selector Agent Status:\n`);
     for (const [agent, st] of Object.entries(status)) {
       const hookIcon = st.hook ? "✓ Hook active" : "✗ No hook";
       const skillIcon = st.skill ? "✓ Skill installed" : "✗ No skill";
@@ -521,7 +522,7 @@ export function runSetupCli(args: string[] = process.argv.slice(2)): SetupResult
   const targetArg = positional[0] || "all";
   const options: SetupOptions = { dryRun, hooksOnly, skillOnly, homeDir, repoDir };
 
-  console.log(`\n⚙️  Configuring Jev Skill Selector for: ${targetArg.toUpperCase()}`);
+  console.log(`\n⚙️  Configuring Skill Selector for: ${targetArg.toUpperCase()}`);
   if (dryRun) console.log(`   (Dry run mode: no files will be written)\n`);
 
   let results: SetupResult[] = [];

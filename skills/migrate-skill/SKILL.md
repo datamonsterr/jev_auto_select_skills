@@ -63,3 +63,19 @@ skill_selector migrate --rollback /absolute/backup/backup_manifest.json --apply
 Rollback preflights every complete tree and refuses to overwrite user edits. Default sources include the canonical global legacy bank; specify project `--source` directories explicitly for project migrations. Collisions block the entire migration before any writes.
 
 Migration and rollback default to preview; `--apply` is required for writes. Use `--legacy-bank /project/.agents/jev_skills` with project sources to include the canonical optional bank. Use `--keep` for additional project-specific always-on skills.
+
+## Explicit source-variant resolution
+
+Default behavior rejects differing source trees. Use `--prefer-native` only when native behavior should take precedence over legacy optional-bank variants. Precedence is shared `.agents/skills` first, other native sources in caller order, then directories explicitly supplied as `--legacy-bank`, regardless of their insertion order. Whole trees are selected; skill bodies, frontmatter and assets are never rewritten or merged. Every original variant is copied into the private backup and verified before any source is removed. Manifest actions record the selected source and exact backup path for each variant. Rollback restores all original variants and permissions; user edits block rollback before changes.
+
+A differing preexisting `other_skills` destination always blocks the whole migration, even with this flag. Kept native directories stay intact; kept native aliases into a migrated legacy bank are retargeted and remain available.
+
+```bash
+# Preview project migration with deliberate native precedence
+skill_selector migrate --source /project/.agents/skills --source /project/.claude/skills --legacy-bank /project/.agents/jev_skills --target /project/.agents/other_skills --prefer-native --dry-run --json
+
+# Apply only after reviewing selectedSource, backupPath, and kept skills
+skill_selector migrate --source /project/.agents/skills --source /project/.claude/skills --legacy-bank /project/.agents/jev_skills --target /project/.agents/other_skills --prefer-native --apply --json
+```
+
+Use a normal terminal for protected global paths. Preview and review first; never bypass harness read-only mounts. Exact backups default to `~/.local/state/skill-selector/backups`.
