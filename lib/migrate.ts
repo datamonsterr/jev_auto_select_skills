@@ -14,7 +14,7 @@ export interface MigrationResult {
   dryRun: boolean; moved: string[]; kept: string[]; skipped: string[]; collisions: string[];
   repairedSymlinks: string[]; actions: MigrationAction[]; manifestPath?: string;
 }
-export const DEFAULT_KEEP_SKILLS = ['caveman','cavecrew','using-superpowers','superpowers','skill_selector','jev-skill-selector','migrate-skill','triage'];
+export const DEFAULT_KEEP_SKILLS = ['caveman','skill_selector','jev-skill-selector'];
 const MANAGED = new Set(['synced','.system','imagegen','openai-docs','skill-creator','skill-installer']);
 const exists = (p: string) => { try { fs.lstatSync(p); return true; } catch(e: any) { if(e.code==='ENOENT') return false; throw e; } };
 const digest = (value: unknown) => crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -39,7 +39,7 @@ export function treeHash(root: string, materialize = false): string {
   }
   visit(root,'',new Set()); return digest(rows);
 }
-interface Source { path: string; backup: string; originalHash: string; materialHash?: string; broken?: boolean; }
+interface Source { path: string; backup: string; originalHash: string; materialHash?: string; broken?: boolean; replacement?: string; }
 interface Target { path: string; hash: string; existed: boolean; from?: string; }
 interface Manifest {
   version: 1; status: 'prepared'|'applying'|'complete'|'rolled_back'; timestamp: string;
@@ -59,13 +59,16 @@ export async function rollbackMigration(manifestPath: string, options: {dryRun?:
   if(manifest.status==='rolled_back') return {restored:0,dryRun:options.dryRun??false};
   for(const src of manifest.sources) {
     if(!exists(src.backup) || treeHash(src.backup)!==src.originalHash) throw new Error(`Backup missing or changed: ${src.backup}`);
-    if(exists(src.path) && treeHash(src.path)!==src.originalHash) throw new Error(`Source changed since migration: ${src.path}`);
+    if(exists(src.path) && treeHash(src.path)!==src.originalHash && (!src.replacement || treeHash(src.path)!==digest([['','link',src.replacement]]))) throw new Error(`Source changed since migration: ${src.path}`);
   }
   for(const target of manifest.targets) {
     if(exists(target.path) && treeHash(target.path,true)!==target.hash) throw new Error(`Target changed since migration: ${target.path}`);
   }
   if(options.dryRun) return {restored:manifest.sources.length,dryRun:true};
-  for(const src of manifest.sources) if(!exists(src.path)) { fs.mkdirSync(path.dirname(src.path),{recursive:true});copyOriginal(src.backup,src.path); }
+  for(const src of manifest.sources) {
+    if(src.replacement && exists(src.path) && treeHash(src.path)!==src.originalHash) remove(src.path);
+    if(!exists(src.path)) {fs.mkdirSync(path.dirname(src.path),{recursive:true});copyOriginal(src.backup,src.path);}
+  }
   for(const target of manifest.targets) if(!target.existed && exists(target.path)) remove(target.path);
   if(!manifest.targetDirExisted && exists(manifest.targetDir) && fs.readdirSync(manifest.targetDir).length===0) fs.rmdirSync(manifest.targetDir);
   manifest.status='rolled_back';saveManifest(manifestPath,manifest);
@@ -79,8 +82,9 @@ export async function migrateSkills(options: MigrationOptions): Promise<Migratio
   const dryRun=options.dryRun??false;
   const result: MigrationResult={dryRun,moved:[],kept:[],skipped:[],collisions:[],repairedSymlinks:[],actions:[]};
   const targetDir=path.resolve(options.targetDir);
-  const backupDir=path.resolve(options.backupDir||path.join(process.env.HOME||'','.agents',`skills_backup_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`));
+  const backupDir=path.resolve(options.backupDir||path.join(process.env.HOME||'','.local','state','skill-selector','backups',`${Date.now()}_${crypto.randomBytes(4).toString('hex')}`));
   const keep=new Set([...DEFAULT_KEEP_SKILLS,...(options.keepSkills||[])].map(n=>n.toLowerCase()));
+  const legacyRoots=(options.legacyBankPaths||[]).map(p=>path.resolve(p));
   const groups=new Map<string,{name:string; sources: Source[]; hash?:string; from?:string}>();
   const seen=new Set<string>();
   for(const dir of [...options.sourceDirs,...(options.legacyBankPaths||[])]) {
@@ -91,9 +95,13 @@ export async function migrateSkills(options: MigrationOptions): Promise<Migratio
       if(entry.name.startsWith('.') || MANAGED.has(entry.name) || entry.name==='node_modules')continue;
       let real:string|undefined;
       try {real=fs.realpathSync(p);}catch(e:any){if(!entry.isSymbolicLink())throw e;}
-      if(keep.has(name.toLowerCase()) || (real && /(?:^|\/)(?:\.system|synced|plugins|marketplaces)(?:\/|$)/.test(real))) {
+      const isLegacy=legacyRoots.includes(absolute);
+      const nativeKept=!isLegacy && keep.has(name.toLowerCase());
+      const retargetKept=nativeKept && entry.isSymbolicLink() && !!real && legacyRoots.some(root=>real.startsWith(root+path.sep));
+      if((nativeKept && !retargetKept) || (real && /(?:^|\/)(?:\.system|synced|plugins|marketplaces)(?:\/|$)/.test(real))) {
         result.kept.push(name);result.actions.push({skillName:name,action:'keep',sourcePath:p});continue;
       }
+
       if(entry.isSymbolicLink() && options.repairSymlinks===false) {result.skipped.push(name);continue;}
       const broken=entry.isSymbolicLink()&&!real;
       const isFlat=entry.isFile()&&entry.name.endsWith('.md');
@@ -104,7 +112,7 @@ export async function migrateSkills(options: MigrationOptions): Promise<Migratio
       for(const nested of [targetDir,backupDir]) if(nested===p||nested.startsWith(p+path.sep)) throw new Error(`Migration destination is inside source: ${p}`);
       const originalHash=treeHash(p);
       const hash=broken?undefined:treeHash(p,true);
-      const src:Source={path:p,backup:path.join(backupDir,'sources',String(seen.size)),originalHash,materialHash:hash,broken};
+      const src:Source={path:p,backup:path.join(backupDir,'sources',String(seen.size)),originalHash,materialHash:hash,broken,replacement:retargetKept?targetPath:undefined};
       let group=groups.get(targetPath);
       if(!group){group={name,sources:[]};groups.set(targetPath,group);}
       if(hash && group.hash && hash!==group.hash) result.collisions.push(name);
@@ -155,7 +163,7 @@ export async function migrateSkills(options: MigrationOptions): Promise<Migratio
     }
     // Detect changes after planning before deleting any original.
     for(const src of sources)if(treeHash(src.path)!==src.originalHash || (src.materialHash && treeHash(src.path,true)!==src.materialHash))throw new Error(`Source changed during migration: ${src.path}`);
-    for(const src of sources)remove(src.path);
+    for(const src of sources) {remove(src.path);if(src.replacement) fs.symlinkSync(src.replacement,src.path);}
     manifest.status='complete';saveManifest(manifestPath,manifest);
   } catch(error) {
     try {await rollbackMigration(manifestPath);}catch(rollbackError){throw new AggregateError([error,rollbackError],`Migration failed; guarded recovery required using ${manifestPath}`);}

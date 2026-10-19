@@ -67,3 +67,15 @@ describe('reviewed migration acceptance',()=>{
   skill(source,'tdd');await migrateSkills({sourceDirs:[source],targetDir:target,backupDir:backup,dryRun:true});expect(fs.existsSync(target)).toBe(false);expect(fs.existsSync(backup)).toBe(false);
  });
 });
+
+it('moves kept names out of legacy bank and retargets a native kept alias with reversible availability', async()=>{
+ const legacy=path.join(root,'jev_skills');skill(legacy,'caveman');
+ fs.symlinkSync(path.join(legacy,'caveman'),path.join(source,'caveman'));
+ const result=await migrateSkills({sourceDirs:[source],legacyBankPaths:[legacy],targetDir:target,backupDir:backup});
+ expect(fs.readdirSync(legacy)).toHaveLength(0);
+ expect(fs.readlinkSync(path.join(source,'caveman'))).toBe(path.join(target,'caveman'));
+ expect(fs.readFileSync(path.join(source,'caveman/scripts/run.sh'),'utf8')).toBe('echo original');
+ await rollbackMigration(result.manifestPath!);
+ expect(fs.readlinkSync(path.join(source,'caveman'))).toBe(path.join(legacy,'caveman'));
+ expect(fs.readFileSync(path.join(source,'caveman/scripts/run.sh'),'utf8')).toBe('echo original');
+});

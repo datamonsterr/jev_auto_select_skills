@@ -5,12 +5,6 @@ import { rollbackMigration, migrateSkills, DEFAULT_KEEP_SKILLS, type MigrationOp
 
 export async function runMigrateCli(args: string[] = process.argv.slice(2)): Promise<void> {
   const homeDir = os.homedir();
-  if (args.includes("--rollback")) {
-    const manifest = args[args.indexOf("--rollback") + 1];
-    if (!manifest || manifest.startsWith("--")) throw new Error("--rollback requires a manifest path");
-    console.log(JSON.stringify(await rollbackMigration(manifest, {dryRun: args.includes("--dry-run")})));
-    return;
-  }
 
   if (args.includes("--help") || args.includes("-h")) {
     console.log(`
@@ -23,6 +17,8 @@ Usage:
   bun run scripts/migrate-skills.ts [options]
 
 Options:
+  --apply             Apply changes (default: preview only)
+  --legacy-bank <dir> Include a canonical legacy bank (repeatable)
   --rollback <file>   Restore a verified backup manifest (supports --dry-run)
   --dry-run, -d        Preview migration actions without modifying filesystem
   --keep, -k <list>    Comma-separated list of additional skill names to keep in native dirs
@@ -39,29 +35,32 @@ Default Kept Skills (always preserved in native dirs):
     return;
   }
 
-  let dryRun = false;
-  let jsonOutput = false;
-  let repairSymlinks = true;
-  let customKeep: string[] = [];
-  let customSources: string[] = [];
-  let customTarget = "";
-  let customBackup = "";
-
+  const valueFlags = new Set(["--keep", "-k", "--source", "-s", "--target", "-t", "--backup", "-b", "--rollback", "--legacy-bank"]);
+  const boolFlags = new Set(["--apply", "--dry-run", "-d", "--json", "--no-repair-symlinks"]);
+  const values = new Map<string, string[]>();
+  const flags = new Set<string>();
   for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (arg === "--dry-run" || arg === "-d") dryRun = true;
-    else if (arg === "--json") jsonOutput = true;
-    else if (arg === "--no-repair-symlinks") repairSymlinks = false;
-    else if (arg === "--keep" || arg === "-k") {
-      const val = args[++i] || "";
-      customKeep.push(...val.split(",").map((s) => s.trim()).filter(Boolean));
-    } else if (arg === "--source" || arg === "-s") {
-      customSources.push(args[++i]);
-    } else if (arg === "--target" || arg === "-t") {
-      customTarget = args[++i];
-    } else if (arg === "--backup" || arg === "-b") {
-      customBackup = args[++i];
-    }
+    const flag = args[i];
+    if (boolFlags.has(flag)) flags.add(flag);
+    else if (valueFlags.has(flag)) {
+      const value = args[++i];
+      if (!value || value.startsWith("-")) throw new Error(`${flag} requires a value`);
+      values.set(flag, [...(values.get(flag) ?? []), value]);
+    } else throw new Error(`Unknown migration argument: ${flag}`);
+  }
+  if (flags.has("--apply") && (flags.has("--dry-run") || flags.has("-d"))) throw new Error("--apply and --dry-run are mutually exclusive");
+  const dryRun = !flags.has("--apply");
+  const jsonOutput = flags.has("--json");
+  const repairSymlinks = !flags.has("--no-repair-symlinks");
+  const all = (...names: string[]) => names.flatMap(name => values.get(name) ?? []);
+  const customKeep = all("--keep", "-k").flatMap(v => v.split(",").map(s => s.trim()).filter(Boolean));
+  const customSources = all("--source", "-s");
+  const customTarget = all("--target", "-t").at(-1);
+  const customBackup = all("--backup", "-b").at(-1);
+  const rollback = all("--rollback").at(-1);
+  if (rollback) {
+    console.log(JSON.stringify(await rollbackMigration(rollback, {dryRun})));
+    return;
   }
 
   const defaultSources = [
@@ -83,7 +82,7 @@ Default Kept Skills (always preserved in native dirs):
     keepSkills: customKeep,
     dryRun,
     repairSymlinks,
-    legacyBankPaths: customSources.length ? [] : [path.join(homeDir, ".agents", "jev_skills")],
+    legacyBankPaths: [...(customSources.length ? [] : [path.join(homeDir, ".agents", "jev_skills")]), ...all("--legacy-bank")],
   };
 
   if (!jsonOutput) {
