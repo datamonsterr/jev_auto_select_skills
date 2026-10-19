@@ -13,7 +13,12 @@ export async function retireLegacySkills(options:{roots:string[];replacement:str
   const backup=path.resolve(options.backupDir);
   for(const root of options.roots)if(backup===path.resolve(root)||backup.startsWith(path.resolve(root)+path.sep))throw new Error('Backup must be outside all skill discovery roots');
   const sources:any[]=[];const seen=new Set<string>();
-  for(const root of options.roots)for(const name of ['jev-dispatch','jev-skill-selector']) {
+  const seenRoots=new Set<string>();
+  const roots=options.roots.filter(root=>{
+    if(!fs.existsSync(root))return false;
+    const real=fs.realpathSync(root);if(seenRoots.has(real))return false;seenRoots.add(real);return true;
+  });
+  for(const root of roots)for(const name of ['jev-dispatch','jev-skill-selector']) {
     const source=path.resolve(root,name);if(seen.has(source))continue;seen.add(source);
     try{fs.lstatSync(source);}catch(e:any){if(e.code==='ENOENT')continue;throw e;}
     if(backup===source||backup.startsWith(source+path.sep))throw new Error('Backup must be outside retired skill directories');
