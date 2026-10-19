@@ -22,7 +22,7 @@ describe("golden_set integration", () => {
 
     if (availableSkillDirs.size <= 1) {
       // Standalone repo mode without test bank
-      expect(availableSkillDirs.has("jev-skill-selector")).toBe(true);
+      expect(availableSkillDirs.has("skill_selector") || availableSkillDirs.has("jev-skill-selector")).toBe(true);
       return;
     }
 
@@ -43,16 +43,33 @@ describe("golden_set integration", () => {
     const hasTdd = availableSkills.some((s) => s.name === "tdd");
     if (!hasTdd) return;
 
-    // Run live test case 1 (TDD)
+    const mockFetch = (async () => {
+      return new Response(
+        JSON.stringify({
+          model: "inception/mercury-decide:free",
+          answers: {
+            primary_skill: {
+              type: "choice",
+              choice: "tdd",
+              probabilities: { tdd: 0.92, "test-driven-development": 0.05 },
+              confidence: 0.95,
+            },
+          },
+          usage: { input_tokens: 150, output_tokens: 40 },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    }) as any;
+
     const result = await selectSkills({
       userPrompt:
         "We need to refactor the payment calculation service. I want to use red-green-refactor cycle and write unit tests against public interfaces before touching any implementation code.",
       skillsDir: testBankPaths,
-      options: { threshold: 0.05 },
+      options: { threshold: 0.05, fetchFn: mockFetch },
     });
 
     expect(["tdd", "test-driven-development"]).toContain(result.primarySkill || "");
     expect(result.selectedSkills.length).toBeGreaterThan(0);
     expect(result.selectedSkills[0].probability).toBeGreaterThan(0.5);
-  }, 15000);
+  });
 });

@@ -16,12 +16,12 @@ if (-not $ScriptDir) {
 }
 
 $HomeDir = [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::UserProfile)
-$SkillsBank = if ($env:SKILLS_BANK_PATH) { $env:SKILLS_BANK_PATH } else { Join-Path $HomeDir ".agents\jev_skills" }
+$SkillsBank = if ($env:SKILLS_BANK_PATH) { $env:SKILLS_BANK_PATH } else { Join-Path $HomeDir ".agents\other_skills" }
 $Timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $BackupDir = Join-Path $HomeDir ".agents\skills_backup_$Timestamp"
 
 Write-Host "`n======================================================" -ForegroundColor Cyan
-Write-Host "  🚀 Jev Skill Selector: Automated Machine Setup (Windows) " -ForegroundColor Cyan
+Write-Host "  🚀 Skill Selector: Automated Machine Setup (Windows) " -ForegroundColor Cyan
 Write-Host "======================================================`n" -ForegroundColor Cyan
 
 # 1. Verify Bun runtime
@@ -40,64 +40,36 @@ New-Item -ItemType Directory -Force -Path $BackupDir | Out-Null
 Write-Host "Skills Bank Path : $SkillsBank" -ForegroundColor Green
 Write-Host "Backup Directory : $BackupDir" -ForegroundColor Green
 
-# 3. Collect and Move Skills from Agents, Claude, and Codex directories
-Write-Host "`nStep 2: Consolidating skills into skills bank..." -ForegroundColor Yellow
-
-$SourceDirs = @(
-    (Join-Path $HomeDir ".agents\skills"),
-    (Join-Path $HomeDir ".claude\skills"),
-    (Join-Path $HomeDir ".codex\skills"),
-    (Join-Path $ScriptDir ".agents\jev_skills"),
-    (Join-Path $ScriptDir "skills")
-)
-
-$MovedCount = 0
-foreach ($src in $SourceDirs) {
-    if (Test-Path $src) {
-        Write-Host "Scanning $src..."
-        Get-ChildItem -Directory -Path $src | ForEach-Object {
-            $skillName = $_.Name
-            if ($skillName -ne "jev-skill-selector") {
-                # Copy to backup
-                Copy-Item -Recurse -Force -Path $_.FullName -Destination (Join-Path $BackupDir $skillName)
-                
-                # Move to centralized skills bank if not already present
-                $destSkill = Join-Path $SkillsBank $skillName
-                if (-not (Test-Path $destSkill)) {
-                    Copy-Item -Recurse -Force -Path $_.FullName -Destination $destSkill
-                    $MovedCount++
-                }
-                
-                # Remove from original agent folder if it's not the repo's skills folder
-                if ($src -ne (Join-Path $ScriptDir "skills")) {
-                    Remove-Item -Recurse -Force -Path $_.FullName
-                }
-            }
-        }
-    }
+# 3. Consolidate optional skills safely using migrate-skills primitive (no destructive deletion)
+Write-Host "`nStep 2: Migrating optional skills into skills bank..." -ForegroundColor Yellow
+$migrateScript = Join-Path $ScriptDir "scripts\migrate-skills.ts"
+try {
+    bun run $migrateScript --target $SkillsBank
+    Write-Host "✓ Safely migrated optional skills while preserving always-on originals." -ForegroundColor Green
+} catch {
+    Write-Host "Warning: Skill migration returned: $_" -ForegroundColor Yellow
 }
 
 $bankCount = (Get-ChildItem -Directory -Path $SkillsBank).Count
-Write-Host "✓ Consolidated and backed up skills. Bank now contains: $bankCount skills." -ForegroundColor Green
+Write-Host "✓ Consolidated skills. Bank now contains: $bankCount skills." -ForegroundColor Green
 
-# 4. Install jev-skill-selector into ~/.agents/skills
-Write-Host "`nStep 3: Installing jev-skill-selector as the active router skill..." -ForegroundColor Yellow
+# 4. Install skill_selector into ~/.agents/skills
+Write-Host "`nStep 3: Installing skill_selector as the active router skill..." -ForegroundColor Yellow
 $AgentsSkills = Join-Path $HomeDir ".agents\skills"
 New-Item -ItemType Directory -Force -Path $AgentsSkills | Out-Null
-$TargetSkillDir = Join-Path $AgentsSkills "jev-skill-selector"
 
-if (Test-Path $TargetSkillDir) {
-    Remove-Item -Recurse -Force -Path $TargetSkillDir
-}
+$TargetSkillDir = Join-Path $AgentsSkills "skill_selector"
+$LegacyTargetSkillDir = Join-Path $AgentsSkills "jev-skill-selector"
 
-# Create Junction or Copy
-try {
-    New-Item -ItemType Junction -Path $TargetSkillDir -Target $ScriptDir | Out-Null
-    Write-Host "✓ Created junction link to: $TargetSkillDir" -ForegroundColor Green
-} catch {
-    Copy-Item -Recurse -Force -Path $ScriptDir -Destination $TargetSkillDir
-    Write-Host "✓ Copied jev-skill-selector to: $TargetSkillDir" -ForegroundColor Green
+foreach ($dir in @($TargetSkillDir, $LegacyTargetSkillDir)) {
+    New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    Copy-Item -Force -Path (Join-Path $ScriptDir "SKILL.md") -Destination (Join-Path $dir "SKILL.md")
+    $runner = Join-Path $ScriptDir "skills\skill_selector\run.sh"
+    if (Test-Path $runner) {
+        Copy-Item -Force -Path $runner -Destination (Join-Path $dir "run.sh")
+    }
 }
+Write-Host "✓ Installed router skill to: $TargetSkillDir" -ForegroundColor Green
 
 # 5. Environment configuration
 Write-Host "`nStep 4: Checking environment configuration..." -ForegroundColor Yellow

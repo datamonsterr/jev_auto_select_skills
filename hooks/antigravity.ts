@@ -127,19 +127,15 @@ export function formatAntigravityEphemeral(
   skillsDir: string,
   options?: { userPrompt?: string; includeContent?: boolean }
 ): string {
-  if (skills.length === 0) return "";
-
-  const shouldIncludeContent = options?.includeContent ?? (process.env.JEV_INJECT_CONTENT !== "false");
+  const shouldIncludeContent =
+    options?.includeContent ??
+    (process.env.SKILL_SELECTOR_INJECT_CONTENT === "true" || process.env.JEV_INJECT_CONTENT === "true");
 
   const lines = [
-    "🎯 **[Jev Dynamic Skill Routing]**",
+    "🎯 **[Skill Selector]**",
     "Recommended skill(s) for this user prompt:",
     "",
   ];
-
-  if (options?.userPrompt) {
-    lines.push(`Task: "${options.userPrompt}"`, "");
-  }
 
   for (const skill of skills) {
     const prob = (skill.probability * 100).toFixed(1);
@@ -174,7 +170,7 @@ export function formatAntigravityEphemeral(
     lines.push("*Instruction:* Follow the skill instructions above directly to execute this task.");
   } else {
     lines.push("");
-    lines.push("*Instruction:* If relevant, use `view_file` to read the skill instructions and follow its workflow.");
+    lines.push("*Instruction:* Use `view_file` to read the skill instructions and follow its workflow.");
   }
 
   return lines.join("\n");

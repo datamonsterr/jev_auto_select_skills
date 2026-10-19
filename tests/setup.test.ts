@@ -124,22 +124,23 @@ describe("agent setup scripts", () => {
     expect(status.codex.skill).toBe(true);
   });
 
-  it("setupAntigravity configures plugins, hooks and skill bank", () => {
+  it("setupAntigravity configures plugins, hooks and does not register routed bank wholesale", () => {
     const res = setupAntigravity({ homeDir: tmpHome, repoDir, dryRun: false });
     expect(res.success).toBe(true);
     expect(res.pluginConfigured).toBe(true);
 
-    const pluginDir = path.join(tmpHome, ".gemini", "config", "plugins", "jev-skill-selector");
+    const pluginDir = path.join(tmpHome, ".gemini", "config", "plugins", "skill_selector");
     expect(fs.existsSync(path.join(pluginDir, "plugin.json"))).toBe(true);
     expect(fs.existsSync(path.join(pluginDir, "hooks.json"))).toBe(true);
 
     const hooksContent = JSON.parse(fs.readFileSync(path.join(pluginDir, "hooks.json"), "utf-8"));
     expect(JSON.stringify(hooksContent)).toContain("hooks/antigravity.ts");
 
+    // Optional routed bank must NOT be registered wholesale in native skills.json
     const skillsJson = path.join(tmpHome, ".gemini", "config", "skills.json");
-    expect(fs.existsSync(skillsJson)).toBe(true);
+    expect(fs.existsSync(skillsJson)).toBe(false);
 
-    const fallbackSkill = path.join(tmpHome, ".agents", "skills", "jev-skill-selector", "SKILL.md");
+    const fallbackSkill = path.join(tmpHome, ".agents", "skills", "skill_selector", "SKILL.md");
     expect(fs.existsSync(fallbackSkill)).toBe(true);
 
     const status = checkAgentStatus({ homeDir: tmpHome, repoDir });
@@ -147,20 +148,20 @@ describe("agent setup scripts", () => {
     expect(status.agy.skill).toBe(true);
   });
 
-  it("setupOpenCode configures plugin and skills path", () => {
+  it("setupOpenCode configures plugin without polluting native skills path", () => {
     const res = setupOpenCode({ homeDir: tmpHome, repoDir, dryRun: false });
     expect(res.success).toBe(true);
 
-    const pluginPath = path.join(tmpHome, ".config", "opencode", "plugin", "jev-skill-selector.ts");
+    const pluginPath = path.join(tmpHome, ".config", "opencode", "plugin", "skill_selector.ts");
     expect(fs.existsSync(pluginPath)).toBe(true);
 
     const configPath = path.join(tmpHome, ".config", "opencode", "opencode.json");
     expect(fs.existsSync(configPath)).toBe(true);
     const configData = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-    expect(configData.skills.paths).toContain(path.join(tmpHome, ".agents", "jev_skills"));
+    expect(configData.skills?.paths).toBeUndefined();
     expect(configData.plugin).toContain(pluginPath);
 
-    const fallbackSkill = path.join(tmpHome, ".config", "opencode", "skills", "jev-skill-selector", "SKILL.md");
+    const fallbackSkill = path.join(tmpHome, ".config", "opencode", "skills", "skill_selector", "SKILL.md");
     expect(fs.existsSync(fallbackSkill)).toBe(true);
 
     const status = checkAgentStatus({ homeDir: tmpHome, repoDir });
@@ -173,8 +174,8 @@ describe("agent setup scripts", () => {
     expect(results.length).toBe(4);
     expect(results.every((r) => r.success)).toBe(true);
 
-    // Central bank should contain jev-skill-selector
-    const bankSkill = path.join(tmpHome, ".agents", "jev_skills", "jev-skill-selector", "SKILL.md");
+    // Central bank should contain skill_selector in other_skills
+    const bankSkill = path.join(tmpHome, ".agents", "other_skills", "skill_selector", "SKILL.md");
     expect(fs.existsSync(bankSkill)).toBe(true);
 
     const status = checkAgentStatus({ homeDir: tmpHome, repoDir });

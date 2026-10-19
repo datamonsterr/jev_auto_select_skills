@@ -12,7 +12,57 @@ import { buildSkillState, buildSkillCriteria } from "./parse_skill";
 import { DEFAULT_SYSTEM_PROMPT, buildJevInstructions } from "./system_prompt";
 
 export const DEFAULT_OPENROUTER_DECISIONS_URL = "https://openrouter.ai/api/alpha/decisions";
-export const DEFAULT_JEV_MODEL = "~typesafe/jev-latest";
+export const DEFAULT_FREE_MODEL = "inception/mercury-decide:free";
+export const DEFAULT_JEV_MODEL = DEFAULT_FREE_MODEL;
+
+/**
+ * Check if a model is an authorized free decision model.
+ * Only free decision models (ending with :free or containing :free) are allowed.
+ */
+export function isFreeModel(model?: string): boolean {
+  if (!model || typeof model !== "string") return false;
+  const trimmed = model.trim().toLowerCase();
+  return trimmed.endsWith(":free") || trimmed.includes(":free");
+}
+
+/**
+ * Resolve the active decision model.
+ * Precedence:
+ * 1. optionsModel (must be free, else error)
+ * 2. SKILL_SELECTOR_MODEL env var (must be free, else error)
+ * 3. Compatible legacy free-only env vars (MODEL, JEV_MODEL) ONLY if free
+ * 4. DEFAULT_FREE_MODEL ("inception/mercury-decide:free")
+ */
+export function resolveActiveModel(optionsModel?: string): string {
+  if (optionsModel) {
+    if (!isFreeModel(optionsModel)) {
+      throw new Error(
+        `Paid model "${optionsModel}" rejected: only free decision models (such as ${DEFAULT_FREE_MODEL}) are authorized.`
+      );
+    }
+    return optionsModel;
+  }
+
+  const envSelectorModel = process.env.SKILL_SELECTOR_MODEL;
+  if (envSelectorModel) {
+    if (!isFreeModel(envSelectorModel)) {
+      throw new Error(
+        `Paid model "${envSelectorModel}" rejected: only free decision models (such as ${DEFAULT_FREE_MODEL}) are authorized.`
+      );
+    }
+    return envSelectorModel;
+  }
+
+  const legacyModel = process.env.MODEL || process.env.JEV_MODEL;
+  if (legacyModel) {
+    if (isFreeModel(legacyModel)) {
+      return legacyModel;
+    }
+    // Legacy model is paid (e.g. ~typesafe/jev-latest): do not silently use it!
+  }
+
+  return DEFAULT_FREE_MODEL;
+}
 
 export interface JevProviderConfig {
   apiKey?: string;
@@ -20,6 +70,7 @@ export interface JevProviderConfig {
   endpoint?: string;
   retries?: number;
   retryDelayMs?: number;
+  timeoutMs?: number;
   fetchFn?: typeof fetch;
 }
 
@@ -32,6 +83,7 @@ export class JevProvider {
   private endpoint: string;
   private retries: number;
   private retryDelayMs: number;
+  private timeoutMs: number;
   private fetchFn: typeof fetch;
 
   constructor(config: JevProviderConfig = {}) {
@@ -40,10 +92,11 @@ export class JevProvider {
       process.env.OPENROUTER_API_KEY ||
       process.env.JEV_API_KEY ||
       "";
-    this.model = config.model || process.env.MODEL || DEFAULT_JEV_MODEL;
+    this.model = resolveActiveModel(config.model);
     this.endpoint = config.endpoint || DEFAULT_OPENROUTER_DECISIONS_URL;
     this.retries = config.retries !== undefined ? config.retries : 3;
     this.retryDelayMs = config.retryDelayMs !== undefined ? config.retryDelayMs : 500;
+    this.timeoutMs = config.timeoutMs !== undefined ? config.timeoutMs : 8000;
     this.fetchFn = config.fetchFn || fetch;
   }
 
@@ -51,6 +104,13 @@ export class JevProvider {
    * Send a decision request to Jev with automatic retries and backoff
    */
   async sendDecisionRequest(request: JevDecisionRequest): Promise<JevDecisionResponse> {
+    const modelToUse = request.model || this.model;
+    if (!isFreeModel(modelToUse)) {
+      throw new Error(
+        `Paid model "${modelToUse}" rejected: only free decision models (such as ${DEFAULT_FREE_MODEL}) are authorized.`
+      );
+    }
+
     if (!this.apiKey) {
       throw new Error(
         "OPENROUTER_API_KEY is not set. Please set the environment variable or pass apiKey in constructor."
@@ -62,16 +122,25 @@ export class JevProvider {
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
-        const response = await this.fetchFn(this.endpoint, {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${this.apiKey}`,
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://github.com/agent-tools/jev-skill-selector",
-            "X-Title": "Jev Skill Selector",
-          },
-          body: JSON.stringify(request),
-        });
+        const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+        const timer = controller ? setTimeout(() => controller.abort(), this.timeoutMs) : null;
+
+        let response: Response;
+        try {
+          response = await this.fetchFn(this.endpoint, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${this.apiKey}`,
+              "Content-Type": "application/json",
+              "HTTP-Referer": "https://github.com/agent-tools/skill_selector",
+              "X-Title": "Skill Selector",
+            },
+            body: JSON.stringify(request),
+            ...(controller ? { signal: controller.signal } : {}),
+          });
+        } finally {
+          if (timer) clearTimeout(timer);
+        }
 
         if (response.ok) {
           const data = (await response.json()) as JevDecisionResponse;
@@ -131,7 +200,7 @@ export class JevProvider {
     const threshold = options.threshold ?? 0.05;
     const maxSkills = options.maxSkills ?? 3;
     const includeNone = options.includeNone ?? true;
-    const activeModel = options.model || this.model;
+    const activeModel = resolveActiveModel(options.model || this.model);
 
     // Build state and criteria (compact: true omits redundant skill array from state, saving ~11,000 input tokens)
     const state = buildSkillState(
@@ -183,7 +252,63 @@ export class JevProvider {
       questions,
     };
 
-    const response = await this.sendDecisionRequest(request);
+    let response: JevDecisionResponse;
+    try {
+      response = await this.sendDecisionRequest(request);
+    } catch (err: any) {
+      // Treat provider failure/timeout as local fallback or no selected skills, explicit source metadata
+      const activeSystemPrompt = systemPrompt || DEFAULT_SYSTEM_PROMPT;
+      const estimateTokens = (text: string) => Math.max(1, Math.ceil(text.trim().length / 3.8));
+
+      // Local heuristic fallback: match skill names present in the user prompt
+      const lowerPrompt = userPrompt.toLowerCase();
+      const localMatches: SelectedSkill[] = [];
+      for (const s of skills) {
+        const sName = s.name.toLowerCase();
+        const wordRegex = new RegExp(`\\b${sName.replace(/[-_]/g, "[-_ ]?")}\\b`, "i");
+        if (wordRegex.test(lowerPrompt) || lowerPrompt.includes(sName)) {
+          localMatches.push({
+            name: s.name,
+            probability: 0.85,
+            confidence: 0.85,
+            description: s.description,
+            whenToUse: s.whenToUse,
+            path: s.path,
+          });
+          if (localMatches.length >= maxSkills) break;
+        }
+      }
+
+      if (options?.includeContent) {
+        for (const skill of localMatches) {
+          if (skill.path && fs.existsSync(skill.path)) {
+            try {
+              skill.content = fs.readFileSync(skill.path, "utf-8");
+            } catch {}
+          }
+        }
+      }
+
+      return {
+        selectedSkills: localMatches,
+        primarySkill: localMatches[0]?.name || null,
+        answers: {},
+        source: "local_fallback",
+        metadata: {
+          source: "local_fallback",
+          model: activeModel,
+          error: err?.message || String(err),
+        },
+        usage: {
+          total_tokens: 0,
+          input_tokens: 0,
+          output_tokens: 0,
+          user_prompt_tokens: estimateTokens(userPrompt),
+          system_prompt_tokens: estimateTokens(activeSystemPrompt),
+        },
+      };
+    }
+
     const skillMap = new Map(skills.map((s) => [s.name, s]));
     const collectedMap = new Map<string, SelectedSkill>();
 
@@ -261,6 +386,11 @@ export class JevProvider {
       answers: response.answers,
       usage,
       raw: response,
+      source: "model",
+      metadata: {
+        source: "model",
+        model: activeModel,
+      },
     };
   }
 }

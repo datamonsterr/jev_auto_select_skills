@@ -6,14 +6,32 @@ export interface OpenCodePluginOptions {
   skillsDir?: string | string[];
   threshold?: number;
   autoInject?: boolean;
+  includeContent?: boolean;
+  selectSkillsFn?: any;
 }
 
 let cachedSelectSkills: any = null;
 let cachedFormatSkillSummary: any = null;
-
 let cachedFormatSkillContent: typeof import("../index").formatSkillContent | undefined;
 
-async function getSelectSkillsFn() {
+async function getSelectSkillsFn(customSelectFn?: any) {
+  if (customSelectFn) {
+    try {
+      const mod = await import("../index");
+      return {
+        selectSkills: customSelectFn,
+        formatSkillSummary: mod.formatSkillSummary,
+        formatSkillContent: mod.formatSkillContent,
+      };
+    } catch {
+      return {
+        selectSkills: customSelectFn,
+        formatSkillSummary: (skills: any[]) => JSON.stringify(skills),
+        formatSkillContent: (skills: any[]) => JSON.stringify(skills),
+      };
+    }
+  }
+
   const setupModule = (mod: any) => {
     mod.loadEnvironment?.();
     cachedSelectSkills = mod.selectSkills;
@@ -40,10 +58,11 @@ async function getSelectSkillsFn() {
     return setupModule(mod);
   } catch {}
 
-  // 2. Try JEV_SKILL_SELECTOR_DIR env variable
-  if (process.env.JEV_SKILL_SELECTOR_DIR) {
+  // 2. Try SKILL_SELECTOR_DIR / JEV_SKILL_SELECTOR_DIR env variable
+  const selectorDir = process.env.SKILL_SELECTOR_DIR || process.env.JEV_SKILL_SELECTOR_DIR;
+  if (selectorDir) {
     try {
-      const mod = await import(path.resolve(process.env.JEV_SKILL_SELECTOR_DIR, "index.ts"));
+      const mod = await import(path.resolve(selectorDir, "index.ts"));
       return setupModule(mod);
     } catch {}
   }
@@ -51,7 +70,8 @@ async function getSelectSkillsFn() {
   // 3. Try standard installation paths
   const home = process.env.HOME || process.env.USERPROFILE || "";
   const candidates = [
-    "/home/dat/dev/jev_skill_selector/index.ts",
+    path.join(home, "dev", "skill_selector", "index.ts"),
+    path.join(home, ".agents", "skill_selector", "index.ts"),
     path.join(home, "dev", "jev_skill_selector", "index.ts"),
     path.join(home, ".agents", "jev_skill_selector", "index.ts"),
   ];
@@ -64,19 +84,19 @@ async function getSelectSkillsFn() {
     }
   }
 
-  throw new Error("Could not load jev-skill-selector. Set JEV_SKILL_SELECTOR_DIR environment variable.");
+  throw new Error("Could not load skill_selector. Set SKILL_SELECTOR_DIR environment variable.");
 }
 
 /**
- * OpenCode Plugin for TypeSafe Jev Skill Selector
+ * OpenCode Plugin for Skill Selector
  */
-export default function jevSkillSelectorPlugin(options: OpenCodePluginOptions = {}) {
+export default function skillSelectorPlugin(options: OpenCodePluginOptions = {}) {
   const autoInject = options.autoInject ?? true;
 
   return {
-    name: "jev-skill-selector",
+    name: "skill_selector",
     version: "1.0.0",
-    description: "Dynamically selects and loads skills using TypeSafe Jev decision model",
+    description: "Dynamically selects and loads skills using free decision models",
 
     hooks: {
       // OpenCode 1.x lifecycle hook for message stream inspection & injection
@@ -100,25 +120,47 @@ export default function jevSkillSelectorPlugin(options: OpenCodePluginOptions = 
         if (!prompt) return;
 
         try {
-          const { selectSkills, formatSkillSummary, formatSkillContent } = await getSelectSkillsFn();
+          const { selectSkills, formatSkillSummary, formatSkillContent } =
+            await getSelectSkillsFn(options.selectSkillsFn);
+          const shouldIncludeContent = options.includeContent ?? false;
           const result = await selectSkills({
             userPrompt: prompt,
             skillsDir: options.skillsDir,
-            options: { threshold: options.threshold ?? 0.05, includeContent: true },
+            options: { threshold: options.threshold ?? 0.05, includeContent: shouldIncludeContent },
           });
 
-          if (result.selectedSkills.length > 0) {
-            // Add a model-visible system message without mutating the user text
-            const content = formatSkillContent
+          if (result && result.selectedSkills && result.selectedSkills.length > 0) {
+            // Format concise names + paths + load instructions by default, full content only on explicit request
+            const content = shouldIncludeContent && formatSkillContent
               ? formatSkillContent(result.selectedSkills, { userPrompt: prompt })
               : formatSkillSummary(result.selectedSkills);
-            messages.push({
-              info: { role: "system", synthetic: true },
+
+            // OpenCode dedupe per user turn: replace own prior injection rather than unbounded messages
+            const existingIdx = messages.findIndex(
+              (m: any) =>
+                m?.info?.role === "system" &&
+                (m?.info?.source === "skill_selector" ||
+                  m?.parts?.some(
+                    (p: any) =>
+                      typeof p?.text === "string" &&
+                      (p.text.includes("[Skill Selector]") ||
+                        p.text.includes("[Jev Dynamic Skill Routing]"))
+                  ))
+            );
+
+            const newMessage = {
+              info: { role: "system", synthetic: true, source: "skill_selector" },
               parts: [{ type: "text", text: content }],
-            });
+            };
+
+            if (existingIdx !== -1) {
+              messages[existingIdx] = newMessage;
+            } else {
+              messages.push(newMessage);
+            }
           }
         } catch (err: any) {
-          console.warn(`[jev-skill-selector] Plugin hook error: ${err.message}`);
+          console.warn(`[skill_selector] Plugin hook error: ${err.message}`);
         }
       },
 

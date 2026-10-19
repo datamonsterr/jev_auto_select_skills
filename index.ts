@@ -20,13 +20,45 @@ import { dirnameCompat } from "./lib/compat";
 loadEnvironment();
 
 /**
+ * Walk up directory tree from `startDir` to find nearest workspace skills directory.
+ * Looks for `.agents/other_skills`, legacy `.agents/jev_skills`, or `skills`.
+ */
+export function findNearestWorkspaceSkillsDir(startDir: string): string | null {
+  let curr = path.resolve(startDir);
+  const root = path.parse(curr).root;
+
+  while (curr && curr !== root) {
+    const candidateOther = path.join(curr, ".agents", "other_skills");
+    if (fs.existsSync(candidateOther)) return candidateOther;
+
+    const candidateLegacy = path.join(curr, ".agents", "jev_skills");
+    if (fs.existsSync(candidateLegacy)) return candidateLegacy;
+
+    // Check if git root
+    const gitDir = path.join(curr, ".git");
+    if (fs.existsSync(gitDir)) {
+      if (fs.existsSync(candidateOther)) return candidateOther;
+      if (fs.existsSync(candidateLegacy)) return candidateLegacy;
+      const skillsDir = path.join(curr, "skills");
+      if (fs.existsSync(skillsDir)) return skillsDir;
+      break;
+    }
+
+    curr = path.dirname(curr);
+  }
+  return null;
+}
+
+/**
  * Resolve all search paths for skills bank directories.
- * By default reads:
- *  - Agent skills: ./.agents/jev_skills (or AGENT_SKILLS_PATH / SKILLS_AGENT_DIR)
- *  - Global skills: ~/.agents/jev_skills/ (or GLOBAL_SKILLS_PATH / SKILLS_GLOBAL_DIR)
- *
- * Can be overridden by environment variables (SKILLS_BANK_PATH, SKILLS_DIR,
- * GLOBAL_SKILLS_PATH, AGENT_SKILLS_PATH) or explicit arguments.
+ * Precedence:
+ *  1. Explicit path(s) passed directly
+ *  2. Project-level nearest ancestor discovery (.agents/other_skills, legacy .agents/jev_skills)
+ *     (Project skills override global EVEN WITH global SKILLS_BANK_PATH)
+ *  3. Workspace-specific paths
+ *  4. Environment variable overrides (SKILL_SELECTOR_BANK_PATH, SKILLS_BANK_PATH)
+ *  5. Global skills bank (~/.agents/other_skills/, legacy ~/.agents/jev_skills/)
+ *  6. Realpath deduplication across all resolved paths
  */
 export function resolveSkillsSearchPaths(options?: {
   customPath?: string | string[];
@@ -35,95 +67,99 @@ export function resolveSkillsSearchPaths(options?: {
   cwd?: string;
 }): string[] {
   const paths: string[] = [];
+  const seenRealpaths = new Set<string>();
   const homeDir = process.env.HOME || process.env.USERPROFILE || "";
   const cwd = options?.cwd || process.cwd();
+
+  const addPath = (p: string | null | undefined): boolean => {
+    if (!p) return false;
+    const resolved = p.startsWith("~") ? path.join(homeDir, p.slice(1)) : path.resolve(cwd, p);
+    if (!fs.existsSync(resolved)) return false;
+
+    let real = resolved;
+    try {
+      real = fs.realpathSync(resolved);
+    } catch {
+      real = resolved;
+    }
+
+    if (!seenRealpaths.has(real)) {
+      seenRealpaths.add(real);
+      paths.push(resolved);
+      return true;
+    }
+    return false;
+  };
 
   // 1. Explicit path(s) passed directly
   const explicit = options?.customPath || options?.skillsDir;
   if (explicit) {
     const list = Array.isArray(explicit) ? explicit : [explicit];
     for (const p of list) {
-      if (!p) continue;
-      const resolved = p.startsWith("~") ? path.join(homeDir, p.slice(1)) : path.resolve(cwd, p);
-      if (fs.existsSync(resolved) && !paths.includes(resolved)) {
-        paths.push(resolved);
-      }
+      addPath(p);
     }
     if (paths.length > 0) return paths;
   }
 
-  // 2. Environment variable overrides (SKILLS_BANK_PATH, SKILLS_DIR)
-  const envPath = process.env.SKILLS_BANK_PATH || process.env.SKILLS_DIR;
+  // 2. Project-level nearest workspace ancestor discovery (Project overrides Global)
+  const nearestProjectBank = findNearestWorkspaceSkillsDir(cwd);
+  if (nearestProjectBank) {
+    addPath(nearestProjectBank);
+  }
+
+  // 3. Workspace-specific paths
+  if (options?.workspacePaths) {
+    for (const ws of options.workspacePaths) {
+      addPath(path.resolve(ws, ".agents", "other_skills"));
+      addPath(path.resolve(ws, ".agents", "jev_skills"));
+    }
+  }
+
+  // 4. Agent-specific skills path (SKILL_SELECTOR_AGENT_SKILLS_PATH, AGENT_SKILLS_PATH)
+  const agentEnv =
+    process.env.SKILL_SELECTOR_AGENT_SKILLS_PATH ||
+    process.env.AGENT_SKILLS_PATH ||
+    process.env.SKILLS_AGENT_DIR;
+  if (agentEnv) {
+    addPath(agentEnv);
+  }
+
+  addPath(path.resolve(cwd, ".agents", "other_skills"));
+  addPath(path.resolve(cwd, ".agents", "jev_skills"));
+  addPath(path.resolve(cwd, "skills"));
+  addPath(path.resolve(dirnameCompat(import.meta), ".agents", "other_skills"));
+  addPath(path.resolve(dirnameCompat(import.meta), ".agents", "jev_skills"));
+  addPath(path.resolve(dirnameCompat(import.meta), "skills"));
+
+  // 5. Environment variable overrides (SKILL_SELECTOR_BANK_PATH, SKILLS_BANK_PATH, SKILLS_DIR)
+  const envPath =
+    process.env.SKILL_SELECTOR_BANK_PATH ||
+    process.env.SKILLS_BANK_PATH ||
+    process.env.SKILLS_DIR;
   if (envPath) {
     const parts = envPath.split(/[:;,]/).map((p) => p.trim()).filter(Boolean);
     for (const p of parts) {
-      const resolved = p.startsWith("~") ? path.join(homeDir, p.slice(1)) : path.resolve(cwd, p);
-      if (fs.existsSync(resolved) && !paths.includes(resolved)) {
-        paths.push(resolved);
-      }
-    }
-    if (paths.length > 0) return paths;
-  }
-
-  // 3. Workspace-specific paths (e.g. from IDE or multi-root agent)
-  if (options?.workspacePaths) {
-    for (const ws of options.workspacePaths) {
-      const cand = path.resolve(ws, ".agents", "jev_skills");
-      if (fs.existsSync(cand) && !paths.includes(cand)) {
-        paths.push(cand);
-      }
+      addPath(p);
     }
   }
 
-  // 4. Agent-specific skills path (default: ./.agents/jev_skills)
-  const agentEnv = process.env.AGENT_SKILLS_PATH || process.env.SKILLS_AGENT_DIR;
-  const agentCandidates = [
-    agentEnv ? (agentEnv.startsWith("~") ? path.join(homeDir, agentEnv.slice(1)) : path.resolve(cwd, agentEnv)) : null,
-    path.resolve(cwd, "skills"),
-    path.resolve(cwd, ".agents", "jev_skills"),
-    path.resolve(dirnameCompat(import.meta), "skills"),
-    path.resolve(dirnameCompat(import.meta), ".agents", "jev_skills"),
-  ].filter((p): p is string => Boolean(p));
-
-  for (const cand of agentCandidates) {
-    if (fs.existsSync(cand) && !paths.includes(cand)) {
-      paths.push(cand);
-      break;
-    }
+  // 6. Global skills path (default: ~/.agents/other_skills/, legacy ~/.agents/jev_skills/)
+  const globalEnv =
+    process.env.SKILL_SELECTOR_GLOBAL_SKILLS_PATH ||
+    process.env.GLOBAL_SKILLS_PATH ||
+    process.env.SKILLS_GLOBAL_DIR;
+  if (globalEnv) {
+    addPath(globalEnv);
   }
 
-  // 4. Global skills path (default: ~/.agents/jev_skills/)
-  const globalEnv = process.env.GLOBAL_SKILLS_PATH || process.env.SKILLS_GLOBAL_DIR;
-  const globalCandidates = [
-    globalEnv ? (globalEnv.startsWith("~") ? path.join(homeDir, globalEnv.slice(1)) : path.resolve(globalEnv)) : null,
-    path.join(homeDir, ".agents", "jev_skills"),
-    path.join(homeDir, ".agents", "skills_bank"),
-    path.join(homeDir, ".gemini", "config", "skills"),
-  ].filter((p): p is string => Boolean(p));
-
-  for (const cand of globalCandidates) {
-    if (fs.existsSync(cand) && !paths.includes(cand)) {
-      paths.push(cand);
-      break;
-    }
-  }
-
-  // 5. Legacy fallbacks
-  const legacyCandidates = [
-    path.resolve(cwd, "skills"),
-    path.resolve(dirnameCompat(import.meta), "skills"),
-    path.join(homeDir, ".agents", "skills"),
-  ];
-  for (const cand of legacyCandidates) {
-    if (fs.existsSync(cand) && !paths.includes(cand)) {
-      paths.push(cand);
-      break;
-    }
-  }
+  addPath(path.join(homeDir, ".agents", "other_skills"));
+  addPath(path.join(homeDir, ".agents", "jev_skills"));
+  addPath(path.join(homeDir, ".agents", "skills_bank"));
+  addPath(path.join(homeDir, ".gemini", "config", "skills"));
 
   // Default fallback if none exists yet
   if (paths.length === 0) {
-    paths.push(path.resolve(cwd, ".agents", "jev_skills"));
+    paths.push(path.resolve(cwd, ".agents", "other_skills"));
   }
 
   return paths;
@@ -134,7 +170,7 @@ export function resolveSkillsSearchPaths(options?: {
  */
 export function resolveSkillsBankPath(customPath?: string): string {
   const searchPaths = resolveSkillsSearchPaths({ customPath });
-  return searchPaths[0] || path.resolve(process.cwd(), ".agents", "jev_skills");
+  return searchPaths[0] || path.resolve(process.cwd(), ".agents", "other_skills");
 }
 
 export {
@@ -156,6 +192,7 @@ export {
   checkAgentStatus,
   runSetupCli,
 } from "./scripts/setup-agent";
+export { migrateSkills, DEFAULT_KEEP_SKILLS } from "./lib/migrate";
 export type { Skill, SelectedSkill, SkillSelectionResult, SkillSelectorOptions, UsageMetrics };
 
 /**
@@ -177,12 +214,15 @@ export async function selectSkills(params: {
     throw new Error(`No skills found in directories: ${targetDirs.join(", ")}`);
   }
 
-  const provider = new JevProvider({
-    apiKey: options.apiKey,
-    model: options.model,
-    retries: options.retries,
-    retryDelayMs: options.retryDelayMs,
-  });
+  const provider =
+    options.provider ||
+    new JevProvider({
+      apiKey: options.apiKey,
+      model: options.model,
+      retries: options.retries,
+      retryDelayMs: options.retryDelayMs,
+      fetchFn: options.fetchFn,
+    });
 
   return provider.selectSkills({
     userPrompt,
@@ -194,23 +234,25 @@ export async function selectSkills(params: {
 
 function printHelp(): void {
   console.log(`
-Jev Skill Selector (TypeSafe Jev System One Model)
+Skill Selector (skill_selector)
 Usage:
-  jev-skill-selector "<user prompt>" [options]
-  jev-skill-selector setup [agent] [options]
-  jev-skill-selector --prompt "<user prompt>" --content
-  jev-skill-selector --skill "<skill-name>"
-  echo '{"userPrompt": "..."}' | jev-skill-selector
+  skill_selector "<user prompt>" [options]
+  skill_selector setup [agent] [options]
+  skill_selector migrate [options]
+  skill_selector --prompt "<user prompt>" --content
+  skill_selector --skill "<skill-name>"
+  echo '{"userPrompt": "..."}' | skill_selector
 
 Commands:
   setup [agent]            Configure agent harness (claude, codex, agy, opencode, all)
+  migrate                  Safely relocate optional skills to .agents/other_skills
 
 Options:
   --prompt, -p <text>      The user prompt / task to evaluate
-  --content, -c            Output full SKILL.md instructions for selected skills (use if harness cannot use hooks)
+  --content, -c            Output full SKILL.md instructions for selected skills
   --skill, -k <name>       Fetch and print content of a specific skill directly by name
   --system, -s <text>      Optional system prompt or instructions
-  --skills-dir, -d <path>  Path to skills directory (default: agent ./.agents/jev_skills and global ~/.agents/jev_skills)
+  --skills-dir, -d <path>  Path to skills directory (default: agent ./.agents/other_skills and global ~/.agents/other_skills)
   --threshold, -t <num>    Probability threshold (default: 0.05)
   --max-skills, -m <num>   Maximum skills to return (default: 3)
   --json                   Output results as JSON
@@ -233,6 +275,13 @@ async function main() {
   if (args[0] === "setup") {
     const { runSetupCli } = await import("./scripts/setup-agent");
     runSetupCli(args.slice(1));
+    return;
+  }
+
+  // Delegate to migrate command if requested
+  if (args[0] === "migrate" || args[0] === "migrate-skill" || args[0] === "migrate-skills") {
+    const { runMigrateCli } = await import("./scripts/migrate-skills");
+    await runMigrateCli(args.slice(1));
     return;
   }
 

@@ -124,14 +124,33 @@ export function loadSkillsFromDir(skillsDir: string | string[]): Skill[] {
 
     const entries = fs.readdirSync(resolvedDir, { withFileTypes: true });
     for (const entry of entries) {
+      const fullPath = path.join(resolvedDir, entry.name);
+      let isDir = false;
+      let isFile = false;
+
       if (entry.isDirectory()) {
-        const skillPath = path.join(resolvedDir, entry.name, "SKILL.md");
+        isDir = true;
+      } else if (entry.isFile()) {
+        isFile = true;
+      } else if (entry.isSymbolicLink()) {
+        try {
+          const stat = fs.statSync(fullPath);
+          if (stat.isDirectory()) isDir = true;
+          else if (stat.isFile()) isFile = true;
+        } catch {
+          // Broken symlink: handle gracefully and ignore
+          continue;
+        }
+      }
+
+      if (isDir) {
+        const skillPath = path.join(fullPath, "SKILL.md");
         if (fs.existsSync(skillPath)) {
           const skill = parseSkillFile(skillPath);
           if (skill) skillMap.set(skill.name, skill);
         }
-      } else if (entry.isFile() && entry.name.endsWith(".md")) {
-        const skill = parseSkillFile(path.join(resolvedDir, entry.name));
+      } else if (isFile && entry.name.endsWith(".md")) {
+        const skill = parseSkillFile(fullPath);
         if (skill) skillMap.set(skill.name, skill);
       }
     }
