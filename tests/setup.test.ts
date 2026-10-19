@@ -59,7 +59,7 @@ describe("agent setup scripts", () => {
     expect(settings.hooks.UserPromptSubmit).toBeDefined();
     expect(JSON.stringify(settings)).toContain("hooks/claude.ts");
 
-    const skillTarget = path.join(tmpHome, ".claude", "skills", "jev-skill-selector");
+    const skillTarget = path.join(tmpHome, ".claude", "skills", "skill_selector");
     expect(fs.existsSync(path.join(skillTarget, "SKILL.md"))).toBe(true);
     expect(fs.existsSync(path.join(skillTarget, "run.sh"))).toBe(true);
 
@@ -89,7 +89,7 @@ describe("agent setup scripts", () => {
         expect(sRes.hookConfigured).toBe(false);
         expect(sRes.skillInstalled).toBe(true);
         expect(fs.existsSync(path.join(skillOnlyHome, ".claude", "settings.json"))).toBe(false);
-        expect(fs.existsSync(path.join(skillOnlyHome, ".claude", "skills", "jev-skill-selector", "SKILL.md"))).toBe(true);
+        expect(fs.existsSync(path.join(skillOnlyHome, ".claude", "skills", "skill_selector", "SKILL.md"))).toBe(true);
       } finally {
         fs.rmSync(skillOnlyHome, { recursive: true, force: true });
       }
@@ -114,7 +114,7 @@ describe("agent setup scripts", () => {
     expect(hooksData.hooks.UserPromptSubmit).toBeDefined();
     expect(JSON.stringify(hooksData)).toContain("hooks/codex.ts");
 
-    const skillTarget = path.join(tmpHome, ".codex", "skills", "jev-skill-selector");
+    const skillTarget = path.join(tmpHome, ".codex", "skills", "skill_selector");
     expect(fs.existsSync(path.join(skillTarget, "SKILL.md"))).toBe(true);
     expect(fs.existsSync(path.join(skillTarget, "run.sh"))).toBe(true);
 

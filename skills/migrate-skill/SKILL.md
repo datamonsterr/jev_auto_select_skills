@@ -79,3 +79,19 @@ skill_selector migrate --source /project/.agents/skills --source /project/.claud
 ```
 
 Use a normal terminal for protected global paths. Preview and review first; never bypass harness read-only mounts. Exact backups default to `~/.local/state/skill-selector/backups`.
+
+## Retire obsolete selector and dispatch skills
+
+After installing `skill_selector` and verifying it, archive the obsolete names from every native discovery root and both old/new banks. The retirement helper touches only `jev-dispatch` and `jev-skill-selector`. It requires an accessible installed replacement and backs up exact originals outside discovery catalogs using the same guarded rollback manifest format. Defaults to preview; `--apply` is explicit. Run this after physical bank migration and configuration cutover, so old instructions cannot route agents back to retired tools. Installation no longer recreates legacy skill names.
+
+```bash
+# Preview in a normal terminal; add --root for project or account-specific native directories.
+bun run /home/dat/dev/jev_skill_selector/scripts/retire-legacy-skills.ts --replacement /home/dat/.agents/skills/skill_selector/SKILL.md --root /home/dat/.agents/skills --root /home/dat/.claude/skills --root /home/dat/.codex/skills --root /home/dat/.gemini/config/skills --root /home/dat/.config/opencode/skills --root /home/dat/.agents/jev_skills --root /home/dat/.agents/other_skills --dry-run
+
+# Repeat the reviewed arguments with --apply instead of --dry-run.
+# Rollback uses the returned manifest:
+skill_selector migrate --rollback /private/retirement/backup_manifest.json --dry-run
+skill_selector migrate --rollback /private/retirement/backup_manifest.json --apply
+```
+
+Safe sequence: install new selector and account entrypoints; review migration and backup plans; migrate optional skill banks; switch config/hooks to the new selector; retire legacy names; restart and verify harnesses. Keep all returned manifests for rollback. Protected global paths require a normal terminal; never bypass read-only mounts.

@@ -122,7 +122,6 @@ export function setupClaude(options: SetupOptions = {}): SetupResult {
   if (!options.hooksOnly) {
     const targetDirs = [
       path.join(homeDir, ".claude", "skills", "skill_selector"),
-      path.join(homeDir, ".claude", "skills", "jev-skill-selector"),
     ];
     installSkillFiles(targetDirs, repoDir, Boolean(options.dryRun), filesModified);
     skillInstalled = true;
@@ -199,7 +198,6 @@ export function setupCodex(options: SetupOptions = {}): SetupResult {
   if (!options.hooksOnly) {
     const targetDirs = [
       path.join(homeDir, ".codex", "skills", "skill_selector"),
-      path.join(homeDir, ".codex", "skills", "jev-skill-selector"),
     ];
     installSkillFiles(targetDirs, repoDir, Boolean(options.dryRun), filesModified);
     skillInstalled = true;
@@ -268,7 +266,6 @@ export function setupAntigravity(options: SetupOptions = {}): SetupResult {
   if (!options.hooksOnly) {
     const targetDirs = [
       path.join(homeDir, ".agents", "skills", "skill_selector"),
-      path.join(homeDir, ".agents", "skills", "jev-skill-selector"),
     ];
     installSkillFiles(targetDirs, repoDir, Boolean(options.dryRun), filesModified);
     skillInstalled = true;
@@ -308,7 +305,7 @@ export function setupOpenCode(options: SetupOptions = {}): SetupResult {
       if (fs.existsSync(pluginSource)) {
         const entrypoint = `export { default } from ${JSON.stringify(pluginSource)};\n`;
         fs.writeFileSync(pluginDest, entrypoint);
-        fs.writeFileSync(legacyPluginDest, entrypoint);
+    
         filesModified.push(pluginDest);
       }
 
@@ -339,7 +336,6 @@ export function setupOpenCode(options: SetupOptions = {}): SetupResult {
   if (!options.hooksOnly) {
     const targetDirs = [
       path.join(opencodeDir, "skills", "skill_selector"),
-      path.join(opencodeDir, "skills", "jev-skill-selector"),
     ];
     installSkillFiles(targetDirs, repoDir, Boolean(options.dryRun), filesModified);
     skillInstalled = true;
@@ -369,9 +365,6 @@ export function setupAll(options: SetupOptions = {}): SetupResult[] {
   if (!options.dryRun) {
     const targetDirs = [
       path.join(bankDir, "skill_selector"),
-      path.join(bankDir, "jev-skill-selector"),
-      path.join(legacyBankDir, "skill_selector"),
-      path.join(legacyBankDir, "jev-skill-selector"),
     ];
     installSkillFiles(targetDirs, repoDir, false, []);
 
