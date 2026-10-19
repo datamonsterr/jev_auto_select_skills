@@ -91,8 +91,12 @@ export async function migrateSkills(options: MigrationOptions): Promise<Migratio
   // Legacy canonical banks are always last, regardless of input insertion order.
   const priority=(dir: string)=>legacyRoots.includes(path.resolve(dir))?2:/(?:^|\/)\.agents\/skills\/?$/.test(path.resolve(dir))?0:1;
   const orderedDirs=[...options.sourceDirs,...(options.legacyBankPaths||[])].sort((a,b)=>priority(a)-priority(b));
+  const seenRoots=new Set<string>();
   for(const dir of orderedDirs) {
     const absolute=path.resolve(dir);if(!exists(absolute))continue;
+    const realRoot=fs.realpathSync(absolute);
+    if(seenRoots.has(realRoot))continue;
+    seenRoots.add(realRoot);
     for(const entry of fs.readdirSync(absolute,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name))) {
       const p=path.join(absolute,entry.name), name=entry.name.replace(/\.md$/,'');
       if(seen.has(p))continue;seen.add(p);

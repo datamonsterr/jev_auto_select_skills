@@ -79,3 +79,17 @@ it('moves kept names out of legacy bank and retargets a native kept alias with r
  expect(fs.readlinkSync(path.join(source,'caveman'))).toBe(path.join(legacy,'caveman'));
  expect(fs.readFileSync(path.join(source,'caveman/scripts/run.sh'),'utf8')).toBe('echo original');
 });
+
+
+it('deduplicates source directory aliases without losing native entry aliases', async()=>{
+ skill(source,'tdd');
+ const alias=path.join(root,'codex-skills');fs.symlinkSync(source,alias);
+ const options={sourceDirs:[source,alias],targetDir:target,backupDir:backup};
+ const preview=await migrateSkills({...options,dryRun:true});
+ expect(preview.moved).toEqual(['tdd']);expect(preview.actions.filter(a=>a.action==='move')).toHaveLength(1);
+ const result=await migrateSkills(options);
+ expect(fs.readFileSync(path.join(target,'tdd/scripts/run.sh'),'utf8')).toBe('echo original');
+ expect(fs.readdirSync(source)).toHaveLength(0);expect(fs.lstatSync(alias).isSymbolicLink()).toBe(true);
+ await rollbackMigration(result.manifestPath!);
+ expect(fs.readFileSync(path.join(alias,'tdd/scripts/run.sh'),'utf8')).toBe('echo original');
+});
