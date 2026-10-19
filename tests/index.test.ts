@@ -28,7 +28,7 @@ describe("index programmatic API", () => {
 
     const result = await selectSkills({
       userPrompt: "Dynamically select and route the right skill for an agent prompt to avoid context bloat",
-      options: { threshold: 0.05, fetchFn: mockFetch as any },
+      options: { apiKey: "offline-test-key", threshold: 0.05, fetchFn: mockFetch as any },
     });
 
     expect(result.primarySkill).toBe("skill_selector");

@@ -86,7 +86,7 @@ Step 3: Run all checks with verification-before-completion.`;
     const result = await selectSkills({
       userPrompt: prompt,
       skillsDir: testBankPaths,
-      options: { multiStep: true, maxSkills: 3, fetchFn: mockFetch },
+      options: { apiKey: "offline-test-key", multiStep: true, maxSkills: 3, fetchFn: mockFetch },
     });
 
     expect(result.selectedSkills.length).toBeGreaterThanOrEqual(2);

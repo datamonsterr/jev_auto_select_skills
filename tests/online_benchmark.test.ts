@@ -57,7 +57,7 @@ describe("metatool online benchmark integration", () => {
       );
     }) as any;
 
-    const provider = new JevProvider({ fetchFn: mockFetch });
+    const provider = new JevProvider({ apiKey: "offline-test-key", fetchFn: mockFetch });
     const result = await provider.selectSkills({
       userPrompt: "I want to know the latest news about Tesla and how it has impacted the stock market.",
       skills: candidateSkills,

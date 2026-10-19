@@ -65,7 +65,7 @@ describe("golden_set integration", () => {
       userPrompt:
         "We need to refactor the payment calculation service. I want to use red-green-refactor cycle and write unit tests against public interfaces before touching any implementation code.",
       skillsDir: testBankPaths,
-      options: { threshold: 0.05, fetchFn: mockFetch },
+      options: { apiKey: "offline-test-key", threshold: 0.05, fetchFn: mockFetch },
     });
 
     expect(["tdd", "test-driven-development"]).toContain(result.primarySkill || "");

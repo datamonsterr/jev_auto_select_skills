@@ -93,6 +93,8 @@ async function getSelectSkillsFn(customSelectFn?: any) {
 export default function skillSelectorPlugin(options: OpenCodePluginOptions = {}) {
   const autoInject = options.autoInject ?? true;
 
+  const turns = new Map<string, Promise<string | null>>();
+
   return {
     name: "skill_selector",
     version: "1.0.0",
@@ -119,49 +121,52 @@ export default function skillSelectorPlugin(options: OpenCodePluginOptions = {})
         }
         if (!prompt) return;
 
-        try {
-          const { selectSkills, formatSkillSummary, formatSkillContent } =
-            await getSelectSkillsFn(options.selectSkillsFn);
-          const shouldIncludeContent = options.includeContent ?? false;
-          const result = await selectSkills({
-            userPrompt: prompt,
-            skillsDir: options.skillsDir,
-            options: { threshold: options.threshold ?? 0.05, includeContent: shouldIncludeContent },
-          });
-
-          if (result && result.selectedSkills && result.selectedSkills.length > 0) {
-            // Format concise names + paths + load instructions by default, full content only on explicit request
-            const content = shouldIncludeContent && formatSkillContent
-              ? formatSkillContent(result.selectedSkills, { userPrompt: prompt })
-              : formatSkillSummary(result.selectedSkills);
-
-            // OpenCode dedupe per user turn: replace own prior injection rather than unbounded messages
-            const existingIdx = messages.findIndex(
-              (m: any) =>
-                m?.info?.role === "system" &&
-                (m?.info?.source === "skill_selector" ||
-                  m?.parts?.some(
-                    (p: any) =>
-                      typeof p?.text === "string" &&
-                      (p.text.includes("[Skill Selector]") ||
-                        p.text.includes("[Jev Dynamic Skill Routing]"))
-                  ))
-            );
-
-            const newMessage = {
-              info: { role: "system", synthetic: true, source: "skill_selector" },
-              parts: [{ type: "text", text: content }],
-            };
-
-            if (existingIdx !== -1) {
-              messages[existingIdx] = newMessage;
-            } else {
-              messages.push(newMessage);
-            }
+        // Remove all previous selector context, including legacy installations.
+        for (let i = messages.length - 1; i >= 0; i--) {
+          const m = messages[i];
+          if ((m?.info?.role === "system" || m?.role === "system") &&
+              (m?.info?.source === "skill_selector" || m?.parts?.some((p: any) =>
+                typeof p?.text === "string" && /\[Skill Selector\]|\[Jev Dynamic Skill Routing\]/.test(p.text)))) {
+            messages.splice(i, 1);
           }
-        } catch (err: any) {
-          console.warn(`[skill_selector] Plugin hook error: ${err.message}`);
         }
+        const info = lastUser?.info ?? lastUser;
+        const session = info?.sessionID ?? (_input as any)?.sessionID;
+        const message = info?.id;
+        // Never dedupe solely by prompt text: identical consecutive real turns differ.
+        const key = session && message ? JSON.stringify([session, message, prompt]) : undefined;
+        let pending = key ? turns.get(key) : undefined;
+        if (!pending) {
+          pending = (async () => {
+            try {
+              const { selectSkills, formatSkillSummary, formatSkillContent } =
+                await getSelectSkillsFn(options.selectSkillsFn);
+              const includeContent = options.includeContent ?? false;
+              const result = await selectSkills({ userPrompt: prompt, skillsDir: options.skillsDir,
+                options: { threshold: options.threshold ?? 0.05, includeContent } });
+              if (!result?.selectedSkills?.length) return null;
+              return includeContent && formatSkillContent
+                ? formatSkillContent(result.selectedSkills)
+                : formatSkillSummary(result.selectedSkills);
+            } catch (err: any) {
+              console.warn(`[skill_selector] Plugin hook error: ${err.message}`);
+              return null;
+            }
+          })();
+          if (key) {
+            turns.set(key, pending);
+            if (turns.size > 256) turns.delete(turns.keys().next().value!);
+          }
+        }
+        const content = await pending;
+        // Another concurrent transform may have finished while awaiting the same decision.
+        for (let i = messages.length - 1; i >= 0; i--) {
+          if (messages[i]?.info?.source === "skill_selector") messages.splice(i, 1);
+        }
+        if (content) messages.push({
+          info: { role: "system", synthetic: true, source: "skill_selector" },
+          parts: [{ type: "text", text: content }],
+        });
       },
 
       // OpenCode hook for system prompt transformations

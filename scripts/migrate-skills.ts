@@ -1,10 +1,16 @@
 #!/usr/bin/env bun
 import path from "node:path";
 import os from "node:os";
-import { migrateSkills, DEFAULT_KEEP_SKILLS, type MigrationOptions } from "../lib/migrate";
+import { rollbackMigration, migrateSkills, DEFAULT_KEEP_SKILLS, type MigrationOptions } from "../lib/migrate";
 
 export async function runMigrateCli(args: string[] = process.argv.slice(2)): Promise<void> {
   const homeDir = os.homedir();
+  if (args.includes("--rollback")) {
+    const manifest = args[args.indexOf("--rollback") + 1];
+    if (!manifest || manifest.startsWith("--")) throw new Error("--rollback requires a manifest path");
+    console.log(JSON.stringify(await rollbackMigration(manifest, {dryRun: args.includes("--dry-run")})));
+    return;
+  }
 
   if (args.includes("--help") || args.includes("-h")) {
     console.log(`
@@ -17,6 +23,7 @@ Usage:
   bun run scripts/migrate-skills.ts [options]
 
 Options:
+  --rollback <file>   Restore a verified backup manifest (supports --dry-run)
   --dry-run, -d        Preview migration actions without modifying filesystem
   --keep, -k <list>    Comma-separated list of additional skill names to keep in native dirs
   --source, -s <dir>   Source skill directory (can be specified multiple times)
@@ -58,6 +65,7 @@ Default Kept Skills (always preserved in native dirs):
   }
 
   const defaultSources = [
+    path.join(homeDir, ".agents", "jev_skills"),
     path.join(homeDir, ".agents", "skills"),
     path.join(homeDir, ".claude", "skills"),
     path.join(homeDir, ".codex", "skills"),
@@ -75,10 +83,7 @@ Default Kept Skills (always preserved in native dirs):
     keepSkills: customKeep,
     dryRun,
     repairSymlinks,
-    legacyBankPaths: [
-      path.join(homeDir, ".agents", "jev_skills"),
-      path.resolve(".agents", "jev_skills"),
-    ],
+    legacyBankPaths: customSources.length ? [] : [path.join(homeDir, ".agents", "jev_skills")],
   };
 
   if (!jsonOutput) {
@@ -89,6 +94,8 @@ Default Kept Skills (always preserved in native dirs):
   }
 
   const result = await migrateSkills(options);
+
+  if (result.collisions.length) process.exitCode = 1;
 
   if (jsonOutput) {
     console.log(JSON.stringify(result, null, 2));
@@ -113,7 +120,7 @@ Default Kept Skills (always preserved in native dirs):
   if (result.manifestPath) {
     console.log(`\nManifest saved to: ${result.manifestPath}`);
   }
-  console.log(`\n✓ Migration complete.\n`);
+  console.log(result.collisions.length ? "Migration blocked: collisions; no changes applied." : "Migration complete.");
 }
 
 if (import.meta.main) {

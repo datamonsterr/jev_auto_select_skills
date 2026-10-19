@@ -185,6 +185,18 @@ describe("agent setup scripts", () => {
     expect(status.opencode.hook).toBe(true);
   });
 
+  it("stages ten Gemini entrypoints and migration skill without changing live CLI links", () => {
+    const link = path.join(os.homedir(), ".bun/bin/skill_selector");
+    const before = fs.existsSync(link) ? fs.readlinkSync(link) : null;
+    for (let i = 1; i <= 4; i++) fs.mkdirSync(path.join(tmpHome, ".omnigent/accounts", `account${i}`, ".gemini/config"), {recursive:true});
+    setupAll({homeDir: tmpHome, repoDir});
+    for (const base of [tmpHome, ...[1,2,3,4].map(i=>path.join(tmpHome,".omnigent/accounts",`account${i}`))]) {
+      for (const file of ["hooks.json","plugin.json"]) expect(fs.existsSync(path.join(base,".gemini/config/plugins/skill_selector",file))).toBe(true);
+    }
+    expect(fs.existsSync(path.join(tmpHome,".agents/other_skills/migrate-skill/SKILL.md"))).toBe(true);
+    expect(fs.existsSync(link) ? fs.readlinkSync(link) : null).toBe(before);
+  });
+
   it("runSetupCli handles CLI arguments cleanly", () => {
     // --status
     const statusRes = runSetupCli(["--status"]);

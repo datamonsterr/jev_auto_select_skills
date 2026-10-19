@@ -13,7 +13,6 @@ describe("Safe skill migration primitive (migrate-skills)", () => {
   beforeEach(() => {
     fs.mkdirSync(nativeSkillsDir, { recursive: true });
     fs.mkdirSync(targetOtherSkillsDir, { recursive: true });
-    fs.mkdirSync(backupDir, { recursive: true });
 
     // Create an always-on skill (e.g. caveman)
     const cavemanDir = path.join(nativeSkillsDir, "caveman");

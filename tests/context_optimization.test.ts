@@ -55,7 +55,7 @@ describe("Context optimization and injection formatting", () => {
   });
 
   it("OpenCode plugin dedupes per user turn and replaces own prior injection instead of unbounded messages", async () => {
-    const plugin = opencodePlugin({ autoInject: true });
+    const plugin = opencodePlugin({ autoInject: true, selectSkillsFn: async () => ({selectedSkills: dummySkills}) });
     const transformHook = plugin.hooks["experimental.chat.messages.transform"];
 
     const mockOutput = {

@@ -22,7 +22,7 @@ Safe, non-destructive migration utility to relocate optional task-specific skill
 4. **Exact Backup Manifest**: Automatically writes an exact JSON manifest recording timestamp, source/target paths, and file hashes in `backup_manifest.json`.
 5. **Idempotency**: Running migration repeatedly is a safe no-op once skills are migrated.
 6. **Collision Protection**: If a target skill already exists with different contents, the operation is rejected and the source is untouched.
-7. **Symlink Handling & Repair**: Automatically detects and repairs symlinks that point into the legacy `.agents/jev_skills` path, updating them to `.agents/other_skills`.
+7. **Symlink Handling & Repair**: Materializes optional skills from native aliases and the legacy bank into `.agents/other_skills`, then removes verified optional native aliases. Original symlinks remain in the backup for rollback.
 8. **No Destructive `rm -rf`**: Deletion is only performed on specifically verified moved files, never on parent folders or kept skills.
 
 ## CLI Usage
@@ -49,3 +49,15 @@ Direct script execution:
 bun run scripts/migrate-skills.ts --dry-run
 bun run scripts/migrate-skills.ts
 ```
+
+
+## Rollback
+
+Every apply returns `manifestPath`. Restore only after previewing the guarded rollback:
+
+```bash
+skill_selector migrate --rollback /absolute/backup/backup_manifest.json --dry-run
+skill_selector migrate --rollback /absolute/backup/backup_manifest.json
+```
+
+Rollback preflights every complete tree and refuses to overwrite user edits. Default sources include the canonical global legacy bank; specify project `--source` directories explicitly for project migrations. Collisions block the entire migration before any writes.

@@ -17,12 +17,12 @@ export const DEFAULT_JEV_MODEL = DEFAULT_FREE_MODEL;
 
 /**
  * Check if a model is an authorized free decision model.
- * Only free decision models (ending with :free or containing :free) are allowed.
+ * Only free decision models (ending with the exact :free suffix) are allowed.
  */
 export function isFreeModel(model?: string): boolean {
   if (!model || typeof model !== "string") return false;
   const trimmed = model.trim().toLowerCase();
-  return trimmed.endsWith(":free") || trimmed.includes(":free");
+  return trimmed.endsWith(":free");
 }
 
 /**
@@ -94,9 +94,9 @@ export class JevProvider {
       "";
     this.model = resolveActiveModel(config.model);
     this.endpoint = config.endpoint || DEFAULT_OPENROUTER_DECISIONS_URL;
-    this.retries = config.retries !== undefined ? config.retries : 3;
+    this.retries = Math.max(1, Math.min(3, Math.floor(config.retries ?? 3)));
     this.retryDelayMs = config.retryDelayMs !== undefined ? config.retryDelayMs : 500;
-    this.timeoutMs = config.timeoutMs !== undefined ? config.timeoutMs : 8000;
+    this.timeoutMs = Math.max(1, Math.min(8000, config.timeoutMs ?? 8000));
     this.fetchFn = config.fetchFn || fetch;
   }
 
@@ -122,41 +122,47 @@ export class JevProvider {
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
-        const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
-        const timer = controller ? setTimeout(() => controller.abort(), this.timeoutMs) : null;
-
+        const controller = new AbortController();
+        let timer: ReturnType<typeof setTimeout>;
+        const deadline = new Promise<never>((_, reject) => {
+          timer = setTimeout(() => {
+            controller.abort();
+            reject(new Error(`Decision request timed out after ${this.timeoutMs}ms`));
+          }, this.timeoutMs);
+        });
         let response: Response;
+        let data: any;
         try {
-          response = await this.fetchFn(this.endpoint, {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${this.apiKey}`,
-              "Content-Type": "application/json",
-              "HTTP-Referer": "https://github.com/agent-tools/skill_selector",
-              "X-Title": "Skill Selector",
-            },
-            body: JSON.stringify(request),
-            ...(controller ? { signal: controller.signal } : {}),
-          });
+          const operation = (async () => {
+            const reply = await this.fetchFn(this.endpoint, {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${this.apiKey}`,
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://github.com/datamonsterr/jev_auto_select_skills",
+                "X-Title": "Skill Selector",
+              },
+              body: JSON.stringify({ ...request, model: modelToUse }),
+              signal: controller.signal,
+            });
+            // The deadline covers both headers and body, even for injected clients.
+            const body = await reply.text();
+            let parsed: any;
+            try { parsed = JSON.parse(body); } catch { parsed = { error: {message: body} }; }
+            return {reply, parsed};
+          })();
+          const completed = await Promise.race([operation, deadline]);
+          response = completed.reply;
+          data = completed.parsed;
         } finally {
-          if (timer) clearTimeout(timer);
+          clearTimeout(timer!);
         }
-
-        if (response.ok) {
-          const data = (await response.json()) as JevDecisionResponse;
-          return data;
-        }
+        if (response.ok) return data as JevDecisionResponse;
 
         const isRateLimit = response.status === 429;
         const isServerError = response.status >= 500 && response.status <= 599;
 
-        let errorText = "";
-        try {
-          const errJson = await response.json();
-          errorText = errJson.error?.message || JSON.stringify(errJson);
-        } catch {
-          errorText = await response.text();
-        }
+        const errorText = data?.error?.message || JSON.stringify(data);
 
         const error = new Error(
           `Jev decision API failed with HTTP ${response.status}: ${errorText}`
@@ -265,7 +271,7 @@ export class JevProvider {
       const localMatches: SelectedSkill[] = [];
       for (const s of skills) {
         const sName = s.name.toLowerCase();
-        const wordRegex = new RegExp(`\\b${sName.replace(/[-_]/g, "[-_ ]?")}\\b`, "i");
+        const wordRegex = new RegExp(`\\b${sName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/[-_]/g, "[-_ ]?")}\\b`, "i");
         if (wordRegex.test(lowerPrompt) || lowerPrompt.includes(sName)) {
           localMatches.push({
             name: s.name,

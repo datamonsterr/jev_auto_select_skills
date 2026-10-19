@@ -59,7 +59,10 @@ function installSkillFiles(targetSkillDirs: string[], repoDir: string, dryRun: b
         try { fs.chmodSync(path.join(skillTarget, "run.sh"), 0o755); } catch {}
       }
     }
-    filesModified.push(skillTarget);
+    const migrationSource = path.join(repoDir, "skills", "migrate-skill");
+    const migrationTarget = path.join(path.dirname(skillTarget), "migrate-skill");
+    if (!dryRun && fs.existsSync(migrationSource)) fs.cpSync(migrationSource, migrationTarget, {recursive: true});
+    filesModified.push(skillTarget, migrationTarget);
   }
 }
 
@@ -225,53 +228,24 @@ export function setupAntigravity(options: SetupOptions = {}): SetupResult {
   const hookScript = path.join(repoDir, "hooks", "antigravity.ts");
   const geminiConfigDir = path.join(homeDir, ".gemini", "config");
   const pluginDestDir = path.join(geminiConfigDir, "plugins", "skill_selector");
-  const legacyPluginDestDir = path.join(geminiConfigDir, "plugins", "jev-skill-selector");
 
   // 1. Install Plugin Spec & Hooks Config
   if (!options.skillOnly) {
     if (!options.dryRun) {
-      fs.mkdirSync(pluginDestDir, { recursive: true });
-      fs.mkdirSync(legacyPluginDestDir, { recursive: true });
-
-      // plugin.json
-      const pluginJson = { name: "skill_selector" };
-      fs.writeFileSync(
-        path.join(pluginDestDir, "plugin.json"),
-        JSON.stringify(pluginJson, null, 2) + "\n"
-      );
-      fs.writeFileSync(
-        path.join(legacyPluginDestDir, "plugin.json"),
-        JSON.stringify({ name: "jev-skill-selector" }, null, 2) + "\n"
-      );
-
-      // hooks.json with dynamic repo script path
-      const hooksJson = {
-        "skill_selector": {
-          PreInvocation: [
-            {
-              type: "command",
-              command: `bun run ${hookScript}`,
-              timeout: 30,
-            },
-          ],
-        },
-      };
-      fs.writeFileSync(
-        path.join(pluginDestDir, "hooks.json"),
-        JSON.stringify(hooksJson, null, 2) + "\n"
-      );
-      fs.writeFileSync(
-        path.join(legacyPluginDestDir, "hooks.json"),
-        JSON.stringify(
-          {
-            "jev-skill-selector": {
-              PreInvocation: [{ type: "command", command: `bun run ${hookScript}`, timeout: 30 }],
-            },
-          },
-          null,
-          2
-        ) + "\n"
-      );
+      // Account-specific Gemini configuration is independent of the global root.
+      // Only stage existing accounts; never manufacture new account/auth profiles.
+      const configRoots = [geminiConfigDir, ...[1, 2, 3, 4].map(i =>
+        path.join(homeDir, ".omnigent", "accounts", `account${i}`, ".gemini", "config"))
+        .filter(dir => fs.existsSync(dir))];
+      for (const configRoot of configRoots) {
+        const pluginDestDir = path.join(configRoot, "plugins", "skill_selector");
+        fs.mkdirSync(pluginDestDir, {recursive: true});
+        fs.writeFileSync(path.join(pluginDestDir, "plugin.json"), JSON.stringify({name: "skill_selector"}, null, 2) + "\n");
+        fs.writeFileSync(path.join(pluginDestDir, "hooks.json"), JSON.stringify({skill_selector: {
+          PreInvocation: [{type: "command", command: `bun run ${hookScript}`, timeout: 30}],
+        }}, null, 2) + "\n");
+        filesModified.push(path.join(pluginDestDir, "plugin.json"), path.join(pluginDestDir, "hooks.json"));
+      }
 
       // Note: We do NOT overwrite skills.json to register the routed bank wholesale in the native catalog.
       // Normal native skills remain discoverable in their native dirs.
@@ -401,9 +375,9 @@ export function setupAll(options: SetupOptions = {}): SetupResult[] {
     installSkillFiles(targetDirs, repoDir, false, []);
 
     // 2. Link binary globally
-    try {
-      execSync("bun link", { cwd: repoDir, stdio: "ignore" });
-    } catch {}
+    if (options.homeDir === undefined && process.env.NODE_ENV !== "test" && !process.env.CI) {
+      try { execSync("bun link", { cwd: repoDir, stdio: "ignore" }); } catch {}
+    }
 
     // 3. Ensure .env exists
     const envFile = path.join(repoDir, ".env");
@@ -495,6 +469,8 @@ Supported Agents:
   all          Setup all supported agents and link CLI globally (default)
 
 Options:
+  --home <dir>     Stage files under an isolated home (never runs bun link)
+  --repo <dir>     Canonical runtime source used by installed hooks
   --status         Show current configuration status for all agents
   --hooks-only     Only configure lifecycle hooks (Priority 1)
   --skill-only     Only install fallback skill (Priority 2)
@@ -533,8 +509,17 @@ export function runSetupCli(args: string[] = process.argv.slice(2)): SetupResult
     return;
   }
 
-  const targetArg = args.find((a) => !a.startsWith("-")) || "all";
-  const options: SetupOptions = { dryRun, hooksOnly, skillOnly };
+  const valueFor = (flag: string) => {
+    const i = args.indexOf(flag);
+    if (i < 0) return undefined;
+    if (!args[i+1] || args[i+1].startsWith("--")) throw new Error(`${flag} requires a directory`);
+    return args[i+1];
+  };
+  const homeDir = valueFor("--home");
+  const repoDir = valueFor("--repo");
+  const positional = args.filter((a,i) => !a.startsWith("-") && !["--home","--repo"].includes(args[i-1] ?? ""));
+  const targetArg = positional[0] || "all";
+  const options: SetupOptions = { dryRun, hooksOnly, skillOnly, homeDir, repoDir };
 
   console.log(`\n⚙️  Configuring Jev Skill Selector for: ${targetArg.toUpperCase()}`);
   if (dryRun) console.log(`   (Dry run mode: no files will be written)\n`);
