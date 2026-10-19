@@ -297,7 +297,6 @@ export function setupOpenCode(options: SetupOptions = {}): SetupResult {
   const opencodeDir = path.join(homeDir, ".config", "opencode");
   const pluginDestDir = path.join(opencodeDir, "plugin");
   const pluginDest = path.join(pluginDestDir, "skill_selector.ts");
-  const legacyPluginDest = path.join(pluginDestDir, "jev-skill-selector.ts");
 
   if (!options.skillOnly) {
     if (!options.dryRun) {
@@ -305,7 +304,7 @@ export function setupOpenCode(options: SetupOptions = {}): SetupResult {
       if (fs.existsSync(pluginSource)) {
         const entrypoint = `export { default } from ${JSON.stringify(pluginSource)};\n`;
         fs.writeFileSync(pluginDest, entrypoint);
-    
+
         filesModified.push(pluginDest);
       }
 
@@ -360,7 +359,6 @@ export function setupAll(options: SetupOptions = {}): SetupResult[] {
 
   // 1. Ensure central skills bank exists
   const bankDir = path.join(homeDir, ".agents", "other_skills");
-  const legacyBankDir = path.join(homeDir, ".agents", "jev_skills");
 
   if (!options.dryRun) {
     const targetDirs = [
