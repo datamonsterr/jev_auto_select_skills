@@ -6,14 +6,32 @@ export interface OpenCodePluginOptions {
   skillsDir?: string | string[];
   threshold?: number;
   autoInject?: boolean;
+  includeContent?: boolean;
+  selectSkillsFn?: any;
 }
 
 let cachedSelectSkills: any = null;
 let cachedFormatSkillSummary: any = null;
-
 let cachedFormatSkillContent: typeof import("../index").formatSkillContent | undefined;
 
-async function getSelectSkillsFn() {
+async function getSelectSkillsFn(customSelectFn?: any) {
+  if (customSelectFn) {
+    try {
+      const mod = await import("../index");
+      return {
+        selectSkills: customSelectFn,
+        formatSkillSummary: mod.formatSkillSummary,
+        formatSkillContent: mod.formatSkillContent,
+      };
+    } catch {
+      return {
+        selectSkills: customSelectFn,
+        formatSkillSummary: (skills: any[]) => JSON.stringify(skills),
+        formatSkillContent: (skills: any[]) => JSON.stringify(skills),
+      };
+    }
+  }
+
   const setupModule = (mod: any) => {
     mod.loadEnvironment?.();
     cachedSelectSkills = mod.selectSkills;
@@ -40,10 +58,11 @@ async function getSelectSkillsFn() {
     return setupModule(mod);
   } catch {}
 
-  // 2. Try JEV_SKILL_SELECTOR_DIR env variable
-  if (process.env.JEV_SKILL_SELECTOR_DIR) {
+  // 2. Try SKILL_SELECTOR_DIR / JEV_SKILL_SELECTOR_DIR env variable
+  const selectorDir = process.env.SKILL_SELECTOR_DIR || process.env.JEV_SKILL_SELECTOR_DIR;
+  if (selectorDir) {
     try {
-      const mod = await import(path.resolve(process.env.JEV_SKILL_SELECTOR_DIR, "index.ts"));
+      const mod = await import(path.resolve(selectorDir, "index.ts"));
       return setupModule(mod);
     } catch {}
   }
@@ -51,7 +70,8 @@ async function getSelectSkillsFn() {
   // 3. Try standard installation paths
   const home = process.env.HOME || process.env.USERPROFILE || "";
   const candidates = [
-    "/home/dat/dev/jev_skill_selector/index.ts",
+    path.join(home, "dev", "skill_selector", "index.ts"),
+    path.join(home, ".agents", "skill_selector", "index.ts"),
     path.join(home, "dev", "jev_skill_selector", "index.ts"),
     path.join(home, ".agents", "jev_skill_selector", "index.ts"),
   ];
@@ -64,19 +84,21 @@ async function getSelectSkillsFn() {
     }
   }
 
-  throw new Error("Could not load jev-skill-selector. Set JEV_SKILL_SELECTOR_DIR environment variable.");
+  throw new Error("Could not load skill_selector. Set SKILL_SELECTOR_DIR environment variable.");
 }
 
 /**
- * OpenCode Plugin for TypeSafe Jev Skill Selector
+ * OpenCode Plugin for Skill Selector
  */
-export default function jevSkillSelectorPlugin(options: OpenCodePluginOptions = {}) {
+export default function skillSelectorPlugin(options: OpenCodePluginOptions = {}) {
   const autoInject = options.autoInject ?? true;
 
+  const turns = new Map<string, Promise<string | null>>();
+
   return {
-    name: "jev-skill-selector",
+    name: "skill_selector",
     version: "1.0.0",
-    description: "Dynamically selects and loads skills using TypeSafe Jev decision model",
+    description: "Dynamically selects and loads skills using free decision models",
 
     hooks: {
       // OpenCode 1.x lifecycle hook for message stream inspection & injection
@@ -99,27 +121,52 @@ export default function jevSkillSelectorPlugin(options: OpenCodePluginOptions = 
         }
         if (!prompt) return;
 
-        try {
-          const { selectSkills, formatSkillSummary, formatSkillContent } = await getSelectSkillsFn();
-          const result = await selectSkills({
-            userPrompt: prompt,
-            skillsDir: options.skillsDir,
-            options: { threshold: options.threshold ?? 0.05, includeContent: true },
-          });
-
-          if (result.selectedSkills.length > 0) {
-            // Add a model-visible system message without mutating the user text
-            const content = formatSkillContent
-              ? formatSkillContent(result.selectedSkills, { userPrompt: prompt })
-              : formatSkillSummary(result.selectedSkills);
-            messages.push({
-              info: { role: "system", synthetic: true },
-              parts: [{ type: "text", text: content }],
-            });
+        // Remove all previous selector context, including legacy installations.
+        for (let i = messages.length - 1; i >= 0; i--) {
+          const m = messages[i];
+          if ((m?.info?.role === "system" || m?.role === "system") &&
+              (m?.info?.source === "skill_selector" || m?.parts?.some((p: any) =>
+                typeof p?.text === "string" && /\[Skill Selector\]|\[Jev Dynamic Skill Routing\]/.test(p.text)))) {
+            messages.splice(i, 1);
           }
-        } catch (err: any) {
-          console.warn(`[jev-skill-selector] Plugin hook error: ${err.message}`);
         }
+        const info = lastUser?.info ?? lastUser;
+        const session = info?.sessionID ?? (_input as any)?.sessionID;
+        const message = info?.id;
+        // Never dedupe solely by prompt text: identical consecutive real turns differ.
+        const key = session && message ? JSON.stringify([session, message, prompt]) : undefined;
+        let pending = key ? turns.get(key) : undefined;
+        if (!pending) {
+          pending = (async () => {
+            try {
+              const { selectSkills, formatSkillSummary, formatSkillContent } =
+                await getSelectSkillsFn(options.selectSkillsFn);
+              const includeContent = options.includeContent ?? false;
+              const result = await selectSkills({ userPrompt: prompt, skillsDir: options.skillsDir,
+                options: { threshold: options.threshold ?? 0.05, includeContent } });
+              if (!result?.selectedSkills?.length) return null;
+              return includeContent && formatSkillContent
+                ? formatSkillContent(result.selectedSkills)
+                : formatSkillSummary(result.selectedSkills);
+            } catch (err: any) {
+              console.warn(`[skill_selector] Plugin hook error: ${err.message}`);
+              return null;
+            }
+          })();
+          if (key) {
+            turns.set(key, pending);
+            if (turns.size > 256) turns.delete(turns.keys().next().value!);
+          }
+        }
+        const content = await pending;
+        // Another concurrent transform may have finished while awaiting the same decision.
+        for (let i = messages.length - 1; i >= 0; i--) {
+          if (messages[i]?.info?.source === "skill_selector") messages.splice(i, 1);
+        }
+        if (content) messages.push({
+          info: { role: "system", synthetic: true, source: "skill_selector" },
+          parts: [{ type: "text", text: content }],
+        });
       },
 
       // OpenCode hook for system prompt transformations

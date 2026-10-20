@@ -38,9 +38,11 @@ export async function handleClaudeHook(
     options: { includeContent: true },
   });
 
-  const shouldIncludeContent = options.includeContent ?? (process.env.JEV_INJECT_CONTENT !== "false");
+  const shouldIncludeContent =
+    options.includeContent ??
+    (process.env.SKILL_SELECTOR_INJECT_CONTENT === "true" || process.env.JEV_INJECT_CONTENT === "true");
   return shouldIncludeContent
-    ? formatSkillContent(result.selectedSkills, { userPrompt: prompt })
+    ? formatSkillContent(result.selectedSkills)
     : formatSkillSummary(result.selectedSkills);
 }
 

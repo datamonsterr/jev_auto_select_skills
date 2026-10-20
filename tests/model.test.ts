@@ -50,7 +50,7 @@ describe("model and system_prompt", () => {
     const summary = formatSkillSummary([
       { name: "tdd", probability: 0.9, confidence: 0.9, description: "Test driven dev" },
     ]);
-    expect(summary).toContain("**tdd** (probability: 0.90, confidence: 0.90)");
+    expect(summary).toContain("tdd");
     expect(summary).toContain("Test driven dev");
   });
 
@@ -68,7 +68,7 @@ describe("model and system_prompt", () => {
       ],
       { userPrompt: "Build user signup test-first" }
     );
-    expect(output).toContain("Build user signup test-first");
+    expect(output).not.toContain("Task: \"Build user signup test-first\"");
     expect(output).toContain("## Skill: tdd");
     expect(output).toContain("Always write red before green.");
   });

@@ -59,7 +59,7 @@ describe("agent setup scripts", () => {
     expect(settings.hooks.UserPromptSubmit).toBeDefined();
     expect(JSON.stringify(settings)).toContain("hooks/claude.ts");
 
-    const skillTarget = path.join(tmpHome, ".claude", "skills", "jev-skill-selector");
+    const skillTarget = path.join(tmpHome, ".claude", "skills", "skill_selector");
     expect(fs.existsSync(path.join(skillTarget, "SKILL.md"))).toBe(true);
     expect(fs.existsSync(path.join(skillTarget, "run.sh"))).toBe(true);
 
@@ -89,7 +89,7 @@ describe("agent setup scripts", () => {
         expect(sRes.hookConfigured).toBe(false);
         expect(sRes.skillInstalled).toBe(true);
         expect(fs.existsSync(path.join(skillOnlyHome, ".claude", "settings.json"))).toBe(false);
-        expect(fs.existsSync(path.join(skillOnlyHome, ".claude", "skills", "jev-skill-selector", "SKILL.md"))).toBe(true);
+        expect(fs.existsSync(path.join(skillOnlyHome, ".claude", "skills", "skill_selector", "SKILL.md"))).toBe(true);
       } finally {
         fs.rmSync(skillOnlyHome, { recursive: true, force: true });
       }
@@ -114,7 +114,7 @@ describe("agent setup scripts", () => {
     expect(hooksData.hooks.UserPromptSubmit).toBeDefined();
     expect(JSON.stringify(hooksData)).toContain("hooks/codex.ts");
 
-    const skillTarget = path.join(tmpHome, ".codex", "skills", "jev-skill-selector");
+    const skillTarget = path.join(tmpHome, ".codex", "skills", "skill_selector");
     expect(fs.existsSync(path.join(skillTarget, "SKILL.md"))).toBe(true);
     expect(fs.existsSync(path.join(skillTarget, "run.sh"))).toBe(true);
 
@@ -124,22 +124,23 @@ describe("agent setup scripts", () => {
     expect(status.codex.skill).toBe(true);
   });
 
-  it("setupAntigravity configures plugins, hooks and skill bank", () => {
+  it("setupAntigravity configures plugins, hooks and does not register routed bank wholesale", () => {
     const res = setupAntigravity({ homeDir: tmpHome, repoDir, dryRun: false });
     expect(res.success).toBe(true);
     expect(res.pluginConfigured).toBe(true);
 
-    const pluginDir = path.join(tmpHome, ".gemini", "config", "plugins", "jev-skill-selector");
+    const pluginDir = path.join(tmpHome, ".gemini", "config", "plugins", "skill_selector");
     expect(fs.existsSync(path.join(pluginDir, "plugin.json"))).toBe(true);
     expect(fs.existsSync(path.join(pluginDir, "hooks.json"))).toBe(true);
 
     const hooksContent = JSON.parse(fs.readFileSync(path.join(pluginDir, "hooks.json"), "utf-8"));
     expect(JSON.stringify(hooksContent)).toContain("hooks/antigravity.ts");
 
+    // Optional routed bank must NOT be registered wholesale in native skills.json
     const skillsJson = path.join(tmpHome, ".gemini", "config", "skills.json");
-    expect(fs.existsSync(skillsJson)).toBe(true);
+    expect(fs.existsSync(skillsJson)).toBe(false);
 
-    const fallbackSkill = path.join(tmpHome, ".agents", "skills", "jev-skill-selector", "SKILL.md");
+    const fallbackSkill = path.join(tmpHome, ".agents", "skills", "skill_selector", "SKILL.md");
     expect(fs.existsSync(fallbackSkill)).toBe(true);
 
     const status = checkAgentStatus({ homeDir: tmpHome, repoDir });
@@ -147,20 +148,21 @@ describe("agent setup scripts", () => {
     expect(status.agy.skill).toBe(true);
   });
 
-  it("setupOpenCode configures plugin and skills path", () => {
+  it("setupOpenCode configures plugin without polluting native skills path", () => {
     const res = setupOpenCode({ homeDir: tmpHome, repoDir, dryRun: false });
     expect(res.success).toBe(true);
 
-    const pluginPath = path.join(tmpHome, ".config", "opencode", "plugin", "jev-skill-selector.ts");
+    const pluginPath = path.join(tmpHome, ".config", "opencode", "plugin", "skill_selector.ts");
     expect(fs.existsSync(pluginPath)).toBe(true);
+    expect(fs.readFileSync(pluginPath,"utf8")).toBe(`export { default } from ${JSON.stringify(path.join(repoDir,"plugins/opencode.ts"))};\n`);
 
     const configPath = path.join(tmpHome, ".config", "opencode", "opencode.json");
     expect(fs.existsSync(configPath)).toBe(true);
     const configData = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-    expect(configData.skills.paths).toContain(path.join(tmpHome, ".agents", "jev_skills"));
+    expect(configData.skills?.paths).toBeUndefined();
     expect(configData.plugin).toContain(pluginPath);
 
-    const fallbackSkill = path.join(tmpHome, ".config", "opencode", "skills", "jev-skill-selector", "SKILL.md");
+    const fallbackSkill = path.join(tmpHome, ".config", "opencode", "skills", "skill_selector", "SKILL.md");
     expect(fs.existsSync(fallbackSkill)).toBe(true);
 
     const status = checkAgentStatus({ homeDir: tmpHome, repoDir });
@@ -173,8 +175,8 @@ describe("agent setup scripts", () => {
     expect(results.length).toBe(4);
     expect(results.every((r) => r.success)).toBe(true);
 
-    // Central bank should contain jev-skill-selector
-    const bankSkill = path.join(tmpHome, ".agents", "jev_skills", "jev-skill-selector", "SKILL.md");
+    // Central bank should contain skill_selector in other_skills
+    const bankSkill = path.join(tmpHome, ".agents", "other_skills", "skill_selector", "SKILL.md");
     expect(fs.existsSync(bankSkill)).toBe(true);
 
     const status = checkAgentStatus({ homeDir: tmpHome, repoDir });
@@ -182,6 +184,18 @@ describe("agent setup scripts", () => {
     expect(status.codex.hook).toBe(true);
     expect(status.agy.hook).toBe(true);
     expect(status.opencode.hook).toBe(true);
+  });
+
+  it("stages ten Gemini entrypoints and migration skill without changing live CLI links", () => {
+    const link = path.join(os.homedir(), ".bun/bin/skill_selector");
+    const before = fs.existsSync(link) ? fs.readlinkSync(link) : null;
+    for (let i = 1; i <= 4; i++) fs.mkdirSync(path.join(tmpHome, ".omnigent/accounts", `account${i}`, ".gemini/config"), {recursive:true});
+    setupAll({homeDir: tmpHome, repoDir});
+    for (const base of [tmpHome, ...[1,2,3,4].map(i=>path.join(tmpHome,".omnigent/accounts",`account${i}`))]) {
+      for (const file of ["hooks.json","plugin.json"]) expect(fs.existsSync(path.join(base,".gemini/config/plugins/skill_selector",file))).toBe(true);
+    }
+    expect(fs.existsSync(path.join(tmpHome,".agents/other_skills/migrate-skill/SKILL.md"))).toBe(true);
+    expect(fs.existsSync(link) ? fs.readlinkSync(link) : null).toBe(before);
   });
 
   it("runSetupCli handles CLI arguments cleanly", () => {

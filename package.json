@@ -1,11 +1,12 @@
 {
-  "name": "jev-skill-selector",
-  "version": "1.0.0",
-  "description": "Agent tool using TypeSafe Jev decision model on OpenRouter to dynamically select skills from a skill bank",
+  "name": "skill_selector",
+  "version": "1.1.0",
+  "description": "Agent tool using free decision models (inception/mercury-decide:free) to dynamically select skills from an isolated skills bank",
   "main": "index.ts",
   "module": "index.ts",
   "type": "module",
   "bin": {
+    "skill_selector": "./index.ts",
     "jev-skill-selector": "./index.ts"
   },
   "scripts": {
@@ -15,6 +16,7 @@
     "setup:codex": "bun run scripts/setup-agent.ts codex",
     "setup:agy": "bun run scripts/setup-agent.ts agy",
     "setup:opencode": "bun run scripts/setup-agent.ts opencode",
+    "migrate": "bun run scripts/migrate-skills.ts",
     "test": "bun test tests/",
     "test:golden": "bun run scripts/test-golden.ts",
     "test:complex": "bun run scripts/test-complex.ts",

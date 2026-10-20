@@ -67,7 +67,7 @@ Details here.
     const skills = loadSkillsFromDir(skillsDir);
     expect(skills.length).toBeGreaterThanOrEqual(1);
     
-    const routerSkill = skills.find((s) => s.name === "jev-skill-selector");
+    const routerSkill = skills.find((s) => s.name === "skill_selector");
     expect(routerSkill).toBeDefined();
     expect(routerSkill?.description).toContain("router");
   });
@@ -76,7 +76,7 @@ Details here.
     const primaryDir = path.resolve(__dirname, "../skills");
     const merged = loadSkillsFromDir([primaryDir, primaryDir]);
     expect(merged.length).toBeGreaterThanOrEqual(1);
-    expect(merged.some((s) => s.name === "jev-skill-selector")).toBe(true);
+    expect(merged.some((s) => s.name === "skill_selector")).toBe(true);
   });
 
   it("builds Jev state containing skills description, name and when to use it", () => {

@@ -101,6 +101,13 @@ export interface SkillSelectionResult {
   answers: Record<string, JevChoiceAnswer>;
   usage?: UsageMetrics;
   raw?: JevDecisionResponse;
+  source?: "model" | "local_fallback" | string;
+  metadata?: {
+    source?: string;
+    model?: string;
+    error?: string;
+    [key: string]: any;
+  };
 }
 
 /**
@@ -118,6 +125,8 @@ export interface SkillSelectorOptions {
   retryDelayMs?: number;
   multiStep?: boolean | "auto";
   includeContent?: boolean;
+  fetchFn?: typeof fetch;
+  provider?: any;
 }
 
 /**
@@ -172,7 +181,8 @@ export function filterSelectedSkills(params: {
 }
 
 /**
- * Format selected skills into clean markdown summary suitable for injection into hooks
+ * Format selected skills into clean, concise summary suitable for hook injection.
+ * Defaults to concise selected names, original accessible paths, and load instructions without repeating full prompt.
  */
 export function formatSkillSummary(skills: SelectedSkill[]): string {
   if (skills.length === 0) {
@@ -180,27 +190,35 @@ export function formatSkillSummary(skills: SelectedSkill[]): string {
   }
 
   const lines = [
-    "### Recommended Agent Skills",
-    "The following specialized skills have been selected for this task:",
+    "🎯 **[Skill Selector]**",
+    "The following specialized skill(s) have been selected for this task:",
     "",
   ];
 
   for (const skill of skills) {
-    lines.push(`- **${skill.name}** (probability: ${skill.probability.toFixed(2)}, confidence: ${skill.confidence.toFixed(2)})`);
-    if (skill.description) {
-      lines.push(`  *Description:* ${skill.description}`);
+    const conf = (skill.confidence * 100).toFixed(0);
+    const prob = (skill.probability * 100).toFixed(0);
+    lines.push(`• **${skill.name}** (Confidence: ${conf}%, Probability: ${prob}%)`);
+    if (skill.path) {
+      lines.push(`  - Path: \`${skill.path}\``);
     }
-    if (skill.whenToUse && skill.whenToUse !== skill.description) {
-      lines.push(`  *When to use:* ${skill.whenToUse}`);
+    if (skill.whenToUse) {
+      lines.push(`  - When to use: ${skill.whenToUse}`);
+    } else if (skill.description) {
+      lines.push(`  - Description: ${skill.description}`);
     }
   }
+
+  lines.push("");
+  lines.push("*Load instructions:* To inspect and follow a selected skill, view its `SKILL.md` from the path above.");
 
   return lines.join("\n");
 }
 
 /**
  * Format selected skills with full SKILL.md contents included.
- * Designed for hook injections (UserPromptSubmit, pre-invocation) and standalone skill runs.
+ * Designed for hook injections when explicit content is requested (--content).
+ * Does not silently truncate mandatory skill instructions.
  */
 export function formatSkillContent(
   skills: SelectedSkill[],
@@ -212,14 +230,10 @@ export function formatSkillContent(
 
   const lines: string[] = [
     "### Recommended Agent Skills",
-    "🎯 **[Jev Dynamic Skill Routing]**",
+    "🎯 **[Skill Selector]**",
+    "The following specialized skills have been selected:",
+    "",
   ];
-
-  if (options?.userPrompt) {
-    lines.push(`Task: "${options.userPrompt}"`);
-  }
-
-  lines.push("The following specialized skills have been selected for this prompt:", "");
 
   for (const skill of skills) {
     const prob = (skill.probability * 100).toFixed(1);
@@ -266,7 +280,7 @@ export function formatSkillContent(
     lines.push("", "---", "");
   }
 
-  lines.push("*Instruction:* Apply the above skill instructions and workflows directly to fulfill the user prompt.");
+  lines.push("*Instruction:* Apply the above skill instructions directly to fulfill the user task.");
 
   return lines.join("\n");
 }

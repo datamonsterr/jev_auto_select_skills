@@ -101,7 +101,7 @@ describe("JevProvider", () => {
     expect(result.primarySkill).toBe("git-commit");
   });
 
-  it("throws error after exhausting all retries", async () => {
+  it("throws error in sendDecisionRequest after exhausting all retries and safely falls back in selectSkills", async () => {
     const mockFetch = mock(async () => {
       return new Response(
         JSON.stringify({ error: { message: "Service Unavailable", code: 503 } }),
@@ -116,12 +116,18 @@ describe("JevProvider", () => {
       retryDelayMs: 5,
     });
 
-    expect(
-      provider.selectSkills({
-        userPrompt: "Any prompt",
-        skills: dummySkills,
+    await expect(
+      provider.sendDecisionRequest({
+        model: "inception/mercury-decide:free",
+        questions: {},
       })
     ).rejects.toThrow("Service Unavailable");
+
+    const fallbackRes = await provider.selectSkills({
+      userPrompt: "Any prompt",
+      skills: dummySkills,
+    });
+    expect(fallbackRes.source).toBe("local_fallback");
   });
 
   it("supports multi-step and continuation prompts by evaluating multiple questions and aggregating skills", async () => {

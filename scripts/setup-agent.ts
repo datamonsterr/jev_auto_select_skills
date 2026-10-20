@@ -34,6 +34,38 @@ export function getHomeDir(customHome?: string): string {
   return os.homedir();
 }
 
+function installSkillFiles(targetSkillDirs: string[], repoDir: string, dryRun: boolean, filesModified: string[]) {
+  const candidates = [
+    path.join(repoDir, "skills", "skill_selector", "SKILL.md"),
+    path.join(repoDir, "skills", "jev-skill-selector", "SKILL.md"),
+    path.join(repoDir, "SKILL.md"),
+  ];
+  const skillMd = candidates.find((c) => fs.existsSync(c));
+
+  const runCandidates = [
+    path.join(repoDir, "skills", "skill_selector", "run.sh"),
+    path.join(repoDir, "skills", "jev-skill-selector", "run.sh"),
+  ];
+  const runSh = runCandidates.find((c) => fs.existsSync(c));
+
+  for (const skillTarget of targetSkillDirs) {
+    if (!dryRun) {
+      fs.mkdirSync(skillTarget, { recursive: true });
+      if (skillMd) {
+        fs.copyFileSync(skillMd, path.join(skillTarget, "SKILL.md"));
+      }
+      if (runSh) {
+        fs.copyFileSync(runSh, path.join(skillTarget, "run.sh"));
+        try { fs.chmodSync(path.join(skillTarget, "run.sh"), 0o755); } catch {}
+      }
+    }
+    const migrationSource = path.join(repoDir, "skills", "migrate-skill");
+    const migrationTarget = path.join(path.dirname(skillTarget), "migrate-skill");
+    if (!dryRun && fs.existsSync(migrationSource)) fs.cpSync(migrationSource, migrationTarget, {recursive: true});
+    filesModified.push(skillTarget, migrationTarget);
+  }
+}
+
 /**
  * Setup Claude Code (Priority 1 UserPromptSubmit hook + Priority 2 fallback skill)
  */
@@ -86,23 +118,12 @@ export function setupClaude(options: SetupOptions = {}): SetupResult {
     hookConfigured = true;
   }
 
-  // 2. Install Fallback Skill in ~/.claude/skills/jev-skill-selector
+  // 2. Install Fallback Skill in ~/.claude/skills/skill_selector (and jev-skill-selector for compat)
   if (!options.hooksOnly) {
-    const skillTarget = path.join(homeDir, ".claude", "skills", "jev-skill-selector");
-    const skillMd = path.join(repoDir, "skills", "jev-skill-selector", "SKILL.md");
-    const runSh = path.join(repoDir, "skills", "jev-skill-selector", "run.sh");
-
-    if (!options.dryRun) {
-      fs.mkdirSync(skillTarget, { recursive: true });
-      if (fs.existsSync(skillMd)) {
-        fs.copyFileSync(skillMd, path.join(skillTarget, "SKILL.md"));
-      }
-      if (fs.existsSync(runSh)) {
-        fs.copyFileSync(runSh, path.join(skillTarget, "run.sh"));
-        try { fs.chmodSync(path.join(skillTarget, "run.sh"), 0o755); } catch {}
-      }
-    }
-    filesModified.push(skillTarget);
+    const targetDirs = [
+      path.join(homeDir, ".claude", "skills", "skill_selector"),
+    ];
+    installSkillFiles(targetDirs, repoDir, Boolean(options.dryRun), filesModified);
     skillInstalled = true;
   }
 
@@ -146,7 +167,7 @@ export function setupCodex(options: SetupOptions = {}): SetupResult {
       }
     }
 
-    data.description ??= "Jev skill routing";
+    data.description ??= "Skill selector routing";
     data.hooks ??= {};
     data.hooks.UserPromptSubmit ??= [];
 
@@ -173,23 +194,12 @@ export function setupCodex(options: SetupOptions = {}): SetupResult {
     hookConfigured = true;
   }
 
-  // 2. Install Fallback Skill in ~/.codex/skills/jev-skill-selector
+  // 2. Install Fallback Skill in ~/.codex/skills/skill_selector (and jev-skill-selector for compat)
   if (!options.hooksOnly) {
-    const skillTarget = path.join(homeDir, ".codex", "skills", "jev-skill-selector");
-    const skillMd = path.join(repoDir, "skills", "jev-skill-selector", "SKILL.md");
-    const runSh = path.join(repoDir, "skills", "jev-skill-selector", "run.sh");
-
-    if (!options.dryRun) {
-      fs.mkdirSync(skillTarget, { recursive: true });
-      if (fs.existsSync(skillMd)) {
-        fs.copyFileSync(skillMd, path.join(skillTarget, "SKILL.md"));
-      }
-      if (fs.existsSync(runSh)) {
-        fs.copyFileSync(runSh, path.join(skillTarget, "run.sh"));
-        try { fs.chmodSync(path.join(skillTarget, "run.sh"), 0o755); } catch {}
-      }
-    }
-    filesModified.push(skillTarget);
+    const targetDirs = [
+      path.join(homeDir, ".codex", "skills", "skill_selector"),
+    ];
+    installSkillFiles(targetDirs, repoDir, Boolean(options.dryRun), filesModified);
     skillInstalled = true;
   }
 
@@ -215,52 +225,35 @@ export function setupAntigravity(options: SetupOptions = {}): SetupResult {
 
   const hookScript = path.join(repoDir, "hooks", "antigravity.ts");
   const geminiConfigDir = path.join(homeDir, ".gemini", "config");
-  const pluginDestDir = path.join(geminiConfigDir, "plugins", "jev-skill-selector");
+  const pluginDestDir = path.join(geminiConfigDir, "plugins", "skill_selector");
 
   // 1. Install Plugin Spec & Hooks Config
   if (!options.skillOnly) {
     if (!options.dryRun) {
-      fs.mkdirSync(pluginDestDir, { recursive: true });
+      // Account-specific Gemini configuration is independent of the global root.
+      // Only stage existing accounts; never manufacture new account/auth profiles.
+      const configRoots = [geminiConfigDir, ...[1, 2, 3, 4].map(i =>
+        path.join(homeDir, ".omnigent", "accounts", `account${i}`, ".gemini", "config"))
+        .filter(dir => fs.existsSync(dir))];
+      for (const configRoot of configRoots) {
+        const pluginDestDir = path.join(configRoot, "plugins", "skill_selector");
+        fs.mkdirSync(pluginDestDir, {recursive: true});
+        fs.writeFileSync(path.join(pluginDestDir, "plugin.json"), JSON.stringify({name: "skill_selector"}, null, 2) + "\n");
+        fs.writeFileSync(path.join(pluginDestDir, "hooks.json"), JSON.stringify({skill_selector: {
+          PreInvocation: [{type: "command", command: `bun run ${hookScript}`, timeout: 30}],
+        }}, null, 2) + "\n");
+        filesModified.push(path.join(pluginDestDir, "plugin.json"), path.join(pluginDestDir, "hooks.json"));
+      }
 
-      // plugin.json
-      const pluginJson = { name: "jev-skill-selector" };
-      fs.writeFileSync(
-        path.join(pluginDestDir, "plugin.json"),
-        JSON.stringify(pluginJson, null, 2) + "\n"
-      );
+      // Note: We do NOT overwrite skills.json to register the routed bank wholesale in the native catalog.
+      // Normal native skills remain discoverable in their native dirs.
 
-      // hooks.json with dynamic repo script path
-      const hooksJson = {
-        "jev-skill-selector": {
-          PreInvocation: [
-            {
-              type: "command",
-              command: `bun run ${hookScript}`,
-              timeout: 30,
-            },
-          ],
-        },
-      };
-      fs.writeFileSync(
-        path.join(pluginDestDir, "hooks.json"),
-        JSON.stringify(hooksJson, null, 2) + "\n"
-      );
-
-      // Point skills.json to skills bank (~/.agents/jev_skills)
-      const skillsJsonPath = path.join(geminiConfigDir, "skills.json");
-      const skillsBankDir = path.join(homeDir, ".agents", "jev_skills");
-      fs.mkdirSync(skillsBankDir, { recursive: true });
-      fs.writeFileSync(
-        skillsJsonPath,
-        JSON.stringify({ entries: [{ path: skillsBankDir }] }, null, 2) + "\n"
-      );
-      filesModified.push(skillsJsonPath);
-
-      // If 'agy' CLI command is available, register plugin
-      try {
-        execSync(`agy plugin install "${pluginDestDir}" 2>/dev/null`, { stdio: "ignore" });
-      } catch {
-        // agy CLI registration is optional if files are placed in ~/.gemini/config/plugins
+      // Do NOT invoke live agy install in tests
+      const isTestEnv = process.env.NODE_ENV === "test" || Boolean(process.env.CI) || options.homeDir !== undefined;
+      if (!isTestEnv) {
+        try {
+          execSync(`agy plugin install "${pluginDestDir}" 2>/dev/null`, { stdio: "ignore" });
+        } catch {}
       }
     }
 
@@ -269,23 +262,12 @@ export function setupAntigravity(options: SetupOptions = {}): SetupResult {
     pluginConfigured = true;
   }
 
-  // 2. Install Fallback Skill in ~/.agents/skills/jev-skill-selector
+  // 2. Install Fallback Skill in ~/.agents/skills/skill_selector (and jev-skill-selector for compat)
   if (!options.hooksOnly) {
-    const skillTarget = path.join(homeDir, ".agents", "skills", "jev-skill-selector");
-    const skillMd = path.join(repoDir, "skills", "jev-skill-selector", "SKILL.md");
-    const runSh = path.join(repoDir, "skills", "jev-skill-selector", "run.sh");
-
-    if (!options.dryRun) {
-      fs.mkdirSync(skillTarget, { recursive: true });
-      if (fs.existsSync(skillMd)) {
-        fs.copyFileSync(skillMd, path.join(skillTarget, "SKILL.md"));
-      }
-      if (fs.existsSync(runSh)) {
-        fs.copyFileSync(runSh, path.join(skillTarget, "run.sh"));
-        try { fs.chmodSync(path.join(skillTarget, "run.sh"), 0o755); } catch {}
-      }
-    }
-    filesModified.push(skillTarget);
+    const targetDirs = [
+      path.join(homeDir, ".agents", "skills", "skill_selector"),
+    ];
+    installSkillFiles(targetDirs, repoDir, Boolean(options.dryRun), filesModified);
     skillInstalled = true;
   }
 
@@ -300,7 +282,8 @@ export function setupAntigravity(options: SetupOptions = {}): SetupResult {
 }
 
 /**
- * Setup OpenCode plugin and skills path
+ * Setup OpenCode plugin and fallback skill.
+ * Does NOT pollute native skills paths with the routed bank.
  */
 export function setupOpenCode(options: SetupOptions = {}): SetupResult {
   const repoDir = getRepoDir(options.repoDir);
@@ -313,18 +296,19 @@ export function setupOpenCode(options: SetupOptions = {}): SetupResult {
   const pluginSource = path.join(repoDir, "plugins", "opencode.ts");
   const opencodeDir = path.join(homeDir, ".config", "opencode");
   const pluginDestDir = path.join(opencodeDir, "plugin");
-  const pluginDest = path.join(pluginDestDir, "jev-skill-selector.ts");
-  const skillsBank = path.join(homeDir, ".agents", "jev_skills");
+  const pluginDest = path.join(pluginDestDir, "skill_selector.ts");
 
   if (!options.skillOnly) {
     if (!options.dryRun) {
       fs.mkdirSync(pluginDestDir, { recursive: true });
       if (fs.existsSync(pluginSource)) {
-        fs.copyFileSync(pluginSource, pluginDest);
+        const entrypoint = `export { default } from ${JSON.stringify(pluginSource)};\n`;
+        fs.writeFileSync(pluginDest, entrypoint);
+
         filesModified.push(pluginDest);
       }
 
-      // Configure ~/.config/opencode/opencode.json if present
+      // Configure ~/.config/opencode/opencode.json if present (only plugin, NO native bank pollution)
       const configPath = path.join(opencodeDir, "opencode.json");
       let data: any = {};
       if (fs.existsSync(configPath)) {
@@ -334,8 +318,6 @@ export function setupOpenCode(options: SetupOptions = {}): SetupResult {
           data = {};
         }
       }
-      data.skills ??= {};
-      data.skills.paths = Array.from(new Set([...(data.skills.paths || []), skillsBank]));
       data.plugin = Array.isArray(data.plugin) ? data.plugin : [];
       if (!data.plugin.includes(pluginDest)) {
         data.plugin.push(pluginDest);
@@ -349,23 +331,12 @@ export function setupOpenCode(options: SetupOptions = {}): SetupResult {
     pluginConfigured = true;
   }
 
-  // Fallback skill
+  // Fallback skill in ~/.config/opencode/skills/skill_selector
   if (!options.hooksOnly) {
-    const skillTarget = path.join(opencodeDir, "skills", "jev-skill-selector");
-    const skillMd = path.join(repoDir, "skills", "jev-skill-selector", "SKILL.md");
-    const runSh = path.join(repoDir, "skills", "jev-skill-selector", "run.sh");
-
-    if (!options.dryRun) {
-      fs.mkdirSync(skillTarget, { recursive: true });
-      if (fs.existsSync(skillMd)) {
-        fs.copyFileSync(skillMd, path.join(skillTarget, "SKILL.md"));
-      }
-      if (fs.existsSync(runSh)) {
-        fs.copyFileSync(runSh, path.join(skillTarget, "run.sh"));
-        try { fs.chmodSync(path.join(skillTarget, "run.sh"), 0o755); } catch {}
-      }
-    }
-    filesModified.push(skillTarget);
+    const targetDirs = [
+      path.join(opencodeDir, "skills", "skill_selector"),
+    ];
+    installSkillFiles(targetDirs, repoDir, Boolean(options.dryRun), filesModified);
     skillInstalled = true;
   }
 
@@ -387,25 +358,18 @@ export function setupAll(options: SetupOptions = {}): SetupResult[] {
   const homeDir = getHomeDir(options.homeDir);
 
   // 1. Ensure central skills bank exists
-  const bankDir = path.join(homeDir, ".agents", "jev_skills");
-  const bankSkill = path.join(bankDir, "jev-skill-selector");
-  const skillMd = path.join(repoDir, "skills", "jev-skill-selector", "SKILL.md");
-  const runSh = path.join(repoDir, "skills", "jev-skill-selector", "run.sh");
+  const bankDir = path.join(homeDir, ".agents", "other_skills");
 
   if (!options.dryRun) {
-    fs.mkdirSync(bankSkill, { recursive: true });
-    if (fs.existsSync(skillMd)) {
-      fs.copyFileSync(skillMd, path.join(bankSkill, "SKILL.md"));
-    }
-    if (fs.existsSync(runSh)) {
-      fs.copyFileSync(runSh, path.join(bankSkill, "run.sh"));
-      try { fs.chmodSync(path.join(bankSkill, "run.sh"), 0o755); } catch {}
-    }
+    const targetDirs = [
+      path.join(bankDir, "skill_selector"),
+    ];
+    installSkillFiles(targetDirs, repoDir, false, []);
 
     // 2. Link binary globally
-    try {
-      execSync("bun link", { cwd: repoDir, stdio: "ignore" });
-    } catch {}
+    if (options.homeDir === undefined && process.env.NODE_ENV !== "test" && !process.env.CI) {
+      try { execSync("bun link", { cwd: repoDir, stdio: "ignore" }); } catch {}
+    }
 
     // 3. Ensure .env exists
     const envFile = path.join(repoDir, ".env");
@@ -440,7 +404,9 @@ export function checkAgentStatus(options: SetupOptions = {}): Record<string, { h
       claudeHook = JSON.stringify(data).includes("hooks/claude.ts");
     } catch {}
   }
-  const claudeSkill = fs.existsSync(path.join(homeDir, ".claude", "skills", "jev-skill-selector", "SKILL.md"));
+  const claudeSkill =
+    fs.existsSync(path.join(homeDir, ".claude", "skills", "skill_selector", "SKILL.md")) ||
+    fs.existsSync(path.join(homeDir, ".claude", "skills", "jev-skill-selector", "SKILL.md"));
 
   // Codex status
   let codexHook = false;
@@ -451,15 +417,25 @@ export function checkAgentStatus(options: SetupOptions = {}): Record<string, { h
       codexHook = JSON.stringify(data).includes("hooks/codex.ts");
     } catch {}
   }
-  const codexSkill = fs.existsSync(path.join(homeDir, ".codex", "skills", "jev-skill-selector", "SKILL.md"));
+  const codexSkill =
+    fs.existsSync(path.join(homeDir, ".codex", "skills", "skill_selector", "SKILL.md")) ||
+    fs.existsSync(path.join(homeDir, ".codex", "skills", "jev-skill-selector", "SKILL.md"));
 
   // Antigravity status
-  const agyPlugin = fs.existsSync(path.join(homeDir, ".gemini", "config", "plugins", "jev-skill-selector", "hooks.json"));
-  const agySkill = fs.existsSync(path.join(homeDir, ".agents", "skills", "jev-skill-selector", "SKILL.md"));
+  const agyPlugin =
+    fs.existsSync(path.join(homeDir, ".gemini", "config", "plugins", "skill_selector", "hooks.json")) ||
+    fs.existsSync(path.join(homeDir, ".gemini", "config", "plugins", "jev-skill-selector", "hooks.json"));
+  const agySkill =
+    fs.existsSync(path.join(homeDir, ".agents", "skills", "skill_selector", "SKILL.md")) ||
+    fs.existsSync(path.join(homeDir, ".agents", "skills", "jev-skill-selector", "SKILL.md"));
 
   // OpenCode status
-  const opencodePlugin = fs.existsSync(path.join(homeDir, ".config", "opencode", "plugin", "jev-skill-selector.ts"));
-  const opencodeSkill = fs.existsSync(path.join(homeDir, ".config", "opencode", "skills", "jev-skill-selector", "SKILL.md"));
+  const opencodePlugin =
+    fs.existsSync(path.join(homeDir, ".config", "opencode", "plugin", "skill_selector.ts")) ||
+    fs.existsSync(path.join(homeDir, ".config", "opencode", "plugin", "jev-skill-selector.ts"));
+  const opencodeSkill =
+    fs.existsSync(path.join(homeDir, ".config", "opencode", "skills", "skill_selector", "SKILL.md")) ||
+    fs.existsSync(path.join(homeDir, ".config", "opencode", "skills", "jev-skill-selector", "SKILL.md"));
 
   return {
     claude: { hook: claudeHook, skill: claudeSkill },
@@ -471,7 +447,7 @@ export function checkAgentStatus(options: SetupOptions = {}): Record<string, { h
 
 function printUsage(): void {
   console.log(`
-🚀 Jev Skill Selector: Agent Setup Command
+🚀 Skill Selector: Agent Setup Command
 
 Usage:
   bun run setup [agent] [options]
@@ -485,6 +461,8 @@ Supported Agents:
   all          Setup all supported agents and link CLI globally (default)
 
 Options:
+  --home <dir>     Stage files under an isolated home (never runs bun link)
+  --repo <dir>     Canonical runtime source used by installed hooks
   --status         Show current configuration status for all agents
   --hooks-only     Only configure lifecycle hooks (Priority 1)
   --skill-only     Only install fallback skill (Priority 2)
@@ -513,7 +491,7 @@ export function runSetupCli(args: string[] = process.argv.slice(2)): SetupResult
 
   if (statusMode) {
     const status = checkAgentStatus();
-    console.log(`\n🔍 Jev Skill Selector Agent Status:\n`);
+    console.log(`\n🔍 Skill Selector Agent Status:\n`);
     for (const [agent, st] of Object.entries(status)) {
       const hookIcon = st.hook ? "✓ Hook active" : "✗ No hook";
       const skillIcon = st.skill ? "✓ Skill installed" : "✗ No skill";
@@ -523,10 +501,19 @@ export function runSetupCli(args: string[] = process.argv.slice(2)): SetupResult
     return;
   }
 
-  const targetArg = args.find((a) => !a.startsWith("-")) || "all";
-  const options: SetupOptions = { dryRun, hooksOnly, skillOnly };
+  const valueFor = (flag: string) => {
+    const i = args.indexOf(flag);
+    if (i < 0) return undefined;
+    if (!args[i+1] || args[i+1].startsWith("--")) throw new Error(`${flag} requires a directory`);
+    return args[i+1];
+  };
+  const homeDir = valueFor("--home");
+  const repoDir = valueFor("--repo");
+  const positional = args.filter((a,i) => !a.startsWith("-") && !["--home","--repo"].includes(args[i-1] ?? ""));
+  const targetArg = positional[0] || "all";
+  const options: SetupOptions = { dryRun, hooksOnly, skillOnly, homeDir, repoDir };
 
-  console.log(`\n⚙️  Configuring Jev Skill Selector for: ${targetArg.toUpperCase()}`);
+  console.log(`\n⚙️  Configuring Skill Selector for: ${targetArg.toUpperCase()}`);
   if (dryRun) console.log(`   (Dry run mode: no files will be written)\n`);
 
   let results: SetupResult[] = [];

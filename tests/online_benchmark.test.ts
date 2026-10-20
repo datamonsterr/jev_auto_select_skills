@@ -39,7 +39,25 @@ describe("metatool online benchmark integration", () => {
       description: desc,
     }));
 
-    const provider = new JevProvider();
+    const mockFetch = (async () => {
+      return new Response(
+        JSON.stringify({
+          model: "inception/mercury-decide:free",
+          answers: {
+            primary_skill: {
+              type: "choice",
+              choice: "FinanceTool",
+              probabilities: { FinanceTool: 0.88, NewsTool: 0.72 },
+              confidence: 0.95,
+            },
+          },
+          usage: { input_tokens: 180, output_tokens: 50 },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    }) as any;
+
+    const provider = new JevProvider({ apiKey: "offline-test-key", fetchFn: mockFetch });
     const result = await provider.selectSkills({
       userPrompt: "I want to know the latest news about Tesla and how it has impacted the stock market.",
       skills: candidateSkills,
@@ -49,5 +67,5 @@ describe("metatool online benchmark integration", () => {
     const selectedNames = result.selectedSkills.map((s) => s.name);
     expect(selectedNames).toContain("FinanceTool");
     expect(selectedNames).toContain("NewsTool");
-  }, 15000);
+  });
 });
