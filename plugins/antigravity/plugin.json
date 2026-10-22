@@ -1,3 +1,4 @@
 {
-  "name": "jev-skill-selector"
+  "name": "jev-skill-selector",
+  "description": "Deprecated integration stub: use otherskill setup --agent antigravity or the repository-root plugin."
 }

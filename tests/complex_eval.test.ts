@@ -43,7 +43,7 @@ describe("complex_testset evaluation", () => {
     }
   });
 
-  it("evaluates a complex multi-step prompt and selects multiple matching skills", async () => {
+  it.skipIf(process.env.OTHERSKILL_LIVE_TESTS !== "1" || !process.env.OPENROUTER_API_KEY)("evaluates a complex multi-step prompt and selects multiple matching skills", async () => {
     const availableSkills = loadSkillsFromDir(testBankPaths);
     const hasTdd = availableSkills.some((s) => s.name === "tdd");
     if (!hasTdd) return;

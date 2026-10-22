@@ -1,10 +1,9 @@
 {
   "name": "jev-skill-selector",
   "version": "1.0.0",
-  "description": "Agent tool using TypeSafe Jev decision model to dynamically select skills",
+  "description": "Deprecated integration stub: use otherskill setup --agent codex or the repository-root plugin.",
   "author": {
     "name": "datamonsterr",
     "email": "phamthanhdat17092004@gmail.com"
-  },
-  "hooks": "./hooks.json"
+  }
 }

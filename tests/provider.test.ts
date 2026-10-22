@@ -40,6 +40,7 @@ describe("JevProvider", () => {
 
     const provider = new JevProvider({
       apiKey: "test-key",
+      model: "inception/mercury-decide:free",
       fetchFn: mockFetch as any,
     });
 
@@ -51,9 +52,9 @@ describe("JevProvider", () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
     expect(result.primarySkill).toBe("tdd");
     expect(result.selectedSkills).toHaveLength(1);
-    expect(result.selectedSkills[0].name).toBe("tdd");
-    expect(result.selectedSkills[0].probability).toBe(0.95);
-    expect(result.selectedSkills[0].confidence).toBe(0.95);
+    expect(result.selectedSkills[0]?.name).toBe("tdd");
+    expect(result.selectedSkills[0]?.probability).toBe(0.95);
+    expect(result.selectedSkills[0]?.confidence).toBe(0.95);
   });
 
   it("retries 3 times with delay on 429 rate limit before succeeding", async () => {
@@ -88,6 +89,7 @@ describe("JevProvider", () => {
 
     const provider = new JevProvider({
       apiKey: "test-key",
+      model: "inception/mercury-decide:free",
       fetchFn: mockFetch as any,
       retryDelayMs: 10, // Fast delay for tests
     });
@@ -111,6 +113,7 @@ describe("JevProvider", () => {
 
     const provider = new JevProvider({
       apiKey: "test-key",
+      model: "inception/mercury-decide:free",
       fetchFn: mockFetch as any,
       retries: 3,
       retryDelayMs: 5,
@@ -121,7 +124,7 @@ describe("JevProvider", () => {
         userPrompt: "Any prompt",
         skills: dummySkills,
       })
-    ).rejects.toThrow("Service Unavailable");
+    ).rejects.toThrow("HTTP 503");
   });
 
   it("supports multi-step and continuation prompts by evaluating multiple questions and aggregating skills", async () => {
@@ -161,6 +164,7 @@ describe("JevProvider", () => {
 
     const provider = new JevProvider({
       apiKey: "test-key",
+      model: "inception/mercury-decide:free",
       fetchFn: mockFetch as any,
     });
 

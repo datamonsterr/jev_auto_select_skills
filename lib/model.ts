@@ -154,7 +154,7 @@ export function filterSelectedSkills(params: {
     const winningIdx = items.findIndex((i) => i.name === choice);
     if (winningIdx > 0) {
       const [winningItem] = items.splice(winningIdx, 1);
-      items.unshift(winningItem);
+      if (winningItem) items.unshift(winningItem);
     } else if (winningIdx === -1 && probabilities[choice] !== undefined) {
       const skill = skillMap?.get(choice);
       items.unshift({
@@ -187,6 +187,7 @@ export function formatSkillSummary(skills: SelectedSkill[]): string {
 
   for (const skill of skills) {
     lines.push(`- **${skill.name}** (probability: ${skill.probability.toFixed(2)}, confidence: ${skill.confidence.toFixed(2)})`);
+    if (skill.path) lines.push(`  *SKILL.md:* ${skill.path}`);
     if (skill.description) {
       lines.push(`  *Description:* ${skill.description}`);
     }

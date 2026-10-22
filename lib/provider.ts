@@ -1,6 +1,8 @@
 import fs from "node:fs";
+import {freeModel, FREE_MODEL} from "./otherskill/config";
 import {
   type Skill,
+  type SelectedSkill,
   type SkillSelectorOptions,
   type SkillSelectionResult,
   type UsageMetrics,
@@ -12,7 +14,7 @@ import { buildSkillState, buildSkillCriteria } from "./parse_skill";
 import { DEFAULT_SYSTEM_PROMPT, buildJevInstructions } from "./system_prompt";
 
 export const DEFAULT_OPENROUTER_DECISIONS_URL = "https://openrouter.ai/api/alpha/decisions";
-export const DEFAULT_JEV_MODEL = "~typesafe/jev-latest";
+export const DEFAULT_JEV_MODEL = FREE_MODEL;
 
 export interface JevProviderConfig {
   apiKey?: string;
@@ -40,7 +42,7 @@ export class JevProvider {
       process.env.OPENROUTER_API_KEY ||
       process.env.JEV_API_KEY ||
       "";
-    this.model = config.model || process.env.MODEL || DEFAULT_JEV_MODEL;
+    this.model = freeModel(config.model || process.env.MODEL || DEFAULT_JEV_MODEL);
     this.endpoint = config.endpoint || DEFAULT_OPENROUTER_DECISIONS_URL;
     this.retries = config.retries !== undefined ? config.retries : 3;
     this.retryDelayMs = config.retryDelayMs !== undefined ? config.retryDelayMs : 500;
@@ -58,7 +60,8 @@ export class JevProvider {
     }
 
     let lastError: Error | null = null;
-    const maxAttempts = this.retries;
+    freeModel(request.model);
+    const maxAttempts = Math.max(1, Math.min(this.retries, 5));
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
@@ -83,10 +86,10 @@ export class JevProvider {
 
         let errorText = "";
         try {
-          const errJson = await response.json();
-          errorText = errJson.error?.message || JSON.stringify(errJson);
+          await response.body?.cancel();
+          errorText = 'provider unavailable';
         } catch {
-          errorText = await response.text();
+          errorText = 'provider unavailable';
         }
 
         const error = new Error(
@@ -131,7 +134,7 @@ export class JevProvider {
     const threshold = options.threshold ?? 0.05;
     const maxSkills = options.maxSkills ?? 3;
     const includeNone = options.includeNone ?? true;
-    const activeModel = options.model || this.model;
+    const activeModel = freeModel(options.model || this.model);
 
     // Build state and criteria (compact: true omits redundant skill array from state, saving ~11,000 input tokens)
     const state = buildSkillState(
@@ -141,7 +144,7 @@ export class JevProvider {
       context,
       { compact: true }
     );
-    const criteria = buildSkillCriteria(skills, includeNone, 140);
+    const criteria = buildSkillCriteria(skills, includeNone, Infinity);
 
     // Determine if multi-step questions should be used
     const isMultiStep =

@@ -38,7 +38,7 @@ describe("golden_set integration", () => {
     }
   });
 
-  it("selects expected skill for a complex software engineering prompt from golden set", async () => {
+  it.skipIf(process.env.OTHERSKILL_LIVE_TESTS !== "1" || !process.env.OPENROUTER_API_KEY)("selects expected skill for a complex software engineering prompt from golden set", async () => {
     const availableSkills = loadSkillsFromDir(testBankPaths);
     const hasTdd = availableSkills.some((s) => s.name === "tdd");
     if (!hasTdd) return;
@@ -53,6 +53,6 @@ describe("golden_set integration", () => {
 
     expect(["tdd", "test-driven-development"]).toContain(result.primarySkill || "");
     expect(result.selectedSkills.length).toBeGreaterThan(0);
-    expect(result.selectedSkills[0].probability).toBeGreaterThan(0.5);
+    expect(result.selectedSkills[0]?.probability).toBeGreaterThan(0.5);
   }, 15000);
 });

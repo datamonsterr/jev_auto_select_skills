@@ -142,7 +142,7 @@ export async function assessSkill(params: {
     try {
       const provider = new JevProvider();
       const response = await provider.sendDecisionRequest({
-        model: process.env.MODEL || "~typesafe/jev-latest",
+        model: process.env.MODEL || "inception/mercury-decide:free",
         state: {
           skill_name: skillName,
           description: parsed.description,
@@ -257,6 +257,7 @@ Options:
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
+    if (arg === undefined) continue;
     if (arg === "--move" || arg === "-m") shouldMove = true;
     else if (arg === "--global" || arg === "-g") isGlobal = true;
     else if (arg === "--jev-model") useJevModel = true;

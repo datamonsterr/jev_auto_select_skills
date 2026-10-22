@@ -17,7 +17,7 @@ export function detectEnvironment(
   // Check CLI flag override
   for (const arg of argv) {
     if (arg.startsWith("--mode=")) {
-      const mode = arg.split("=")[1].toLowerCase();
+      const mode = arg.split("=")[1]?.toLowerCase();
       if (mode === "codex" || mode === "claude" || mode === "opencode" || mode === "antigravity" || mode === "cli") {
         return mode as HookEnvironment;
       }

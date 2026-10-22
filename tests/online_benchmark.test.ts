@@ -32,11 +32,12 @@ describe("metatool online benchmark integration", () => {
     }
   });
 
-  it("evaluates a multi-tool query from MetaTool and correctly selects target tools with Jev", async () => {
+  it.skipIf(process.env.OTHERSKILL_LIVE_TESTS !== "1" || !process.env.OPENROUTER_API_KEY)("evaluates a multi-tool query from MetaTool and correctly selects target tools with Jev", async () => {
     const toolsJson: Record<string, string> = JSON.parse(fs.readFileSync(toolsPath, "utf-8"));
     const candidateSkills: Skill[] = Object.entries(toolsJson).map(([name, desc]) => ({
       name,
       description: desc,
+      whenToUse: desc,
     }));
 
     const provider = new JevProvider();

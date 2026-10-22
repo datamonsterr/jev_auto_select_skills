@@ -1,0 +1,39 @@
+{
+  "bankPath": "~/.local/share/otherskill/bank",
+  "model": "inception/mercury-decide:free",
+  "scope": "global",
+  "categories": [
+    {
+      "id": "frontend/ui-ux",
+      "description": "Interface design, accessibility, frontend components, visual usability"
+    },
+    {
+      "id": "frontend/storytelling",
+      "description": "Narrative, copywriting, presentations and visual storytelling"
+    },
+    {
+      "id": "backend",
+      "description": "Server APIs, databases, architecture and backend implementation"
+    },
+    {
+      "id": "testing",
+      "description": "Testing, test-driven development, debugging and verification"
+    },
+    {
+      "id": "management",
+      "description": "Find, create, install and maintain agent skills and project workflows"
+    }
+  ],
+  "limits": {
+    "concurrency": 4,
+    "retries": 1,
+    "retryDelayMs": 250,
+    "timeoutMs": 10000,
+    "maxRequestBytes": 60000,
+    "maxCandidates": 200,
+    "categoryThreshold": 0.05,
+    "skillThreshold": 0.05,
+    "maxCategories": 20,
+    "maxSkills": 10
+  }
+}

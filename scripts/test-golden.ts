@@ -34,7 +34,7 @@ async function runGoldenEvaluation() {
   console.log(`\n======================================================`);
   console.log(`🚀 Starting Jev Skill Selector Golden Evaluation`);
   console.log(`Total Cases: ${testcases.length}`);
-  console.log(`Model: ${process.env.MODEL || "~typesafe/jev-latest"}`);
+  console.log(`Model: ${process.env.MODEL || "inception/mercury-decide:free"}`);
   console.log(`======================================================\n`);
 
   const results: EvaluationResult[] = [];
@@ -42,6 +42,7 @@ async function runGoldenEvaluation() {
 
   for (let i = 0; i < testcases.length; i++) {
     const tc = testcases[i];
+    if (!tc) continue;
     process.stdout.write(`[${i + 1}/${testcases.length}] Evaluating ${tc.id} (${tc.category})... `);
 
     const startTime = Date.now();

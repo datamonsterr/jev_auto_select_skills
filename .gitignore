@@ -46,3 +46,6 @@ skills_backup*/
 # OS specific files
 .DS_Store
 Thumbs.db
+
+# Local verification artifacts
+.tmp/

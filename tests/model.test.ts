@@ -24,10 +24,10 @@ describe("model and system_prompt", () => {
     });
 
     expect(skills).toHaveLength(2);
-    expect(skills[0].name).toBe("tdd");
-    expect(skills[0].probability).toBe(0.85);
-    expect(skills[1].name).toBe("test-driven-development");
-    expect(skills[1].probability).toBe(0.12);
+    expect(skills[0]?.name).toBe("tdd");
+    expect(skills[0]?.probability).toBe(0.85);
+    expect(skills[1]?.name).toBe("test-driven-development");
+    expect(skills[1]?.probability).toBe(0.12);
   });
 
   it("handles when choice is 'none'", () => {

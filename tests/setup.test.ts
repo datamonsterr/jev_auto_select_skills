@@ -57,11 +57,11 @@ describe("agent setup scripts", () => {
     expect(fs.existsSync(settingsPath)).toBe(true);
     const settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
     expect(settings.hooks.UserPromptSubmit).toBeDefined();
-    expect(JSON.stringify(settings)).toContain("hooks/claude.ts");
+    expect(JSON.stringify(settings)).toContain("'find' '--agent' 'claude'");
 
-    const skillTarget = path.join(tmpHome, ".claude", "skills", "jev-skill-selector");
+    const skillTarget = path.join(tmpHome, ".claude", "skills", "use-otherskill");
     expect(fs.existsSync(path.join(skillTarget, "SKILL.md"))).toBe(true);
-    expect(fs.existsSync(path.join(skillTarget, "run.sh"))).toBe(true);
+    expect(fs.existsSync(path.join(skillTarget, "run.sh"))).toBe(false);
 
     // 3. Idempotent execution doesn't duplicate hooks
     setupClaude({ homeDir: tmpHome, repoDir, dryRun: false });
@@ -89,7 +89,7 @@ describe("agent setup scripts", () => {
         expect(sRes.hookConfigured).toBe(false);
         expect(sRes.skillInstalled).toBe(true);
         expect(fs.existsSync(path.join(skillOnlyHome, ".claude", "settings.json"))).toBe(false);
-        expect(fs.existsSync(path.join(skillOnlyHome, ".claude", "skills", "jev-skill-selector", "SKILL.md"))).toBe(true);
+        expect(fs.existsSync(path.join(skillOnlyHome, ".claude", "skills", "use-otherskill", "SKILL.md"))).toBe(true);
       } finally {
         fs.rmSync(skillOnlyHome, { recursive: true, force: true });
       }
@@ -112,11 +112,11 @@ describe("agent setup scripts", () => {
     expect(fs.existsSync(hooksPath)).toBe(true);
     const hooksData = JSON.parse(fs.readFileSync(hooksPath, "utf-8"));
     expect(hooksData.hooks.UserPromptSubmit).toBeDefined();
-    expect(JSON.stringify(hooksData)).toContain("hooks/codex.ts");
+    expect(JSON.stringify(hooksData)).toContain("'find' '--agent' 'codex'");
 
-    const skillTarget = path.join(tmpHome, ".codex", "skills", "jev-skill-selector");
+    const skillTarget = path.join(tmpHome, ".agents", "skills", "use-otherskill");
     expect(fs.existsSync(path.join(skillTarget, "SKILL.md"))).toBe(true);
-    expect(fs.existsSync(path.join(skillTarget, "run.sh"))).toBe(true);
+    expect(fs.existsSync(path.join(skillTarget, "run.sh"))).toBe(false);
 
     // 3. Status reflects configured state
     const status = checkAgentStatus({ homeDir: tmpHome, repoDir });
@@ -124,73 +124,40 @@ describe("agent setup scripts", () => {
     expect(status.codex.skill).toBe(true);
   });
 
-  it("setupAntigravity configures plugins, hooks and skill bank", () => {
-    const res = setupAntigravity({ homeDir: tmpHome, repoDir, dryRun: false });
+  it("setupAntigravity configures native PreInvocation hook without exposing a skills bank", () => {
+    const res = setupAntigravity({ homeDir: tmpHome, repoDir });
     expect(res.success).toBe(true);
-    expect(res.pluginConfigured).toBe(true);
-
-    const pluginDir = path.join(tmpHome, ".gemini", "config", "plugins", "jev-skill-selector");
-    expect(fs.existsSync(path.join(pluginDir, "plugin.json"))).toBe(true);
-    expect(fs.existsSync(path.join(pluginDir, "hooks.json"))).toBe(true);
-
-    const hooksContent = JSON.parse(fs.readFileSync(path.join(pluginDir, "hooks.json"), "utf-8"));
-    expect(JSON.stringify(hooksContent)).toContain("hooks/antigravity.ts");
-
-    const skillsJson = path.join(tmpHome, ".gemini", "config", "skills.json");
-    expect(fs.existsSync(skillsJson)).toBe(true);
-
-    const fallbackSkill = path.join(tmpHome, ".agents", "skills", "jev-skill-selector", "SKILL.md");
-    expect(fs.existsSync(fallbackSkill)).toBe(true);
-
-    const status = checkAgentStatus({ homeDir: tmpHome, repoDir });
-    expect(status.agy.hook).toBe(true);
-    expect(status.agy.skill).toBe(true);
+    const hook = path.join(tmpHome, ".gemini/config/hooks.json");
+    expect(JSON.parse(fs.readFileSync(hook, "utf8")).otherskill.PreInvocation).toHaveLength(1);
+    expect(fs.readFileSync(hook, "utf8")).toContain("'find' '--agent' 'antigravity'");
+    expect(fs.existsSync(path.join(tmpHome, ".gemini/config/skills.json"))).toBe(false);
+    expect(checkAgentStatus({homeDir:tmpHome}).agy).toEqual({hook:true,skill:true});
   });
 
-  it("setupOpenCode configures plugin and skills path", () => {
-    const res = setupOpenCode({ homeDir: tmpHome, repoDir, dryRun: false });
-    expect(res.success).toBe(true);
-
-    const pluginPath = path.join(tmpHome, ".config", "opencode", "plugin", "jev-skill-selector.ts");
-    expect(fs.existsSync(pluginPath)).toBe(true);
-
-    const configPath = path.join(tmpHome, ".config", "opencode", "opencode.json");
-    expect(fs.existsSync(configPath)).toBe(true);
-    const configData = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-    expect(configData.skills.paths).toContain(path.join(tmpHome, ".agents", "jev_skills"));
-    expect(configData.plugin).toContain(pluginPath);
-
-    const fallbackSkill = path.join(tmpHome, ".config", "opencode", "skills", "jev-skill-selector", "SKILL.md");
-    expect(fs.existsSync(fallbackSkill)).toBe(true);
-
-    const status = checkAgentStatus({ homeDir: tmpHome, repoDir });
-    expect(status.opencode.hook).toBe(true);
-    expect(status.opencode.skill).toBe(true);
+  it("setupOpenCode uses native plugin auto-discovery and shared companion without skills.paths exposure", () => {
+    expect(setupOpenCode({homeDir:tmpHome,repoDir}).success).toBe(true);
+    const plugin = path.join(tmpHome, ".config/opencode/plugins/otherskill.ts");
+    expect(fs.readFileSync(plugin, "utf8")).toContain('"find","--agent","opencode"');
+    expect(fs.existsSync(path.join(tmpHome, ".config/opencode/opencode.json"))).toBe(false);
+    expect(checkAgentStatus({homeDir:tmpHome}).opencode).toEqual({hook:true,skill:true});
   });
 
-  it("setupAll configures all agents and central bank", () => {
-    const results = setupAll({ homeDir: tmpHome, repoDir, dryRun: false });
-    expect(results.length).toBe(4);
-    expect(results.every((r) => r.success)).toBe(true);
-
-    // Central bank should contain jev-skill-selector
-    const bankSkill = path.join(tmpHome, ".agents", "jev_skills", "jev-skill-selector", "SKILL.md");
-    expect(fs.existsSync(bankSkill)).toBe(true);
-
-    const status = checkAgentStatus({ homeDir: tmpHome, repoDir });
-    expect(status.claude.hook).toBe(true);
-    expect(status.codex.hook).toBe(true);
-    expect(status.agy.hook).toBe(true);
-    expect(status.opencode.hook).toBe(true);
+  it("setupAll configures all agents without copying a categorized bank natively", () => {
+    const results = setupAll({homeDir:tmpHome,repoDir});
+    expect(results).toHaveLength(4);
+    expect(results.every(r=>r.success)).toBe(true);
+    expect(fs.existsSync(path.join(tmpHome, ".agents/jev_skills"))).toBe(false);
+    const status = checkAgentStatus({homeDir:tmpHome});
+    for(const agent of Object.values(status))expect(agent).toEqual({hook:true,skill:true});
   });
 
   it("runSetupCli handles CLI arguments cleanly", () => {
     // --status
-    const statusRes = runSetupCli(["--status"]);
+    const statusRes = runSetupCli(["--status", "--home", tmpHome]);
     expect(statusRes).toBeUndefined();
 
     // specific agent with --dry-run
-    const claudeRes = runSetupCli(["claude", "--dry-run"]);
+    const claudeRes = runSetupCli(["claude", "--dry-run", "--home", tmpHome]);
     expect(Array.isArray(claudeRes)).toBe(true);
     expect(claudeRes?.[0]?.target).toBe("claude");
 

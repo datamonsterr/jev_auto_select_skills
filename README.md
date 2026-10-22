@@ -1,366 +1,149 @@
-# Jev Skill Selector
+# OtherSkill
 
-High-performance, calibrated agent router powered by the **TypeSafe Jev System One** decision model on OpenRouter (`~typesafe/jev-latest`).
+OtherSkill keeps categorized skills outside native discovery. A free OpenRouter model selects categories, then concurrent HTTP requests select skills inside each selected category. Hooks inject only selected names, complete descriptions and provenance, never full skill bodies automatically.
 
-Instead of polluting your agent's context window by loading 70+ skills on startup, Jev evaluates each prompt against your skill bank in a single parallel tensor pass (~400–700ms) and dynamically injects **only the necessary skills and their complete instructions** for that specific task.
+Requires Bun, Git for online imports and a POSIX shell for the managed launcher. Supported adapters are Claude, Codex, Antigravity and OpenCode 1.x. Windows and OpenCode 2.x lifecycle integration are unverified.
 
-```
-git remote: https://github.com/datamonsterr/jev_auto_select_skills.git
-```
+## Setup
 
----
-
-## 🏛 Architecture: Hooks vs. Skills
-
-We prioritize a **two-tier architecture** for agent harnesses:
-
-| Priority | Strategy | How It Works | Context Bloat | Supported Harnesses |
-| :--- | :--- | :--- | :--- | :--- |
-| **Priority 1 (Recommended)** | **Lifecycle Hooks & Plugins** | Intercepts user prompt before LLM plans, runs Jev inference (~400ms), and injects matching `SKILL.md` content directly into context. | **0 static skills loaded.** Only relevant skill(s) injected per turn. | Claude Code, Codex, OpenCode, Antigravity |
-| **Priority 2 (Fallback)** | **Router Agent Skill** | For harnesses without lifecycle hooks. Install `jev-skill-selector` into the agent's skills folder. The agent invokes `jev-skill-selector "<prompt>" --content` on demand. | **Only 1 skill loaded.** Dynamic retrieval of content when required. | Any agent supporting skills / CLI tools |
-
----
-
-## ⚡ 1-Step Automated Agent Setup
-
-Configure hooks (Priority 1) and fallback skills (Priority 2) across any or all agent harnesses with a single command:
-
-```bash
-# Setup all supported agents and link binary globally (recommended)
-bun run setup
-# Or after linking:
-jev-skill-selector setup
-
-# Target a specific agent harness:
-bun run setup claude       # Claude Code (~/.claude/settings.json hook + skill)
-bun run setup codex        # Codex CLI (~/.codex/hooks.json hook + skill)
-bun run setup agy          # Google Antigravity CLI plugin & skill (~/.gemini/config)
-bun run setup opencode     # OpenCode plugin & skill (~/.config/opencode)
-
-# Check configuration status across all harnesses:
-bun run setup --status
-
-# Dry-run preview without modifying files:
-bun run setup --dry-run
+```sh
+bun install --frozen-lockfile
+bun otherskill.ts --help
+bun otherskill.ts setup
 ```
 
-### CLI Setup Flags:
-| Flag | Description |
-| :--- | :--- |
-| `[agent]` | Target agent: `claude`, `codex`, `agy`, `opencode`, or `all` (default) |
-| `--status` | Show live configuration status of hooks and skills across all agents |
-| `--hooks-only` | Only configure lifecycle hooks (Priority 1) |
-| `--skill-only` | Only install fallback skill (Priority 2) |
-| `--dry-run` | Preview actions without modifying filesystem |
-| `--help` | Display setup usage instructions |
+The interactive menu selects harness, global/project scope, hidden OpenRouter key, free model, enabled categories and companion installation. `otherskill config` offers quick edits and apply. Cancellation and `--dry-run` write nothing.
 
-### Initial Migration Scripts (Bash / PowerShell):
-If you have an existing directory of 50+ skills you wish to back up and consolidate into `~/.agents/jev_skills/` on first install:
+Setup creates a managed launcher at `~/.local/share/otherskill/bin/otherskill`; add that directory to PATH, invoke it directly, or explicitly use `bun link`. The launcher references this checkout and Bun by absolute path: keep the checkout in place, or rerun setup after moving it. Setup never globally links the package. The package's `jev-skill-selector` binary is a deprecated alias for the canonical CLI.
 
-```bash
-# Linux / macOS
-chmod +x scripts/backup-and-setup.sh
-./scripts/backup-and-setup.sh
+```sh
+# Obtain OPENROUTER_API_KEY from your shell/secret manager, never an argument literal.
+bun otherskill.ts setup --non-interactive --agent claude --scope global \
+  --key-env OPENROUTER_API_KEY --model inception/mercury-decide:free \
+  --categories frontend/ui-ux,frontend/storytelling,backend,testing,management
+
+# Preview in scratch roots, without changing your real home.
+bun otherskill.ts setup --non-interactive --agent codex --scope project \
+  --home /tmp/otherskill-home --cwd /tmp/otherskill-project --dry-run
 ```
 
-```powershell
-# Windows (PowerShell)
-.\scripts\backup-and-setup.ps1
+`--key-stdin` accepts a secret-manager pipe. Saved keys live in the selected home's `.config/otherskill/credentials.json`, mode `0600`; a newly created parent uses `0700`. Keys never enter project config, argument literals, menu echoes or diagnostics. Inherited `OPENROUTER_API_KEY` overrides the private file. OtherSkill does not copy/search `.env`; Bun's automatic `.env` loading still applies when launched from a directory containing one.
+
+Setup preserves unrelated native settings, hooks and skills. It refuses malformed config, unowned launcher/adapter collisions, modified companions and pre-existing native bank exposure. `--no-companion` installs only hooks. It never moves/removes native skills or exposes the bank through links or `skills.paths`.
+
+| Harness | Global hook/adapter | Project hook/adapter | Companion relative to scope root |
+| --- | --- | --- | --- |
+| Claude | `~/.claude/settings.json` | `.claude/settings.json` | `.claude/skills/use-otherskill/SKILL.md` |
+| Codex | `~/.codex/hooks.json` | `.codex/hooks.json` | `.agents/skills/use-otherskill/SKILL.md` |
+| Antigravity | `~/.gemini/config/hooks.json` | `.agents/hooks.json` | `.agents/skills/use-otherskill/SKILL.md` |
+| OpenCode 1.x | `~/.config/opencode/plugins/otherskill.ts` | `.opencode/plugins/otherskill.ts` | `.agents/skills/use-otherskill/SKILL.md` |
+
+All generated integrations use the same launcher and **`find --agent <harness>`**. Claude/Codex `UserPromptSubmit` hooks read native stdin payloads. Codex may require trust review through `/hooks`. Antigravity uses a named `PreInvocation` group, skips repeated invocations, and reads the original request from the supplied transcript when needed. OpenCode uses `experimental.chat.messages.transform`, appends a synthetic text part, caches per user message and passes the prompt through a subprocess argument array. Global hooks honor the event workspace's config; project hooks pin project config explicitly.
+
+## Add complete skills
+
+```sh
+otherskill add ./my-skill
+otherskill add github:anthropics/skills --path skills/frontend-design
+otherskill add owner/repository --ref release/v1 --path skills/design
+otherskill add https://skills.sh/owner/repository/skill-name
+
+# Explicit offline classification or manual correction:
+otherskill add ./my-skill --category frontend/ui-ux --category testing
+otherskill classify ./my-skill --category frontend/ui-ux --category testing
+otherskill list
 ```
 
-**What the setup automates:**
-1. **Links `jev-skill-selector` globally:** Runs `bun link` so `jev-skill-selector` is available in `$PATH` across all terminal workspaces.
-2. **Backs up & consolidates skills:** Copies existing skills from `~/.agents/skills`, `~/.claude/skills`, `~/.codex/skills` into a centralized bank (`~/.agents/jev_skills/`).
-3. **Configures Priority 1 Hooks:** Registers `UserPromptSubmit` hooks in Claude Code (`~/.claude/settings.json`) and Codex (`~/.codex/hooks.json`), OpenCode plugin, and Antigravity plugin.
-4. **Installs Priority 2 Fallback Skill:** Leaves only `jev-skill-selector` in `~/.agents/skills/jev-skill-selector` (with runner `run.sh`) so harnesses without hooks don't load 70+ static skills.
+Automatic classification sends complete skill name/description and configured taxonomy to the free model. Every category meeting `categoryThreshold` receives a **real complete copy**, preserving scripts, references, assets, file modes and attribution. Disabled routing categories may still hold classified copies. `none` means no import; use explicit categories if necessary.
 
----
+Select one directory containing `SKILL.md`; use `--path` for multi-skill repositories. GitHub tree URLs are accepted; refs containing slashes should use `--ref`. Symlinks/special files are rejected; `.git` internals are excluded. Repository-root licenses/notices are copied when absent from the skill directory. Review imported code/licenses before executing it.
 
-## 🔌 Priority 1: Agent Harness Hook Configurations
-
-Hooks automatically trigger on prompt submission, run Jev decision inference, and inject the full `SKILL.md` content into the agent's turn.
-
-### 1. Claude Code Hook (`~/.claude/settings.json`)
-Add the `UserPromptSubmit` command hook:
-
-```json
-{
-  "hooks": {
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bun run /absolute/path/to/jev_skill_selector/hooks/claude.ts",
-            "timeout": 30
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-*Alternatively, install via plugin spec: `.claude-plugin/plugin.json`.*
-
-### 2. Codex Hook (`~/.codex/hooks.json`)
-Add the `UserPromptSubmit` hook with ample context limit for full skill content:
-
-```json
-{
-  "description": "Jev skill routing",
-  "hooks": {
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bun run /absolute/path/to/jev_skill_selector/hooks/codex.ts",
-            "timeout": 30,
-            "additionalContextLimit": 50000
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-*Alternatively, install via plugin spec: `.codex-plugin/plugin.json`.*
-
-### 3. OpenCode Plugin
-1. Copy [`plugins/opencode.ts`](plugins/opencode.ts) to OpenCode's plugin directory:
-   ```bash
-   mkdir -p ~/.config/opencode/plugin
-   cp /absolute/path/to/jev_skill_selector/plugins/opencode.ts ~/.config/opencode/plugin/jev-skill-selector.ts
-   ```
-2. Or register in `~/.config/opencode/opencode.json`:
-   ```json
-   {
-     "plugin": ["/absolute/path/to/jev_skill_selector/plugins/opencode.ts"],
-     "skills": { "paths": ["~/.agents/jev_skills"] }
-   }
-   ```
-*Includes `messages.transform` hook and `select_skill` tool.*
-
-### 4. Antigravity Hook
-Antigravity automatically executes `hooks/antigravity.ts` on prompt invocation and receives an ephemeral context message with the selected skill instructions.
-
----
-
-## 📦 Priority 2: Fallback Skill (When Harness Cannot Use Hooks)
-
-If an agent harness does not support lifecycle hooks, copy `skills/jev-skill-selector` into your harness's skills folder:
-
-```bash
-# Standard agent harnesses (~/.agents/skills)
-cp -r skills/jev-skill-selector ~/.agents/skills/
-
-# Claude Code (~/.claude/skills)
-cp -r skills/jev-skill-selector ~/.claude/skills/
-
-# Codex (~/.codex/skills)
-cp -r skills/jev-skill-selector ~/.codex/skills/
-```
-
-### How the Copied Skill Resolves the Path
-When the skill is copied to an external project, it resolves the `jev_skill_selector` runtime via:
-1. **Global Binary (Recommended):** Run `bun link` in your cloned repository. `jev-skill-selector` is symlinked to `~/.bun/bin` and works globally across all workspaces.
-2. **Included Runner (`run.sh`):** The copied folder contains `run.sh`, which automatically checks `$PATH`, `$JEV_PATH`, and standard clone directories.
-3. **Environment Variable:** Set `export JEV_PATH="/path/to/cloned/jev_skill_selector"`.
-
-### Get Full Skill Content for a Task
-When the agent needs specialized guidance for a prompt, run:
-```bash
-jev-skill-selector "<user prompt or task>" --content
-
-# Or using the copied skill's runner:
-./run.sh "<user prompt or task>" --content
-```
-
-**Output:**
-```markdown
-### Recommended Agent Skills
-🎯 **[Jev Dynamic Skill Routing]**
-Task: "Refactor payment service with TDD and make a git commit"
-The following specialized skills have been selected for this prompt:
-
-• **tdd** (Probability: 65.0% | Confidence: 88%)
-  - Path: `/home/dat/.agents/jev_skills/tdd/SKILL.md`
-• **git-commit** (Probability: 32.0% | Confidence: 88%)
-  - Path: `/home/dat/.agents/jev_skills/git-commit/SKILL.md`
-
----
-## Skill: tdd
-*Location: `/home/dat/.agents/jev_skills/tdd/SKILL.md`*
-
-<full content of tdd/SKILL.md>
-
----
-## Skill: git-commit
-*Location: `/home/dat/.agents/jev_skills/git-commit/SKILL.md`*
-
-<full content of git-commit/SKILL.md>
-```
-
-### Direct Skill Inspection by Name
-```bash
-jev-skill-selector --skill tdd
-```
-
----
-
-## ⚙️ Skills Directory Resolution & Precedence
-
-Skills are automatically resolved and merged from standard locations:
-1. **Agent Skills (Project-Level)**: `./skills` or `./.agents/jev_skills`
-2. **Global Skills (User-Level)**: `~/.agents/jev_skills/`
-3. **Precedence**: Local project skills override global skills with the same name.
-
-### Environment Variable Overrides
-Configure in your `.env` or shell profile:
-
-```bash
-# Required: OpenRouter API Key
-export OPENROUTER_API_KEY="sk-or-v1-your-key-here"
-
-# Model slug (defaults to ~typesafe/jev-latest)
-export MODEL="~typesafe/jev-latest"
-
-# Optional: Override global skills directory
-export GLOBAL_SKILLS_PATH="$HOME/.agents/jev_skills"
-
-# Optional: Override agent skills directory
-export AGENT_SKILLS_PATH="./.agents/jev_skills"
-
-# Optional: Toggle hook injection of full SKILL.md content (default: true)
-export JEV_INJECT_CONTENT="true"
-```
-
----
-
-## ➕ Adding & Assessing New Skills
-
-### 1. Adding a Skill
-Add a directory with a `SKILL.md` in `~/.agents/jev_skills/` (global) or `./.agents/jev_skills/` (project-local):
-
-```bash
-mkdir -p ~/.agents/jev_skills/my-skill
-cat <<'EOF' > ~/.agents/jev_skills/my-skill/SKILL.md
----
-name: my-skill
-description: Automate database migrations. Use when user asks about schema versioning or migrations.
----
-
-# Migration Guidelines
-Step 1...
-EOF
-```
-
-### 2. Assessing Skill Placement: `ALWAYS_ON` vs. `JEV_ROUTED`
-Skills shouldn't all be routed through Jev. We categorize skills into two types:
-- **`ALWAYS_ON`**: Universal personas, output style constraints, or core developer guidelines (e.g. `caveman`, terse-mode, system constraints) that should be active on *every* prompt. Keep these in your harness's normal skills directory (`~/.agents/skills/` or `./.agents/skills/`).
-- **`JEV_ROUTED`**: Task-specific, technology, framework, workflow, or diagnostic skills (e.g. `tdd`, `git-commit`, `supabase`, `kubernetes`) that should only consume context when relevant. Keep these in Jev's bank (`~/.agents/jev_skills/` or `./.agents/jev_skills/`).
-
-Use the included assessment script:
-```bash
-# Quick assessment (heuristic + optional Jev model)
-bun run assess /path/to/skill
-
-# Assess and automatically move to Jev bank if JEV_ROUTED
-bun run assess /path/to/skill --move
-
-# Move to global bank (~/.agents/jev_skills) instead of project-local
-bun run assess /path/to/skill --move --global
-
-# JSON output for integration scripts
-bun run assess /path/to/skill --json
-```
-
-### 3. Integrated into `find-skills` & `skill-creator`
-Both `find-skills` and `skill-creator` skills in `~/.agents/jev_skills/` feature a built-in **`move-to-jev`** step:
-- When creating or installing a skill, the agent runs `bun run scripts/assess.ts <skill-dir> --move` automatically.
-- Prevents context bloat by moving task-specific skills directly to the Jev bank.
-
----
-
-## 🎯 Input Token Optimization
-
-Jev is specifically engineered to minimize token usage and latency:
-1. **Criteria Sanitization**: Redundant prefixes like *"Use this skill when..."*, *"Activate when the user asks for..."* are stripped to reduce criteria tokens by ~30–40%.
-2. **Prompt Compaction**: Oversized code blocks, huge logs, and diffs in the prompt are automatically collapsed into concise summaries before sending to Jev (`compactUserPromptForJev`), keeping routing inference under 500 tokens.
-3. **Single Parallel Pass**: Jev classifies and returns probabilities for all candidates in one fast tensor call (~400–700ms), eliminating multi-step LLM overhead.
-
----
-
-## 💻 CLI Usage & Token Metrics
-
-Fast probability inspection without dumping full files:
-```bash
-bun run index.ts "How do I refactor code using TDD and commit changes?"
-```
-
-Output:
 ```text
-🎯 Jev Skill Selection Result
-Prompt: "How do I refactor code using TDD and commit changes?"
-Primary Choice: tdd
-Confidence: 0.88
-
-Selected Skills:
-  • tdd                            Prob: 59.0% | Conf: 88.0%
-  • test-driven-development        Prob: 36.0% | Conf: 88.0%
-
-📊 Token Usage Breakdown:
-  • Total Used Tokens:    3977
-  • Input Prompt Tokens:  14
-  • System Prompt Tokens: 37
-  • API Input Tokens:     3209 (including skills criteria)
-  • Output Tokens:        768
-  • Estimated Cost:       $0.000135
+~/.local/share/otherskill/bank/
+  frontend/ui-ux/design--<source-hash>/
+    SKILL.md
+    scripts/...
+    references/...
+    assets/...
+    .otherskill.json
+  testing/design--<source-hash>/
+    SKILL.md
+    scripts/...
+    references/...
+    assets/...
+    .otherskill.json
 ```
 
-Return JSON for programmatic consumers:
-```bash
-bun run index.ts --json "Diagnose memory leak in auth microservice"
+Metadata records source URL/path, requested ref, resolved Git revision, category and logical identity. Distinct sources with the same name remain distinct; category copies have scoped instance identities. Re-adding stages complete trees before replacing only owned destinations. Reclassification adds/replaces requested memberships and preserves existing memberships; it does not silently delete copies. The source remains unchanged.
+
+`install` aliases `add`. Optional local creation emits ordinary YAML frontmatter and supplied instructions, then classifies/copies the result. It refuses an existing source destination. If automatic classification fails, the generated source remains available for retry.
+
+```sh
+otherskill create ./my-skill --name my-skill \
+  --description 'When this reusable capability applies' \
+  --instructions-file ./instructions.md --category management
+otherskill search 'accessibility'
 ```
 
----
+`search` performs real GitHub code search with `path:SKILL.md` and returns source links. It uses authenticated `gh api` or `GH_TOKEN`; unavailable access is an explicit error. `find` exclusively means routing.
 
-## 🧪 Testing & Benchmarks
+## Find skills
 
-```bash
-# Run unit and integration tests (45/45 passing)
-bun test
-
-# Run single-focus golden set evaluation (12/12 passing)
-bun run test:golden
-
-# Run complex multi-step and continuation benchmark (12/12 passing)
-bun run test:complex
-
-# Run public online dataset benchmark (MetaTool / ToolE)
-bun run test:benchmark
+```sh
+otherskill find --agent codex --prompt 'Design an accessible form and test it'
+printf '%s' '{"prompt":"Design an accessible form and test it"}' | otherskill find --agent claude
+otherskill find --agent opencode --prompt 'Review an API change' --json
 ```
 
-### 🌐 Online Dataset Benchmark: MetaTool (ToolE)
+Invoke through an argument array or proper shell quoting. Never interpolate prompt text into executable shell code. `--agent` overrides detection. `hook` aliases `find`; `select` returns JSON routing results. Native output is Claude/Codex `hookSpecificOutput.additionalContext`, Antigravity `injectSteps`, or an OpenCode selected-skill list plus `context`.
 
-Benchmarked against the standardized [MetaTool (ToolE)](https://github.com/HowieHwong/MetaTool) dataset across multi-tool routing, single-tool precision, and tool awareness:
+Stage one receives the original full prompt and all enabled category descriptions. Each selected nonempty category gets a concurrent request containing the same full prompt and **all candidates with complete descriptions**. Logical calls equal `1 + N`; bounded retries can add HTTP attempts. These are HTTP requests, never harness subagents. Injection deduplicates logical copies while retaining category provenance and preserves distinct same-name sources.
 
-- **Candidate Bank:** 47 tools (`golden_set/metatool_tools.json`)
-- **Model:** `~typesafe/jev-latest` via OpenRouter
-- **Accuracy:** **12 / 12 (100.0%)**
-- **Latency:** **460 ms / decision**
+Choices, finite probabilities, normalization and winning choice are validated. Inputs are never silently truncated or candidates omitted. Context/candidate/selection overflow returns a safe diagnostic so you can raise limits or reorganize categories. Only one explicit `provider/model:free` is accepted. Paid overrides, fallback chains and silent model substitution are forbidden.
 
-| Case ID | Category | Expected Ground Truth | Actual Primary | Selected Skills | Confidence | Latency | Status |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `meta-01-finance-news` | Multi-Tool | `FinanceTool`, `NewsTool` | `FinanceTool` | `FinanceTool`, `NewsTool` | 91% | 808 ms | **PASS** ✅ |
-| `meta-02-finance-course` | Multi-Tool | `FinanceTool`, `CourseTool` | `FinanceTool` | `FinanceTool`, `CourseTool` | 78% | 459 ms | **PASS** ✅ |
-| `meta-03-house-map` | Multi-Tool | `HouseRentingTool`, `MapTool` | `HouseRentingTool` | `HouseRentingTool`, `MapTool` | 93% | 503 ms | **PASS** ✅ |
-| `meta-04-weather-trip` | Multi-Tool | `WeatherTool`, `TripTool` | `WeatherTool` | `WeatherTool`, `TripAdviceTool` | 39% | 463 ms | **PASS** ✅ |
-| `meta-05-job-resume` | Multi-Tool | `JobTool`, `ResumeTool` | `JobTool` | `JobTool` | 100% | 381 ms | **PASS** ✅ |
-| `meta-06-chart-data` | Multi-Tool | `ChartTool`, `DataRetrievalTool` | `ChartTool` | `ChartTool` | 98% | 461 ms | **PASS** ✅ |
-| `meta-07-repo-search` | Single-Tool | `RepoTool` | `RepoTool` | `RepoTool` | 100% | 401 ms | **PASS** ✅ |
-| `meta-08-law-search` | Single-Tool | `LawTool` | `LawTool` | `LawTool` | 99% | 442 ms | **PASS** ✅ |
-| `meta-09-earthquake` | Single-Tool | `EarthquakeTool` | `EarthquakeTool` | `EarthquakeTool` | 98% | 454 ms | **PASS** ✅ |
-| `meta-10-nasa` | Single-Tool | `NASATool` | `NASATool` | `NASATool` | 99% | 384 ms | **PASS** ✅ |
-| `meta-11-awareness-chat` | Awareness | *none (no tool)* | `none` | *empty* | 0% | 378 ms | **PASS** ✅ |
-| `meta-12-awareness-math` | Awareness | *none (no tool)* | `none` | *empty* | 0% | 388 ms | **PASS** ✅ |
+A stage-one failure injects nothing. Category failures can return validated successful categories with explicit `partial` status. Hook failures exit successfully with protocol-correct empty context. Fixed diagnostics never include prompts, keys or upstream response bodies. JSON results retain status, category/instance provenance and logical call counts.
+
+## Config and doctor
+
+Precedence: **`--config` / `OTHERSKILL_CONFIG` > nearest ancestor `otherskill.config.json` > `~/.config/otherskill/otherskill.config.json` > defaults**. The chosen file is complete, with schema defaults filling absent fields; global/project files are not implicitly merged. Relative bank paths resolve beside that file; `~/` uses the selected home. Invalid config is an error, never a fallback.
+
+[otherskill.config.example.json](otherskill.config.example.json) contains editable starter categories and limits. Stable category IDs support arbitrary nesting. Traversal, duplicate IDs, unknown enabled IDs, native overlap and symlink aliases into native paths are rejected.
+
+```sh
+otherskill config
+otherskill config show
+otherskill config get model
+otherskill config get categories
+otherskill config set model inception/mercury-decide:free
+otherskill config set categories frontend/ui-ux,testing
+otherskill config set key --key-env OPENROUTER_API_KEY
+otherskill config show --scope global
+otherskill config set scope project --apply --agent codex
+otherskill config set limits '{"concurrency":2,"retries":1}'
+otherskill doctor
+otherskill doctor --live
+```
+
+`categories` edits enabled routing IDs. `get taxonomy` returns all IDs/descriptions; `set taxonomy '<JSON array>'` changes taxonomy. `get key` only reports configured/unavailable. `--scope global` bypasses project config; project scope targets the project. `--apply` updates harness hooks. Scope changes preserve the previous scope's hooks/config.
+
+Defaults: concurrency 4, retries after the initial request 1, timeout 10 seconds, retry delay 250ms, request bytes 60000, candidates 200, category/skill thresholds 0.05, selected categories 20, selected skills 10. All have validated configuration bounds. Doctor checks paths, native exposure and companion presence. Ordinary doctor does not call a provider; `--live` makes one tiny free-only request. Configured paths/key presence do not prove running-harness activation or valid credentials.
+
+## Migration and verification
+
+Legacy backup/setup scripts now delegate to safe setup; they do not migrate/remove native skills, copy `.env`, globally link the checkout or expose a bank. Existing legacy installations remain intact: explicitly disable old routing hooks before activating the new hook to avoid duplicate routing. This PR does not activate any real home installation.
+
+The only installation skill source is the orchestrator-authored [use-otherskill](examples/polly/skills/use-otherskill/SKILL.md). Legacy root/bundled selector skill prose remains unchanged for history and is not installed. Commands integrate the requested capability areas of skill-creator, skill-installer, find-skills, write-a-skill and writing-skills; their prose/code was not copied wholesale. Imported skills retain upstream files/licenses and source metadata.
+
+```sh
+bun install --frozen-lockfile
+mkdir -p .tmp
+TMPDIR="$PWD/.tmp" bun test tests/
+bunx tsc --noEmit
+bun run build
+TMPDIR="$PWD/.tmp" python3 scripts/smoke-interactive.py
+TMPDIR="$PWD/.tmp" bun scripts/smoke-live.ts
+```
+
+Use a writable scratch directory if system `/tmp` quota is exhausted. Offline tests exercise full copies, identities, actual concurrency at the HTTP boundary, response validation, CLI subprocesses and adapters. Menu smoke uses a real PTY and synthetic key. Four legacy live tests require `OTHERSKILL_LIVE_TESTS=1` and an inherited OpenRouter key; skipped tests are not passed online evidence. Live smoke checks the public decision-model catalog and, only with an existing credential, tiny Mercury and two-stage requests. See [measured evidence and limitations](docs/otherskill-evidence.md).
+
+Primary protocol references: [OpenRouter Decisions example](https://openrouter.ai/blog/tutorials/jev-vs-llm-when-to-use-each/), [decision model catalog](https://openrouter.ai/api/v1/models?output_modalities=decisions), [Claude hooks](https://code.claude.com/docs/en/hooks), [Codex hooks](https://learn.chatgpt.com/docs/hooks), [Antigravity hooks](https://antigravity.google/docs/hooks), [OpenCode plugins](https://opencode.ai/docs/plugins/).

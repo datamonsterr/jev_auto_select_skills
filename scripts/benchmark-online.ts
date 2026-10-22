@@ -41,6 +41,7 @@ async function runOnlineBenchmark() {
   const candidateSkills: Skill[] = Object.entries(toolsJson).map(([name, desc]) => ({
     name,
     description: desc,
+    whenToUse: desc,
   }));
 
   console.log(`\n======================================================`);
@@ -48,7 +49,7 @@ async function runOnlineBenchmark() {
   console.log(`Dataset: MetaTool / ToolE (HuggingFace / GitHub)`);
   console.log(`Total Candidate Tools in Bank: ${candidateSkills.length}`);
   console.log(`Total Benchmark Test Cases: ${testcases.length}`);
-  console.log(`Model: ${process.env.MODEL || "~typesafe/jev-latest"}`);
+  console.log(`Model: ${process.env.MODEL || "inception/mercury-decide:free"}`);
   console.log(`======================================================\n`);
 
   const provider = new JevProvider();
@@ -58,6 +59,7 @@ async function runOnlineBenchmark() {
 
   for (let i = 0; i < testcases.length; i++) {
     const tc = testcases[i];
+    if (!tc) continue;
     process.stdout.write(`[${i + 1}/${testcases.length}] Evaluating ${tc.id} (${tc.category})... `);
 
     const startTime = Date.now();
@@ -165,7 +167,7 @@ async function runOnlineBenchmark() {
   const report = {
     benchmark: "MetaTool (ToolE) Tool Selection & Awareness Benchmark",
     timestamp: new Date().toISOString(),
-    model: process.env.MODEL || "~typesafe/jev-latest",
+    model: process.env.MODEL || "inception/mercury-decide:free",
     totalCases: testcases.length,
     passedCount,
     accuracyPct: accuracy,

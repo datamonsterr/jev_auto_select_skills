@@ -2,7 +2,7 @@ import { describe, it, expect } from "bun:test";
 import { selectSkills } from "../index";
 
 describe("index programmatic API", () => {
-  it("exports selectSkills function that returns matching skills and usage breakdown", async () => {
+  it.skipIf(process.env.OTHERSKILL_LIVE_TESTS !== "1" || !process.env.OPENROUTER_API_KEY)("exports selectSkills function that returns matching skills and usage breakdown", async () => {
     expect(typeof selectSkills).toBe("function");
 
     const result = await selectSkills({
