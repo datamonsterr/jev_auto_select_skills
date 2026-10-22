@@ -28,11 +28,10 @@ import {
 import {
   agentName,
   detectAgent,
-  planSetup,
+  planMultiSetup,
   inspectInstallation,
   applySetup,
   hookFile,
-  nativeCompanion,
   launcherPath,
   agents,
   type Agent,
@@ -43,7 +42,7 @@ import { menu } from "./lib/otherskill/menu";
 export const HELP = `OtherSkill — hidden skill sets and free OpenRouter routing
 Usage: otherskill <command> [arguments] [options]
 Canonical commands:
-  setup                              Interactive harness, scope, key, free model and categories menu
+  setup                              Interactive target checkboxes, scope, key, free model and categories menu
   add <local-dir|github:owner/repo|https://skills.sh/owner/repo/skill>
                                      Classify automatically and copy full skill trees into every match
   find --agent <harness> --prompt <text>
@@ -60,6 +59,7 @@ Secondary commands:
 Aliases: install = add; hook = find; select = find --json (routing result)
 Options:
   --agent claude|codex|antigravity|opencode   Explicit harness overrides detection
+  --agents claude,codex,...          Install hook integrations for multiple harnesses in one setup
   --scope global|project             Hook/config scope (setup/config)
   --home <dir> --cwd <dir>            Isolated home/project roots
   --config <file>                    Explicit config override (otherwise nearest ancestor, then global)
@@ -69,7 +69,7 @@ Options:
   --key-env <ENV_NAME> | --key-stdin  Save key privately (0600); never printed or put in config
   --non-interactive                  Use flags/defaults for setup/config instead of menus
   --dry-run                         Validate and preview setup/config writes without mutations
-  --no-companion                    Install hooks without native companion
+  --no-companion                    Install hooks without the shared .agents companion
   --ref <branch-or-tag> --path <dir> GitHub skill source selection (slash refs use --ref)
   --prompt <literal text> --json     Native find output, or JSON routing result for inspection
   --apply                           Apply config settings to harness hooks
@@ -80,6 +80,7 @@ Project configs never contain credentials. Explicit config > nearest project con
 `;
 const options = {
   agent: { type: "string" },
+  agents: { type: "string" },
   scope: { type: "string" },
   home: { type: "string" },
   cwd: { type: "string" },
@@ -178,8 +179,20 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
         if (key) throw new Error("choose one credential input");
         key = (await stdin()).trim();
       }
+      const agentsFlag =
+        values.agents === undefined
+          ? undefined
+          : values.agents
+              .split(",")
+              .map((value) => value.trim())
+              .filter(Boolean)
+              .map(agentName);
+      if (values.agents !== undefined && !agentsFlag?.length)
+        throw new Error("--agents requires one or more harness names");
       let scope = scopeValue(values.scope, config.scope);
       let companion = !values["no-companion"];
+      let shared = true;
+      let selectedAgents: Agent[] = [];
       let apply = command === "setup" || !!values.apply;
       let data = configData(config);
       if (!scripted) {
@@ -188,6 +201,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
           command,
           {
             fixedAgent: values.agent ? agentName(values.agent) : undefined,
+            fixedAgents: agentsFlag,
             fixedScope: values.scope ? scope : undefined,
             noCompanion: values["no-companion"],
             configForScope: (targetScope) =>
@@ -201,7 +215,9 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
         config = answers.config;
         data = configData(config);
         agent = answers.agent;
+        selectedAgents = answers.agents;
         scope = answers.scope;
+        shared = answers.targets.includes("agents");
         companion = answers.companion;
         key = answers.key ?? key;
         apply = true;
@@ -211,7 +227,6 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
           enabledCategories: answers.enabledCategories,
         };
       }
-      agent ??= config.agent;
       if (values.model) data.model = values.model;
       if (values.categories !== undefined)
         data.enabledCategories = values.categories.trim()
@@ -283,6 +298,18 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
         }
       } else if (command === "config" && action)
         throw new Error("unknown config action");
+      if (scripted) {
+        // Resolve after config edits so `config set agent ... --apply` uses the new value.
+        selectedAgents = agentsFlag ?? (agent ? [agent] : []);
+        if (selectedAgents.length === 0 && config.agent && apply)
+          selectedAgents = [config.agent];
+        agent ??= selectedAgents[0];
+        shared = selectedAgents.length > 0;
+        if (apply && selectedAgents.length === 0)
+          throw new Error(
+            "setup/apply requires --agent, --agents or interactive selection",
+          );
+      }
       const target =
         command === "config" &&
         action === "set" &&
@@ -293,16 +320,11 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
           : file;
       config = writeConfig(target, data, roots, true);
       const plan = apply
-        ? planSetup(
-            config,
-            agent ??
-              (() => {
-                throw new Error(
-                  "setup/apply requires --agent or interactive selection",
-                );
-              })(),
-            { scope, companion },
-          )
+        ? planMultiSetup(config, selectedAgents, {
+            scope,
+            companion,
+            shared,
+          })
         : undefined;
       // Validate all writes, including credentials, before applying any mutations.
       if (key) saveKey(config.home, key, true);
@@ -315,6 +337,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
             dryRun,
             configPath: target,
             agent,
+            agents: selectedAgents,
+            targets:
+              plan?.targets ??
+              [...(shared ? (["agents"] as const) : []), ...selectedAgents],
             scope,
             credential: key
               ? "saved privately" + (dryRun ? " (dry-run)" : "")

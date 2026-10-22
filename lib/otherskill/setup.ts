@@ -11,6 +11,11 @@ import {
 } from "./config";
 export const agents = ["claude", "codex", "antigravity", "opencode"] as const;
 export type Agent = (typeof agents)[number];
+export const setupTargets = ["agents", ...agents] as const;
+export type SetupTarget = (typeof setupTargets)[number];
+export function isAgentTarget(target: SetupTarget): target is Agent {
+  return target !== "agents";
+}
 export function agentName(value: string): Agent {
   if (value === "agy") return "antigravity";
   if (agents.includes(value as Agent)) return value as Agent;
@@ -56,14 +61,21 @@ export function hookFile(
       : ".opencode/plugins/otherskill.ts",
   );
 }
+/** The single authoritative use-otherskill companion tree. */
+export function canonicalCompanionDir(root: string): string {
+  return path.join(root, ".agents/skills/use-otherskill");
+}
+/**
+ * Native companion location for a harness. Claude reads .claude/skills while
+ * Codex, Antigravity and OpenCode read the shared .agents/skills catalog.
+ */
+export function companionDir(agent: Agent, root: string): string {
+  return agent === "claude"
+    ? path.join(root, ".claude/skills/use-otherskill")
+    : canonicalCompanionDir(root);
+}
 export function nativeCompanion(agent: Agent, root: string): string {
-  return path.join(
-    root,
-    agent === "claude"
-      ? ".claude/skills/use-otherskill"
-      : ".agents/skills/use-otherskill",
-    "SKILL.md",
-  );
+  return path.join(companionDir(agent, root), "SKILL.md");
 }
 function objectFile(file: string): Record<string, unknown> {
   if (!fs.existsSync(file)) return {};
@@ -81,65 +93,123 @@ function record(value: unknown): Record<string, unknown> {
     throw new Error("refusing malformed native hook configuration");
   return parsed.data;
 }
+function lstat(file: string): fs.Stats | undefined {
+  try {
+    return fs.lstatSync(file);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw error;
+  }
+}
 function assertRealTarget(file: string): void {
   if (realPath(file) !== path.resolve(file))
     throw new Error("refusing installation through symlink paths");
 }
+function assertRealParent(file: string): void {
+  const parent = path.dirname(file);
+  if (realPath(parent) !== path.resolve(parent))
+    throw new Error("refusing installation through symlink paths");
+}
+/**
+ * True only for an untouched generated companion copy. Such a copy can be
+ * migrated to a symlink; anything with extra or edited files is user content.
+ */
+function managedCompanionCopy(dir: string, content: string): boolean {
+  let entries: string[];
+  try {
+    entries = fs.readdirSync(dir);
+  } catch {
+    return false;
+  }
+  if (entries.length !== 1 || entries[0] !== "SKILL.md") return false;
+  const skill = path.join(dir, "SKILL.md");
+  const stat = lstat(skill);
+  return stat?.isFile() === true && fs.readFileSync(skill, "utf8") === content;
+}
+function validateCanonicalCompanion(dir: string, content: string): void {
+  const stat = lstat(dir);
+  if (!stat) return;
+  if (stat.isSymbolicLink())
+    throw new Error(
+      "refusing managed canonical companion symlink collision; move or remove " +
+        dir +
+        " first",
+    );
+  if (!stat.isDirectory())
+    throw new Error("refusing unrelated canonical companion collision at " + dir);
+  const skill = path.join(dir, "SKILL.md");
+  const skillStat = lstat(skill);
+  if (skillStat) {
+    if (!skillStat.isFile() || fs.readFileSync(skill, "utf8") !== content)
+      throw new Error(
+        "refusing to overwrite modified native companion at " + skill,
+      );
+    // Preserve unrelated files inside an existing companion directory.
+    return;
+  }
+  if (fs.readdirSync(dir).length > 0)
+    throw new Error(
+      "refusing unrelated native companion directory collision at " + dir,
+    );
+}
+function validateCompanionLink(
+  link: string,
+  canonicalDir: string,
+  content: string,
+): void {
+  const stat = lstat(link);
+  if (!stat) return;
+  if (stat.isSymbolicLink()) {
+    const target = path.resolve(
+      path.dirname(link),
+      fs.readlinkSync(link),
+    );
+    if (realPath(target) !== realPath(canonicalDir))
+      throw new Error(
+        "refusing to replace existing native companion symlink at " + link,
+      );
+    return;
+  }
+  if (!stat.isDirectory() || !managedCompanionCopy(link, content))
+    throw new Error(
+      "refusing to overwrite modified native companion at " + link,
+    );
+}
+export interface SetupFile {
+  path: string;
+  content?: string;
+  mode?: number;
+  symlink?: string;
+}
 export interface SetupPlan {
-  agent: Agent;
+  agent?: Agent;
+  agents: Agent[];
+  targets: SetupTarget[];
   scope: "global" | "project";
   root: string;
-  files: Array<{ path: string; content: string; mode?: number }>;
+  files: SetupFile[];
   command: string;
+  commands: string[];
   companion: boolean;
+  shared: boolean;
 }
-export function planSetup(
+export interface SetupOptions {
+  scope?: "global" | "project";
+  projectRoot?: string;
+  repoDir?: string;
+  companion?: boolean;
+  shared?: boolean;
+}
+function planHook(
   config: Config,
   agent: Agent,
-  options: {
-    scope?: "global" | "project";
-    projectRoot?: string;
-    repoDir?: string;
-    companion?: boolean;
-  } = {},
-): SetupPlan {
-  auditNativeExposure(config);
-  const scope = options.scope ?? config.scope;
-  const root =
-    scope === "global"
-      ? config.home
-      : path.resolve(options.projectRoot ?? config.cwd);
-  const repo = path.resolve(options.repoDir ?? repoRoot);
-  const launcher = launcherPath(config.home);
-  const cli = path.join(repo, "otherskill.ts");
-  if (!fs.existsSync(cli)) throw new Error("OtherSkill CLI source not found");
-  const files: SetupPlan["files"] = [];
-  const launcherContent = `#!/bin/sh\n# OtherSkill managed launcher\nexec ${quote(process.execPath)} ${quote(cli)} "$@"\n`;
-  if (
-    fs.existsSync(launcher) &&
-    !fs.readFileSync(launcher, "utf8").includes("# OtherSkill managed launcher")
-  )
-    throw new Error("refusing unrelated launcher collision");
-  files.push({ path: launcher, content: launcherContent, mode: 0o755 });
-  const commandArgs = [
-    launcher,
-    "find",
-    "--agent",
-    agent,
-    "--home",
-    config.home,
-    ...(scope === "project" ||
-    (config.configPath &&
-      config.configPath !==
-        path.join(config.home, ".config/otherskill/otherskill.config.json"))
-      ? [
-          "--config",
-          config.configPath ?? path.join(root, "otherskill.config.json"),
-        ]
-      : []),
-  ];
-  // Native payloads travel on stdin; no interpolation of prompt text into a shell command.
-  const command = commandArgs.map(quote).join(" ");
+  scope: "global" | "project",
+  root: string,
+  repo: string,
+  launcher: string,
+  command: string,
+  commandArgs: string[],
+): SetupFile {
   const hook = hookFile(agent, root, scope);
   const batches =
     1 +
@@ -185,86 +255,213 @@ export function planSetup(
           "bank is exposed by native OpenCode skills.paths; remove that exposure before setup",
         );
     }
-    files.push({ path: hook, content: plugin });
-  } else {
-    const data = objectFile(hook);
-    const handler = {
-      type: "command",
-      command,
-      timeout: Math.ceil(timeoutMs / 1000),
-      ...(agent === "codex" ? { additionalContextLimit: 100000 } : {}),
-    };
-    if (agent === "antigravity") {
-      const old = data.otherskill;
-      if (old !== undefined) {
-        const group = record(old);
-        if (
-          !Array.isArray(group.PreInvocation) ||
-          group.PreInvocation.some(
-            (h) =>
-              !h ||
-              typeof h !== "object" ||
-              !String((h as Record<string, unknown>).command).startsWith(
-                quote(launcher) + " 'find' '--agent' 'antigravity'",
-              ),
-          )
-        )
-          throw new Error("refusing unrelated Antigravity hook collision");
-      }
-      data.otherskill = { PreInvocation: [handler] };
-    } else {
-      const hooks = data.hooks === undefined ? {} : record(data.hooks);
-      const groups = hooks.UserPromptSubmit ?? [];
-      if (!Array.isArray(groups))
-        throw new Error("refusing malformed UserPromptSubmit hooks");
-      // Keep all unrelated groups/handlers, including unknown valid extension fields.
-      const kept = groups
-        .map((group) => {
-          const entry = record(group);
-          if (!Array.isArray(entry.hooks))
-            throw new Error("refusing malformed native hook group");
-          return {
-            ...entry,
-            hooks: entry.hooks.filter((h) => {
-              const hook = record(h);
-              if (typeof hook.command !== "string") return true;
-              return !hook.command.startsWith(
-                quote(launcher) + " 'find' '--agent' " + quote(agent),
-              );
-            }),
-          };
-        })
-        .filter((entry) => entry.hooks.length > 0);
-      hooks.UserPromptSubmit = [...kept, { hooks: [handler] }];
-      data.hooks = hooks;
-    }
-    files.push({ path: hook, content: JSON.stringify(data, null, 2) + "\n" });
+    return { path: hook, content: plugin };
   }
+  const data = objectFile(hook);
+  const handler = {
+    type: "command",
+    command,
+    timeout: Math.ceil(timeoutMs / 1000),
+    ...(agent === "codex" ? { additionalContextLimit: 100000 } : {}),
+  };
+  if (agent === "antigravity") {
+    const old = data.otherskill;
+    if (old !== undefined) {
+      const group = record(old);
+      if (
+        !Array.isArray(group.PreInvocation) ||
+        group.PreInvocation.some(
+          (h) =>
+            !h ||
+            typeof h !== "object" ||
+            !String((h as Record<string, unknown>).command).startsWith(
+              quote(launcher) + " 'find' '--agent' 'antigravity'",
+            ),
+        )
+      )
+        throw new Error("refusing unrelated Antigravity hook collision");
+    }
+    data.otherskill = { PreInvocation: [handler] };
+  } else {
+    const hooks = data.hooks === undefined ? {} : record(data.hooks);
+    const groups = hooks.UserPromptSubmit ?? [];
+    if (!Array.isArray(groups))
+      throw new Error("refusing malformed UserPromptSubmit hooks");
+    // Keep all unrelated groups/handlers, including unknown valid extension fields.
+    const kept = groups
+      .map((group) => {
+        const entry = record(group);
+        if (!Array.isArray(entry.hooks))
+          throw new Error("refusing malformed native hook group");
+        return {
+          ...entry,
+          hooks: entry.hooks.filter((h) => {
+            const hook = record(h);
+            if (typeof hook.command !== "string") return true;
+            return !hook.command.startsWith(
+              quote(launcher) + " 'find' '--agent' " + quote(agent),
+            );
+          }),
+        };
+      })
+      .filter((entry) => entry.hooks.length > 0);
+    hooks.UserPromptSubmit = [...kept, { hooks: [handler] }];
+    data.hooks = hooks;
+  }
+  return { path: hook, content: JSON.stringify(data, null, 2) + "\n" };
+}
+export function planMultiSetup(
+  config: Config,
+  selectedAgents: Agent[],
+  options: SetupOptions = {},
+): SetupPlan {
+  auditNativeExposure(config);
+  const scope = options.scope ?? config.scope;
+  const root =
+    scope === "global"
+      ? config.home
+      : path.resolve(options.projectRoot ?? config.cwd);
+  const repo = path.resolve(options.repoDir ?? repoRoot);
+  const launcher = launcherPath(config.home);
+  const cli = path.join(repo, "otherskill.ts");
+  if (!fs.existsSync(cli)) throw new Error("OtherSkill CLI source not found");
+  const agentList = [...new Set(selectedAgents)];
+  const shared = options.shared ?? true;
   const companion = options.companion ?? true;
-  if (companion) {
+  const files: SetupFile[] = [];
+  const launcherContent = `#!/bin/sh\n# OtherSkill managed launcher\nexec ${quote(process.execPath)} ${quote(cli)} "$@"\n`;
+  if (
+    fs.existsSync(launcher) &&
+    !fs.readFileSync(launcher, "utf8").includes("# OtherSkill managed launcher")
+  )
+    throw new Error("refusing unrelated launcher collision");
+  files.push({ path: launcher, content: launcherContent, mode: 0o755 });
+  const commands: string[] = [];
+  for (const agent of agentList) {
+    const commandArgs = [
+      launcher,
+      "find",
+      "--agent",
+      agent,
+      "--home",
+      config.home,
+      ...(scope === "project" ||
+      (config.configPath &&
+        config.configPath !==
+          path.join(config.home, ".config/otherskill/otherskill.config.json"))
+        ? [
+            "--config",
+            config.configPath ?? path.join(root, "otherskill.config.json"),
+          ]
+        : []),
+    ];
+    // Native payloads travel on stdin; no interpolation of prompt text into a shell command.
+    const command = commandArgs.map(quote).join(" ");
+    commands.push(command);
+    files.push(
+      planHook(config, agent, scope, root, repo, launcher, command, commandArgs),
+    );
+  }
+  const installCompanion = companion && (shared || agentList.length > 0);
+  if (installCompanion) {
     const source = path.join(
       repo,
       "examples/polly/skills/use-otherskill/SKILL.md",
     );
     const content = fs.readFileSync(source, "utf8");
-    const target = nativeCompanion(agent, root);
-    if (fs.existsSync(target) && fs.readFileSync(target, "utf8") !== content)
-      throw new Error("refusing to overwrite modified native companion");
-    files.push({ path: target, content });
+    const canonicalDir = canonicalCompanionDir(root);
+    validateCanonicalCompanion(canonicalDir, content);
+    files.push({ path: path.join(canonicalDir, "SKILL.md"), content });
+    if (agentList.includes("claude")) {
+      // Claude only discovers .claude/skills, so link it to the shared copy.
+      const link = companionDir("claude", root);
+      validateCompanionLink(link, canonicalDir, content);
+      files.push({
+        path: link,
+        content,
+        symlink: path.relative(path.dirname(link), canonicalDir),
+      });
+    }
   }
   for (const file of files) {
-    assertRealTarget(file.path);
+    if (file.symlink) {
+      assertRealParent(file.path);
+      if (
+        overlaps(
+          config.bankPath,
+          path.resolve(path.dirname(file.path), file.symlink),
+        )
+      )
+        throw new Error("bank overlaps installation paths");
+    } else {
+      assertRealTarget(file.path);
+    }
     if (overlaps(config.bankPath, file.path))
       throw new Error("bank overlaps installation paths");
   }
   for (const native of nativePaths(root))
     if (overlaps(config.bankPath, native))
       throw new Error("bank overlaps native discovery");
-  return { agent, scope, root, files, command, companion };
+  return {
+    agent: agentList[0],
+    agents: agentList,
+    targets: [...(shared ? (["agents"] as const) : []), ...agentList],
+    scope,
+    root,
+    files,
+    command: commands[0] ?? "",
+    commands,
+    companion: installCompanion,
+    shared,
+  };
+}
+export function planSetup(
+  config: Config,
+  agent: Agent,
+  options: SetupOptions = {},
+): SetupPlan {
+  return planMultiSetup(config, [agent], options);
+}
+function applySymlink(file: SetupFile): void {
+  if (!file.symlink || file.content === undefined)
+    throw new Error("invalid managed symlink plan");
+  assertRealParent(file.path);
+  const target = path.resolve(path.dirname(file.path), file.symlink);
+  const existing = lstat(file.path);
+  if (existing) {
+    if (existing.isSymbolicLink()) {
+      const current = path.resolve(
+        path.dirname(file.path),
+        fs.readlinkSync(file.path),
+      );
+      if (realPath(current) !== realPath(target))
+        throw new Error(
+          "refusing to replace existing native companion symlink at " +
+            file.path,
+        );
+      return;
+    }
+    if (
+      !existing.isDirectory() ||
+      !managedCompanionCopy(file.path, file.content)
+    )
+      throw new Error(
+        "refusing to overwrite modified native companion at " + file.path,
+      );
+    fs.rmSync(file.path, { recursive: true, force: true });
+  }
+  fs.mkdirSync(path.dirname(file.path), { recursive: true });
+  fs.symlinkSync(file.symlink, file.path, "dir");
 }
 export function applySetup(plan: SetupPlan, dryRun = false): void {
   if (dryRun) return;
   for (const file of plan.files) {
+    if (file.symlink) {
+      applySymlink(file);
+      continue;
+    }
+    if (file.content === undefined)
+      throw new Error("invalid managed file plan");
     assertRealTarget(file.path);
     fs.mkdirSync(path.dirname(file.path), { recursive: true });
     if (
@@ -278,7 +475,7 @@ export function applySetup(plan: SetupPlan, dryRun = false): void {
 export function setup(
   config: Config,
   agent: Agent,
-  options: Parameters<typeof planSetup>[2] & { dryRun?: boolean } = {},
+  options: SetupOptions & { dryRun?: boolean } = {},
 ): SetupPlan {
   const plan = planSetup(config, agent, options);
   applySetup(plan, options.dryRun);

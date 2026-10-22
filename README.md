@@ -42,7 +42,7 @@ bun otherskill.ts --help
 bun otherskill.ts setup
 ```
 
-The interactive menu selects harness, global/project scope, hidden OpenRouter key, free model, enabled categories and companion installation. `otherskill config` offers quick edits and apply. Explicit harness/scope/companion flags take precedence over menu answers. Cancellation and `--dry-run` write nothing.
+The interactive setup menu first shows a keyboard checkbox list: `.agents` is selected by default for the shared canonical companion, while Claude, Codex, Antigravity and OpenCode are optional hook targets. Arrow keys move, SPACE toggles and ENTER confirms. It then asks for global/project scope, the hidden OpenRouter key, free model and enabled categories. Selecting a harness automatically keeps `.agents`; the companion tree lives once under `.agents/skills/use-otherskill`, and Claude's `.claude/skills/use-otherskill` path is a symlink to that shared content. `otherskill config` offers quick edits and apply using the same checklist. Explicit `--agent`/`--agents`, scope and `--no-companion` flags take precedence over menu answers. Cancellation and `--dry-run` write nothing.
 
 Setup creates a managed launcher at `~/.local/share/otherskill/bin/otherskill`; add that directory to PATH, invoke it directly, or explicitly use `bun link`. The launcher references this checkout and Bun by absolute path: keep the checkout in place, or rerun setup after moving it. Setup never globally links the package. The package's `jev-skill-selector` binary is a deprecated alias for the canonical CLI.
 
@@ -52,6 +52,9 @@ bun otherskill.ts setup --non-interactive --agent claude --scope global \
   --key-env OPENROUTER_API_KEY --model inception/mercury-decide:free \
   --categories frontend/ui-ux,frontend/storytelling,backend,testing,management
 
+# Configure several harness hooks against the shared .agents companion.
+bun otherskill.ts setup --non-interactive --agents claude,codex --scope global
+
 # Preview in scratch roots, without changing your real home.
 bun otherskill.ts setup --non-interactive --agent codex --scope project \
   --home /tmp/otherskill-home --cwd /tmp/otherskill-project --dry-run
@@ -59,14 +62,14 @@ bun otherskill.ts setup --non-interactive --agent codex --scope project \
 
 `--key-stdin` accepts a secret-manager pipe. Saved keys live in the selected home's `.config/otherskill/credentials.json`, mode `0600`; a newly created parent uses `0700`. Keys never enter project config, argument literals, menu echoes or diagnostics. Inherited `OPENROUTER_API_KEY` overrides the private file. OtherSkill does not copy/search `.env`; Bun's automatic `.env` loading still applies when launched from a directory containing one.
 
-Setup preserves unrelated native settings, hooks and skills. It refuses malformed config, unowned launcher/adapter collisions, modified companions and pre-existing native bank exposure. `--no-companion` installs only hooks. It never moves/removes native skills or exposes the bank through links or `skills.paths`.
+Setup preserves unrelated native settings, hooks and skills. It refuses malformed config, unowned launcher/adapter collisions, modified companions, companion symlink collisions and pre-existing native bank exposure. An untouched legacy companion copy can be migrated to the shared symlink; a user-modified copy is never replaced. `--no-companion` installs only hooks. It never moves/removes native skills or exposes the bank through links or `skills.paths`.
 
 | Harness | Global hook/adapter | Project hook/adapter | Companion relative to scope root |
 | --- | --- | --- | --- |
-| Claude | `~/.claude/settings.json` | `.claude/settings.json` | `.claude/skills/use-otherskill/SKILL.md` |
-| Codex | `~/.codex/hooks.json` | `.codex/hooks.json` | `.agents/skills/use-otherskill/SKILL.md` |
-| Antigravity | `~/.gemini/config/hooks.json` | `.agents/hooks.json` | `.agents/skills/use-otherskill/SKILL.md` |
-| OpenCode 1.x | `~/.config/opencode/plugins/otherskill.ts` | `.opencode/plugins/otherskill.ts` | `.agents/skills/use-otherskill/SKILL.md` |
+| Claude | `~/.claude/settings.json` | `.claude/settings.json` | `.claude/skills/use-otherskill` (symlink to the `.agents` copy) |
+| Codex | `~/.codex/hooks.json` | `.codex/hooks.json` | `.agents/skills/use-otherskill/SKILL.md` (canonical) |
+| Antigravity | `~/.gemini/config/hooks.json` | `.agents/hooks.json` | `.agents/skills/use-otherskill/SKILL.md` (canonical) |
+| OpenCode 1.x | `~/.config/opencode/plugins/otherskill.ts` | `.opencode/plugins/otherskill.ts` | `.agents/skills/use-otherskill/SKILL.md` (canonical) |
 
 All generated integrations use the same launcher and **`find --agent <harness>`**. Claude/Codex `UserPromptSubmit` hooks read native stdin payloads. Codex may require trust review through `/hooks`. Antigravity uses a named `PreInvocation` group, skips repeated invocations, and reads the original request from the supplied transcript when needed. OpenCode uses `experimental.chat.messages.transform`, appends a synthetic text part, caches per user message and passes the prompt through a subprocess argument array. Global hooks honor the event workspace's config; project hooks pin project config explicitly.
 
@@ -171,6 +174,7 @@ TMPDIR="$PWD/.tmp" bun test tests/
 bunx tsc --noEmit
 bun run build
 TMPDIR="$PWD/.tmp" python3 scripts/smoke-interactive.py
+TMPDIR="$PWD/.tmp" bun test tests/setup-checkboxes.test.ts
 # Optional network installer smoke: real GitHub/dependencies, disposable HOME,
 # scripted project setup and the curl-style interactive pipe on a real PTY.
 TMPDIR="$PWD/.tmp" python3 scripts/smoke-installer.py
