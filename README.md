@@ -26,11 +26,11 @@ curl -fsSL https://raw.githubusercontent.com/datamonsterr/jev_auto_select_skills
 
 The installer requires **Bun >= 1.3**, Bash (including macOS Bash 3.2), HTTPS-capable `curl`, `tar` with gzip support, and standard POSIX utilities. Install Bun separately from [bun.sh](https://bun.sh) first; this script does **not** bootstrap a runtime or use `sudo`. It checks PATH, `$BUN_INSTALL/bin/bun`, then `$HOME/.bun/bin/bun`. Git is unnecessary for installation; online skill imports require it later. Network access to GitHub's raw/codeload hosts and Bun's package registry is required. The commands track the current `master` branch; they are not a pinned or signed release. To inspect the script or check the initial download's exit status separately, download it with `curl -fsSL -o install.sh <raw URL above>`, inspect it, then run `bash install.sh`.
 
-Each run downloads the repository with HTTP failures treated as errors, creates a fresh private snapshot under `~/.local/share/otherskill/installs/release.*`, runs `bun install --frozen-lockfile`, and invokes the existing `otherskill.ts setup`. The original working directory is preserved for project configuration. `--install-dir DIR` changes the snapshot parent (relative paths resolve from your working directory); keep it outside native skill discovery directories. All remaining arguments go to setup unchanged. Use `--` to end installer option parsing, or `-- --help` for setup help after downloading dependencies. Supported targets are `--agent claude|codex|antigravity|opencode` (`agy` also aliases Antigravity).
+Each run downloads the repository with HTTP failures treated as errors, creates a fresh private snapshot under `~/.local/share/otherskill/installs/release.*`, runs `bun install --frozen-lockfile`, and invokes the existing `otherskill.ts setup`. The original working directory is preserved for project configuration. `--install-dir DIR` changes the snapshot parent (relative paths resolve from your working directory); keep it outside native skill discovery directories. All remaining arguments go to setup unchanged. Use `--` to end installer option parsing, or `-- --help` for setup help after downloading dependencies. Supported targets are `--agent claude|codex|antigravity|opencode` (`agy` also aliases Antigravity) or `--agents claude,codex,...` for multiple hooks in one run; use one form, not both.
 
 The default menu reads from the controlling terminal even through `curl | bash`. Without a terminal, pass `--non-interactive --agent <harness>`; use `--scope global|project`, `--home DIR`, `--cwd DIR`, `--no-companion`, `--model` and `--categories` as needed. `--dry-run` previews **setup writes only**; source and dependencies are still installed. Existing native hooks/settings/skills and the private bank follow the same preservation rules described below. Setup installs the optional native `use-otherskill` companion by default (disable it with `--no-companion`); the installer itself writes only the source snapshot and never changes your shell profile.
 
-Downloads and failed dependency snapshots are cleaned up. Successful snapshots and snapshots where setup was attempted are retained because launchers and OpenCode adapters can reference them by absolute path, including after a partial setup failure. Repeated installs create new snapshots and rerun safe setup without overwriting or deleting older source or user data. Keep any snapshot still referenced by an integration; there is no automatic pruning. On setup failure, fix the reported issue and rerun `bun /path/to/retained/release.XXXXXXXX/otherskill.ts setup` with your setup options.
+Downloads and failed dependency snapshots are cleaned up. Successful snapshots and snapshots where setup was attempted are retained because launchers and OpenCode adapters can reference them by absolute path, including after a partial setup failure. Repeated installs create new snapshots and rerun safe setup without overwriting or deleting older source or user data. Keep any snapshot still referenced by an integration; there is no automatic pruning. On setup failure, fix the reported issue and rerun `bun /path/to/retained/release.XXXXXXXX/otherskill.ts setup` with your setup options. Configs written by this version may include an optional `agents` array. Older retained snapshots use a strict schema and reject that field; to roll back, remove `agents` from the config (the current snapshot can restore the full set later) or keep using the current snapshot. Old agent-only configs remain readable.
 
 For API access, inherit `OPENROUTER_API_KEY` from your shell/secret manager or forward `--key-env OPENROUTER_API_KEY` to save it privately. Export the variable before the pipeline so Bash inherits it; never place its value in command arguments. `--key-stdin` requires downloading the installer to a file first, then piping a secret-manager command into `bash install.sh --non-interactive --agent codex --key-stdin`. The streamed installer refuses `--key-stdin` to avoid reading script text as a credential. The setup menu also offers hidden key entry. Details of key storage and precedence are below.
 
@@ -42,7 +42,7 @@ bun otherskill.ts --help
 bun otherskill.ts setup
 ```
 
-The interactive menu selects harness, global/project scope, hidden OpenRouter key, free model, enabled categories and companion installation. `otherskill config` offers quick edits and apply. Explicit harness/scope/companion flags take precedence over menu answers. Cancellation and `--dry-run` write nothing.
+The interactive setup menu first shows a keyboard checkbox list: `.agents` is selected by default for the shared canonical companion, while Claude, Codex, Antigravity and OpenCode are optional hook targets. Arrow keys or `j`/`k` move, SPACE toggles and ENTER confirms. `.agents` is marked required and cannot be deselected while a harness is selected (unless `--no-companion` disables companion installation). It then asks for global/project scope, the hidden OpenRouter key, free model and enabled categories. Selecting a harness automatically keeps `.agents`; the companion tree lives once under `.agents/skills/use-otherskill`, and Claude's `.claude/skills/use-otherskill` path is a symlink to that shared content. `otherskill config` offers quick edits and apply using the same checklist. Explicit `--agent`/`--agents` flags start from a clean target list and, with scope/`--no-companion`, take precedence over menu answers. A rerun without explicit targets prechecks saved harnesses; unchecking all intentionally clears the saved harness selection. Cancellation and `--dry-run` write nothing.
 
 Setup creates a managed launcher at `~/.local/share/otherskill/bin/otherskill`; add that directory to PATH, invoke it directly, or explicitly use `bun link`. The launcher references this checkout and Bun by absolute path: keep the checkout in place, or rerun setup after moving it. Setup never globally links the package. The package's `jev-skill-selector` binary is a deprecated alias for the canonical CLI.
 
@@ -52,6 +52,9 @@ bun otherskill.ts setup --non-interactive --agent claude --scope global \
   --key-env OPENROUTER_API_KEY --model inception/mercury-decide:free \
   --categories frontend/ui-ux,frontend/storytelling,backend,testing,management
 
+# Configure several harness hooks against the shared .agents companion.
+bun otherskill.ts setup --non-interactive --agents claude,codex --scope global
+
 # Preview in scratch roots, without changing your real home.
 bun otherskill.ts setup --non-interactive --agent codex --scope project \
   --home /tmp/otherskill-home --cwd /tmp/otherskill-project --dry-run
@@ -59,14 +62,14 @@ bun otherskill.ts setup --non-interactive --agent codex --scope project \
 
 `--key-stdin` accepts a secret-manager pipe. Saved keys live in the selected home's `.config/otherskill/credentials.json`, mode `0600`; a newly created parent uses `0700`. Keys never enter project config, argument literals, menu echoes or diagnostics. Inherited `OPENROUTER_API_KEY` overrides the private file. OtherSkill does not copy/search `.env`; Bun's automatic `.env` loading still applies when launched from a directory containing one.
 
-Setup preserves unrelated native settings, hooks and skills. It refuses malformed config, unowned launcher/adapter collisions, modified companions and pre-existing native bank exposure. `--no-companion` installs only hooks. It never moves/removes native skills or exposes the bank through links or `skills.paths`.
+Setup preserves unrelated native settings, hooks and skills. It refuses malformed config, unowned launcher/adapter collisions, modified companions, companion symlink collisions and pre-existing native bank exposure. An untouched legacy companion copy can be migrated to the shared symlink; a user-modified or extra-file copy is never replaced and the error tells you where to move it aside. The deprecated skill-only setup wrapper uses the same canonical tree, so it may also migrate an untouched Claude companion to a symlink. `--no-companion` installs only hooks and reports only the selected harness targets. It never moves/removes native skills or exposes the bank through links or `skills.paths`.
 
 | Harness | Global hook/adapter | Project hook/adapter | Companion relative to scope root |
 | --- | --- | --- | --- |
-| Claude | `~/.claude/settings.json` | `.claude/settings.json` | `.claude/skills/use-otherskill/SKILL.md` |
-| Codex | `~/.codex/hooks.json` | `.codex/hooks.json` | `.agents/skills/use-otherskill/SKILL.md` |
-| Antigravity | `~/.gemini/config/hooks.json` | `.agents/hooks.json` | `.agents/skills/use-otherskill/SKILL.md` |
-| OpenCode 1.x | `~/.config/opencode/plugins/otherskill.ts` | `.opencode/plugins/otherskill.ts` | `.agents/skills/use-otherskill/SKILL.md` |
+| Claude | `~/.claude/settings.json` | `.claude/settings.json` | `.claude/skills/use-otherskill` (symlink to the `.agents` copy) |
+| Codex | `~/.codex/hooks.json` | `.codex/hooks.json` | `.agents/skills/use-otherskill/SKILL.md` (canonical) |
+| Antigravity | `~/.gemini/config/hooks.json` | `.agents/hooks.json` | `.agents/skills/use-otherskill/SKILL.md` (canonical) |
+| OpenCode 1.x | `~/.config/opencode/plugins/otherskill.ts` | `.opencode/plugins/otherskill.ts` | `.agents/skills/use-otherskill/SKILL.md` (canonical) |
 
 All generated integrations use the same launcher and **`find --agent <harness>`**. Claude/Codex `UserPromptSubmit` hooks read native stdin payloads. Codex may require trust review through `/hooks`. Antigravity uses a named `PreInvocation` group, skips repeated invocations, and reads the original request from the supplied transcript when needed. OpenCode uses `experimental.chat.messages.transform`, appends a synthetic text part, caches per user message and passes the prompt through a subprocess argument array. Global hooks honor the event workspace's config; project hooks pin project config explicitly.
 
@@ -154,7 +157,7 @@ otherskill doctor
 otherskill doctor --live
 ```
 
-`categories` edits enabled routing IDs. `get taxonomy` returns all IDs/descriptions; `set taxonomy '<JSON array>'` changes taxonomy. `get key` only reports configured/unavailable. `--scope global` bypasses project config; project scope targets the project. `--apply` updates harness hooks. Scope changes preserve the previous scope's hooks/config.
+`categories` edits enabled routing IDs. `get taxonomy` returns all IDs/descriptions; `set taxonomy '<JSON array>'` changes taxonomy. `get key` only reports configured/unavailable. `--scope global` bypasses project config; project scope targets the project. `--apply` updates harness hooks. Setup persists the primary `agent` and full `agents` set; reapply reuses both unless `--agent`/`--agents` is supplied. `config set agent X` is an explicit single-target change and intentionally narrows the saved set to `[X]`. Scope changes preserve the previous scope's hooks/config.
 
 Defaults: concurrency 4, retries after the initial request 1, timeout 10 seconds, retry delay 250ms, request bytes 60000, candidates 200, category/skill thresholds 0.05, selected categories 20, selected skills 10. All have validated configuration bounds. Doctor checks paths, native exposure and companion presence. Ordinary doctor does not call a provider; `--live` makes one tiny free-only request. Configured paths/key presence do not prove running-harness activation or valid credentials.
 
@@ -171,6 +174,7 @@ TMPDIR="$PWD/.tmp" bun test tests/
 bunx tsc --noEmit
 bun run build
 TMPDIR="$PWD/.tmp" python3 scripts/smoke-interactive.py
+TMPDIR="$PWD/.tmp" bun test tests/setup-checkboxes.test.ts
 # Optional network installer smoke: real GitHub/dependencies, disposable HOME,
 # scripted project setup and the curl-style interactive pipe on a real PTY.
 TMPDIR="$PWD/.tmp" python3 scripts/smoke-installer.py
