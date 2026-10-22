@@ -1,0 +1,827 @@
+---
+name: bun-cli
+description: >-
+  Bun CLI reference for package management, script running, type checking, testing, bundling,
+  and compilation. Covers bun install/add/remove/update, bun run, bun check and --check,
+  bun test, bun build, bunx, bun patch, bun audit fix, bun dedupe, bun prune, bun why, bun pm,
+  bun repl, bunfig.toml, bun.lock, workspace catalogs, isolated installs and the global virtual
+  store, offline installs, self-contained workspaces, zero-config frontend dev,
+  parallel/sequential execution, test sharding and parallelism, code splitting, bytecode,
+  profile-guided bytecode layout and cross-compiled executables, compile-to-browser, and
+  replacing npm/npx/yarn/pnpm and tsc --noEmit with bun equivalents. Use for package
+  management, lockfile issues, type checking, test runner config, bundler setup, or frontend
+  dev server
+  Not for Bun runtime APIs (Bun.file(), Bun.$(), Bun.sql()) -- use bun-api skill
+---
+
+# Bun CLI
+
+Bun is an all-in-one JavaScript/TypeScript runtime, package manager, bundler, test runner, and (v1.4.3+) type checker. Bun runs TypeScript natively — `bun file.ts` directly, no compile step, no `tsc`, no `ts-node` — and `bun check` replaces `tsc --noEmit`. Always use `bun` instead of `node`, `npm`, `npx`, `yarn`, or `pnpm` in Bun projects.
+
+**Verified against Bun v1.4.3** (2026-10-10). Features are tagged with the version that
+introduced them (`v1.4+`, `v1.4.1+`, `v1.4.2+`, `v1.4.3+`). Where a release changed existing
+behavior, both behaviors are stated so this skill stays correct on older projects -- run
+`bun --version` before relying on a version-tagged item.
+
+## Check the Version, Then Check Bun's Docs
+
+`bun <command> --help` is authoritative for flags and always matches the installed binary --
+prefer it over any table here when the two disagree.
+
+For everything beyond flags, Bun ships its full docs inside `bun-types`, version-matched to
+the runtime, in any project that has `bun-types` or `@types/bun` installed:
+
+```text
+node_modules/bun-types/docs/pm/**/*.mdx        # install, lockfile, workspaces, catalogs, linkers
+node_modules/bun-types/docs/test/**/*.mdx      # test runner
+node_modules/bun-types/docs/bundler/**/*.mdx   # bun build, executables, loaders, plugins
+node_modules/bun-types/docs/runtime/bunfig.mdx
+node_modules/bun-types/CLAUDE.md             # Bun's own agent rules
+```
+
+1. **Depend on `bun-types`, not `@types/bun`.** `bun-types` ships with every Bun release and
+   carries both the docs and the types. `@types/bun` lags every release, often by a day or
+   more, yet `bun init` adds it as `latest` -- so `bun check` rejects the newest APIs
+   (`TS2339`, `TS2353`). Adding `bun-types` beside `@types/bun` fixes only the docs path:
+   type checking keeps `@types/bun`'s nested, pinned copy. Switch both:
+
+   ```bash
+   bun remove @types/bun
+   bun add -d bun-types@$(bun --version)   # then "types": ["bun-types"] in tsconfig.json
+   ```
+
+   Compare `bun --version` with `node_modules/bun-types/package.json` before trusting either.
+2. **Open by explicit path.** With the global virtual store enabled, `node_modules/bun-types`
+   is a symlink, so `find node_modules -name '*.mdx'` and `rg <pattern> node_modules` return
+   nothing. `find node_modules/bun-types/docs -name '*.mdx'` works.
+3. **Never edit under `node_modules/`.** Under the global store every project on the machine
+   shares the same inode. Use `bun patch`.
+4. **Not installed?** The same path works online: `docs/pm/lockfile.mdx` is
+   `https://bun.com/docs/pm/lockfile`.
+
+| Task | Doc path (under `node_modules/bun-types/docs/`) |
+|---|---|
+| Install behavior, lockfile, linkers | `pm/cli/install.mdx`, `pm/lockfile.mdx`, `pm/isolated-installs.mdx`, `pm/global-store.mdx` |
+| Workspaces, catalogs, filters, overrides | `pm/workspaces.mdx`, `pm/catalogs.mdx`, `pm/filter.mdx`, `pm/overrides.mdx` |
+| Registries, auth, lifecycle scripts | `pm/scopes-registries.mdx`, `pm/npmrc.mdx`, `pm/lifecycle.mdx` |
+| Type checking (`bun check`, `--check`) | `runtime/check.mdx` |
+| Test runner | `test/index.mdx`, `test/discovery.mdx`, `test/configuration.mdx`, `test/code-coverage.mdx`, `test/reporters.mdx`, `test/mocks.mdx` |
+| Bundler, executables, loaders | `bundler/index.mdx`, `bundler/executables.mdx`, `bundler/loaders.mdx`, `bundler/plugins.mdx` |
+| Config | `runtime/bunfig.mdx` |
+| Migrating from npm/yarn/pnpm | `guides/install/from-npm-install-to-bun-install.mdx` |
+
+## Detecting Bun Projects
+
+A project uses Bun if any of these are present:
+- `bun.lock` or `bun.lockb` in the project root
+- `bunfig.toml` in the project root
+- `bun` field in `package.json` (e.g., `"bun": { "install": { ... } }`)
+- Package manager field: `"packageManager": "bun@..."`
+- `[run] bun = true` in `bunfig.toml` (forces Bun runtime for all scripts)
+
+## Critical Rule
+
+**In a Bun project, ALWAYS use `bun` for everything.** Never fall back to `node`, `npm`, `npx`, `yarn`, or `pnpm`. This avoids compatibility issues, unnecessary retries, and cryptic errors from Node.js/npm not understanding Bun-specific features (workspace protocol, lockfile format, trustedDependencies, etc.).
+
+- Run files: `bun file.ts` (not `node file.ts`)
+- Run scripts: `bun run dev` (not `npm run dev`)
+- Execute binaries: `bunx tool` (not `npx tool`)
+- Install packages: `bun add pkg` (not `npm install pkg`)
+- Run tests: `bun test` (not `npx jest` or `node --test`)
+- Type check: `bun check` (not `tsc --noEmit`; v1.4.3+)
+
+## Read-Only Commands (safe, no side effects)
+
+| Command | Purpose |
+|---------|---------|
+| `bun --version` | Runtime version |
+| `bun info <pkg>` | Package metadata, available versions |
+| `bun info <pkg> versions` | List all published versions |
+| `bun pm ls` | List installed packages (alias: `bun list`) |
+| `bun pm ls --all` | List all (including transitive) |
+| `bun pm ls --trusted` | List only packages allowed to run lifecycle scripts (v1.4+) |
+| `bun pm hash` | Print lockfile hash |
+| `bun pm cache` | Show cache directory |
+| `bun pm bin` | Print the bin directory (`-g` for global) |
+| `bun pm licenses` | List dependencies grouped by license (v1.4+; `--json`, `--prod`) |
+| `bun pm diff <pkg>` | Diff two versions of a package (v1.4+) |
+| `bun pm untrusted` | List packages whose lifecycle scripts were blocked |
+| `bun why <pkg>` | Explain why a package is installed |
+| `bun outdated` | Check for outdated dependencies |
+| `bun audit` | Security vulnerability audit |
+| `bun dedupe --check` | Exit 1 if the lockfile has removable duplicates (v1.4+) |
+| `bun prune --dry-run` | Show what would be removed from `node_modules` (v1.4+) |
+| `bun test` | Run test suite |
+| `bun --check` | Type check the whole project and exit; never writes files or runs a script (v1.4.3+). `bun check` does the same unless `package.json` defines a `check` script, which it runs instead |
+| `bun run lint` | Run linter (project-specific) |
+| `bun run check-types` | Type checking (project-specific) |
+
+> **Reference**: See `references/allowlist.md` for copy-paste `Bash(command:*)` patterns for Claude Code / OpenCode settings.
+
+## npm/npx/node to Bun Translation
+
+| npm/npx/node | Bun equivalent |
+|---|---|
+| `npm install` | `bun install` |
+| `npm install pkg` | `bun add pkg` |
+| `npm install -D pkg` | `bun add -d pkg` |
+| `npm install -g pkg` | `bun add -g pkg` |
+| `npm uninstall pkg` | `bun remove pkg` |
+| `npm update` | `bun update` |
+| `npm run script` | `bun run script` |
+| `npx command` | `bunx command` |
+| `node file.js` | `bun file.js` |
+| `node --watch file.js` | `bun --watch file.js` |
+| `npm test` | `bun test` |
+| `tsc --noEmit` | `bun check` (v1.4.3+) |
+| `npm pack` | `bun pm pack` |
+| `npm publish` | `bun publish` |
+| `npm info pkg` | `bun info pkg` |
+| `npm outdated` | `bun outdated` |
+| `npm audit` | `bun audit` |
+| `npm link` | `bun link` |
+
+### Key Behavioral Differences
+
+- **No `npm run` prefix needed**: `bun run dev` works, but so does `bun dev` (direct script execution)
+- **`--bun` flag**: Forces Bun runtime instead of Node.js for scripts that use `node` in their shebang. In `bunfig.toml`, set `[run] bun = true` to make this the default
+- **Lockfile**: Bun uses `bun.lock` (text-based, v1.2+) or `bun.lockb` (binary, legacy). Text lockfile is default for new projects
+- **Workspace commands**: Use `--filter` flag: `bun --filter 'pkg-name' add dep`
+- **Lifecycle scripts**: Bun ignores lifecycle scripts by default for security. Use `trustedDependencies` in package.json to allowlist packages that need postinstall etc.
+
+## Package Management
+
+### Installing Dependencies
+
+```bash
+bun install                    # Install all from package.json
+bun install --frozen-lockfile  # CI mode: fail if lockfile needs update
+bun install --no-save          # Install without updating package.json
+bun install --production       # Skip devDependencies
+bun install --dry-run          # Show what would be installed
+bun install --offline          # No network at all; every package must already be cached (v1.4.1+)
+bun install --prefer-offline   # Cached metadata regardless of age; download only what is missing (v1.4.1+)
+```
+
+`--offline` suits CI jobs that restore `~/.bun/install/cache` and air-gapped machines -- a
+missing package fails by name (`no cached manifest for 'left-pad'`). `--prefer-offline` skips
+the staleness check but still fetches uncached packages. Both have `bunfig.toml` forms:
+`[install] offline = true` and `[install] prefer = "offline"`.
+
+**Changed in 1.4.3 -- installs cache only what they place.** Without a lockfile, `bun install`
+and `bun add` no longer download tarballs that never land in `node_modules`: groups dropped by
+`--production` or `--omit`, other platforms' optional packages, bundled dependencies. A cache
+warmed by `bun install --production` then fails a full `--offline` install with
+`"left-pad" is not in the cache`. Warm an offline cache with an install that places at least
+the same packages, on the same platform.
+
+### Adding/Removing Packages
+
+```bash
+bun add pkg                    # Add to dependencies
+bun add pkg@version            # Add specific version
+bun add -d pkg                 # Add to devDependencies (--dev)
+bun add -D pkg                 # Same as -d
+bun add --optional pkg         # Add to optionalDependencies
+bun add --peer pkg             # Add to peerDependencies
+bun add -g pkg                 # Install globally
+bun add --exact pkg            # Pin exact version (no ^)
+bun add pkg --filter api       # Add to one workspace from the repo root (v1.4+)
+bun add pkg --catalog          # Add to the root catalog, depend on it as "catalog:" (v1.4+)
+bun remove pkg                 # Remove package
+```
+
+**Changed in 1.4:** `bun add`, `bun remove`, and `bun update` accept `--filter`, and
+`bun install <pkg> --filter x` now edits workspace `x` rather than the root. In a workspace
+whose default catalog already lists the package, a plain `bun add <pkg>` writes `catalog:`.
+`--filter 'web...'` selects `web` and everything it depends on; `'...web'` selects everything
+that depends on `web`.
+
+### Updating and Inspecting
+
+```bash
+bun update                     # Update all packages within package.json ranges
+bun update pkg                 # Update every copy of pkg, transitive ones included (v1.4+)
+bun update '@types/*' --latest # Patterns; --latest ignores the declared range
+bun update --recursive         # Update every workspace and write each package.json (v1.4+)
+bun update --filter 'pkg-*' --filter '!pkg-c'   # Repeatable; ! excludes (v1.4+)
+bun outdated                   # Show outdated packages
+bun info pkg                   # Show package metadata
+bun info pkg versions          # List all available versions
+bun why pkg                    # Explain why a package is in the tree
+bun pm ls                      # List installed packages (alias: bun list)
+bun pm ls --all                # List all (including transitive)
+bun pm hash                    # Print lockfile hash
+bun pm cache                   # Show cache directory
+bun pm cache rm                # Clear cache (including the global virtual store)
+```
+
+**Changed in 1.4:** `bun update` re-resolves transitive dependencies, not just the ones named
+in `package.json`, and `bun update <name>` **errors with exit 1** when nothing depends on that
+name (it used to add the package).
+
+### Maintenance (v1.4+)
+
+```bash
+bun audit fix                  # Upgrade vulnerable packages to the lowest safe version
+bun audit fix --dry-run        # Preview
+bun audit fix --latest         # Also apply fixes your declared ranges exclude
+bun dedupe                     # Collapse duplicate versions in bun.lock, then install
+bun dedupe --check             # CI gate: exit 1 if duplicates remain
+bun prune                      # Drop node_modules entries no longer in bun.lock
+bun prune --production         # Also drop devDependencies -- build with them, ship without
+bun pm licenses --prod --json  # License inventory
+bun pm diff react@18.2.0 19.0.0  # What changed between two versions of a package
+```
+
+`bun pm diff` leads with a summary -- files changed, new install scripts, and new imports of
+`child_process`, `fs`, `net`, or `vm` -- then the diff, with minified files expanded and
+formatting-only changes skipped. Useful for reviewing a dependency bump.
+
+`bun prune --production` fits the Docker build stage:
+
+```dockerfile
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile
+COPY . .
+RUN bun run build
+RUN bun prune --production
+```
+
+### Linking and Patching
+
+```bash
+bun link                       # Register current package as linkable
+bun link pkg-name              # Link a registered package
+bun pm pack                    # Create tarball of package
+bun patch pkg                  # Start patching a package
+bun patch --commit pkg-dir     # Apply patch
+```
+
+### Publishing
+
+```bash
+bun publish                    # Publish to npm
+bun publish --dry-run          # Preview what would be published
+bun publish --tag beta         # Publish with tag
+bun publish --access public    # Set access level
+```
+
+> **Reference**: See `references/package-management.md` for complete flag details.
+
+## Install Layout: Linker and Global Virtual Store
+
+Two settings decide how `node_modules` is laid out. Both matter more than they look.
+
+### Linker
+
+| | `hoisted` | `isolated` |
+|---|---|---|
+| Layout | npm-style flat `node_modules` | symlinks into `node_modules/.bun/` (pnpm-style) |
+| Phantom dependencies | resolve silently | fail, as they should |
+| Default when | `configVersion = 0` (any project), or `configVersion = 1` without workspaces | `configVersion = 1` **and** the project uses workspaces |
+
+The default depends on the lockfile's `configVersion`, not on the Bun version: isolated only
+when `configVersion = 1` **and** the project uses workspaces. Lockfiles created before v1.3.2
+are treated as `configVersion = 0` and keep hoisted, so upgrading Bun does not change an
+existing project's layout. Override with `--linker` or `[install] linker`.
+
+### Global Virtual Store (v1.3.14+, faster in 1.4)
+
+Package files live once in `~/.bun/install/cache/links/` and each project symlinks into them:
+warm installs are roughly 7x faster, and `node_modules` drops from hundreds of MB to a few MB
+of links. **It is off by default and needs both settings** -- with `linker = "hoisted"` the
+`globalStore` flag is silently ignored.
+
+```toml
+[install]
+linker = "isolated"      # prerequisite
+globalStore = true
+```
+
+```bash
+BUN_INSTALL_GLOBAL_STORE=1 bun install --linker isolated   # per invocation
+bun pm cache rm                                            # clears the store too
+```
+
+Consequences worth knowing before enabling it:
+
+1. **`node_modules` is mostly symlinks.** `find node_modules -name '*.mdx'` and
+   `rg <pattern> node_modules` return nothing, and `du -sh node_modules` reports ~`0B`
+   because it measures the symlinks rather than their targets (the real tree is a few MB of
+   links; `du -sh -L` shows the target sizes, counted once per link). Address
+   files by explicit path, or pass `find -L` (which double-counts through the link layers).
+   Tools that scan `node_modules` without following symlinks behave differently -- the same
+   caveat as any pnpm-style layout.
+2. **Every project shares the same inode.** Editing a file under `node_modules/` changes it
+   for every project on the machine. Use `bun patch`.
+3. **True phantom dependencies stop resolving.** Packages realpath into the cache, so the
+   hidden `node_modules/.bun/node_modules/` layer is no longer on the resolution path from
+   inside a package. Fix by declaring the dependency, or set `globalStore = false`.
+4. **Some entries stay project-local**: patched packages, `trustedDependencies`, and anything
+   depending on a `workspace:`, `file:`, or `link:` dependency. Ineligibility propagates up
+   the graph, so a monorepo keeps a good share of the tree local regardless.
+
+> **Reference**: `node_modules/bun-types/docs/pm/global-store.mdx` and `pm/isolated-installs.mdx`.
+
+### Self-Contained Workspaces (v1.4.1+, hoisted linker)
+
+Electron packagers and serverless bundlers repackage one workspace's `node_modules` and expect
+every dependency physically under it. List such workspaces in the root `package.json`, or set
+Yarn's `"installConfig": { "hoistingLimits": "workspaces" }` in the workspace's own file:
+
+```json
+{ "workspaces": { "packages": ["apps/*", "packages/*"], "selfContained": ["apps/desktop"] } }
+```
+
+Nothing that workspace depends on, directly or transitively, is hoisted above
+`apps/desktop/node_modules`, and those packages are real copies rather than cache hardlinks.
+The lockfile does not record it, and it has no effect under the isolated linker.
+
+## Running Scripts and Files
+
+### Direct Execution
+
+```bash
+bun file.ts                    # Run TypeScript/JavaScript directly
+bun run script-name            # Run package.json script
+bun script-name                # Short form (if no conflict with bun commands)
+bun --watch file.ts            # Re-run on file changes
+bun --hot file.ts              # Hot reload (preserves state)
+bun --env-file .env file.ts    # Load env file
+bun --env-file .env.local --env-file .env file.ts  # Multiple env files
+bun --no-env-file file.ts      # Skip automatic .env loading (CI/prod; `env = false` in bunfig)
+bun --env-file=<(op inject -i .env.tpl) file.ts   # 1Password CLI renders dotenv lines; any pipe/FIFO//dev/stdin works (v1.4.1+)
+bun --no-ffi-cc file.ts        # cc() from bun:ffi throws ERR_FFI_CC_DISABLED (v1.4.1+)
+bun --check file.ts            # Type check the file and its imports first; nothing runs on an error (v1.4.3+)
+bun --disallow-code-generation-from-strings=strict server.ts   # eval/new Function/node:vm/data: imports throw EvalError (v1.4.3+)
+bun --no-orphans run dev       # Die with the parent, SIGKILL every descendant on exit
+bun repl                       # Native REPL: highlighting, history, completion (v1.3.10+)
+bun repl -p '{ a: 1 }'         # Evaluate and print with REPL semantics
+bun exec 'ls | wc -l'          # Run a shell script through Bun's shell
+bun ./README.md                # Render Markdown in the terminal, no VM started
+```
+
+### bunx (npx Replacement)
+
+```bash
+bunx command                   # Run package binary (auto-installs if needed)
+bunx --bun command             # Force Bun runtime for the command
+bunx command@version           # Run specific version
+```
+
+### Parallel and Sequential Execution
+
+Replaces `npm-run-all` and `concurrently`. Output is prefixed per script (or `package:script`
+under `--filter`), and `pre*`/`post*` hooks stay grouped with their main script.
+
+```bash
+bun run --parallel build lint typecheck        # Run all concurrently
+bun run --parallel 'build:*'                   # Glob-match script names
+bun run --parallel --filter '*' build          # Fan out across every workspace
+bun run --parallel --no-exit-on-error --filter '*' test   # Keep going past failures
+bun run --sequential clean build deploy        # One at a time, same prefixed output
+```
+
+The flag may also precede `run` (`bun --parallel run build lint`); both forms work.
+
+### Workspace-Aware Execution
+
+```bash
+bun --filter 'pkg-name' run script    # Run in specific workspace
+bun --filter '*' run script           # Run in all workspaces
+bun --filter './apps/*' run build     # Run with glob pattern
+```
+
+### Script Flags
+
+```bash
+bun run --smol file.ts         # Reduce memory usage (sacrifice throughput)
+bun run --silent script        # Suppress script name echo
+bun run --shell=bun script     # Use Bun's built-in shell (cross-platform, default on Windows)
+bun run --shell=system script  # Use system shell (default on macOS/Linux)
+```
+
+### Zero-Config Frontend Development
+
+Run HTML files directly as a dev server -- no Vite, Webpack, or any config needed:
+
+```bash
+bun ./index.html               # Start dev server, auto-bundles JS/TS/CSS
+bun --hot ./index.html         # With hot module replacement
+```
+
+Bun automatically transpiles TypeScript, JSX, TSX, and CSS linked from the HTML. Resolves `node_modules` imports in `<script>` tags. Enables HMR and React Fast Refresh.
+
+> **Reference**: See `references/running-and-execution.md` for complete details.
+
+## Type Checking (v1.4.3+)
+
+`bun check` is a built-in port of TypeScript 7: it reads `tsconfig.json`, reports what `tsc`
+reports, uses every CPU core, needs no `typescript` package, and never writes files. Exit 1 on
+any error, 0 when clean, and 1 when there is nothing to check.
+
+```bash
+bun check                          # the project of the nearest tsconfig.json
+bun check src/index.ts             # one file and everything it imports
+bun check -b                       # every project in `references`, like tsc -b -- nothing pre-built
+bun --check src/index.ts           # type check, then run; nothing runs on an error
+bun test --check                   # no test runs on an error
+bun build --check ./app.ts --outdir dist   # nothing is written on an error
+bun --watch --check src/index.ts   # re-check before every restart (there is no bun check --watch)
+```
+
+- **Point `types` at `bun-types`.** With no Bun types, or a stale `@types/bun`, `Bun`,
+  `bun:test`, and every API newer than the installed types fail to check. See "Check the
+  Version" above.
+- **A `check` script wins.** When `package.json` defines `check`, `bun check` runs that
+  script -- from the shell and from other scripts alike, so `bun init`'s
+  `"typecheck": "bun check"` then runs the lint script. Only inside the `check` script and the
+  scripts it starts is `bun check` the type checker. `bun --check` always type checks: use it in
+  scripts. On an older Bun, `"check": "bun check"` calls itself forever.
+- **Agent output.** With `CLAUDECODE=1`, `AGENT=1`, or `REPL_ID=1` set, errors print as
+  `<error file= line= column= code=>` blocks with the source lines. `--no-pretty` gives one
+  `file(line,col): error TSxxxx: ...` line per error, the default when piped; the summary goes to
+  stderr.
+- **TypeScript 7 rules apply** whatever `typescript` is installed: `strict` is on, `types` is
+  empty unless listed, and a removed option (`baseUrl`, `moduleResolution: "node"`,
+  `target: "es5"`) stops the check before any file is checked.
+- **Keep `tsc` for `.d.ts` output** -- `bun check` emits nothing.
+
+> **Reference**: See `references/type-checking.md` for what `--check` covers, output formats,
+> monorepos, CI, and the TypeScript 5-to-7 migration table.
+
+## Testing
+
+Bun includes a built-in test runner compatible with Jest-like syntax.
+
+### Running Tests
+
+```bash
+bun test                          # Run all test files
+bun test file.test.ts             # Run specific file
+bun test foo bar                  # Positional args filter by FILE path, not test name
+bun test -t "pattern"             # Filter by TEST NAME (regex); --grep is an alias
+bun test --timeout 10000         # Set timeout (ms)
+bun test --bail                   # Stop on first failure
+bun test --bail 5                 # Stop after 5 failures
+bun test --rerun-each 3           # Run each test 3 times
+bun test --retry 3                # Default retry count for flaky tests
+bun test --only                   # Run only tests marked with .only
+bun test --todo                   # Include .todo tests
+bun test --only-failures          # Print failures and the summary only
+bun test --pass-with-no-tests     # Exit 0 when nothing matches (monorepos)
+bun test --check                  # Type check test files + imports first; no test runs on an error (v1.4.3+)
+```
+
+**`--filter` is not a test-name filter.** In `bun test`, `--filter` is another **file path**
+filter, identical to a positional argument; `-F` is rejected. (Workspace selection is a
+package-manager feature: `bun run --filter '*' test`.) Passing a test name usually matches
+no files, and `bun test` then exits **1** ("did not match any test files") -- so the mistake
+fails the run rather than passing it silently, but it still tests nothing. Use `-t` /
+`--test-name-pattern` / `--grep` for test names. `--pass-with-no-tests` turns that exit 1
+into 0, which is what would hide it.
+
+### Coverage
+
+```bash
+bun test --coverage               # Enable code coverage
+bun test --coverage-reporter text # Coverage format: 'text' and/or 'lcov' -- there is no 'json'
+bun test --coverage-dir ./cov     # Output directory
+```
+
+`--coverage-reporter` implies `--coverage` as of v1.4.3. Before, `--coverage-reporter=lcov`
+alone ran the tests and wrote no report.
+
+### Parallelism, Sharding, Isolation
+
+```bash
+bun test --parallel               # Files across N worker processes (default: CPU count)
+bun test --parallel=4 --isolate   # Explicit worker count
+bun test --isolate                # Fresh globalThis per file, same process (Jest/Vitest default)
+bun test --shard=1/3              # One CI runner's slice of the files
+bun test --changed=main           # Only files your diff reaches (walks the import graph)
+bun test --timings=t.json --update-timings   # Record per-file durations
+bun test --parallel --shard=1/3 --timings=t.json   # Balance by wall time, not file count
+```
+
+- `--parallel` **implies `--isolate`**; `--no-isolate` opts out so each worker reuses one
+  global and module registry.
+- `--isolate` fixes "passes alone, fails in the suite" by resetting `globalThis` and the module
+  registries between files, and closing servers, sockets, watchers, and subprocesses the file
+  left open. Transpiled source and bytecode stay cached across globals, so the cost is low.
+- Workers expose their 1-indexed slot as `JEST_WORKER_ID` / `BUN_TEST_WORKER_ID`, so Jest
+  setups that key a database or port off `JEST_WORKER_ID` work unchanged.
+- Coverage and JUnit output are merged across workers; `--bail` stops every worker.
+- `--timings` (v1.4+) makes shards equal in **time** rather than file count, and the file is
+  written slowest-first so it doubles as a slow-test report.
+- 1.4.1 stops files using `mock()`, `spyOn()`, `mock.module()`, or `Bun.plugin()` from keeping
+  the previous module graph alive under `--isolate`, so memory stays flat across a large suite.
+
+### Test File Patterns
+
+By default, Bun finds files matching: `*.test.{ts,tsx,js,jsx}`, `*_test.{ts,tsx,js,jsx}`, `*.spec.{ts,tsx,js,jsx}`, `*_spec.{ts,tsx,js,jsx}`, and files in `__tests__/` directories. Exclude paths with `--path-ignore-patterns <glob>` or `test.pathIgnorePatterns` in `bunfig.toml`.
+
+### Snapshot Testing
+
+```bash
+bun test --update-snapshots       # Update snapshot files
+```
+
+### Watch Mode
+
+```bash
+bun test --watch                  # Re-run on file changes
+```
+
+> **Reference**: See `references/testing.md` for test API, mocking, lifecycle hooks, and coverage config.
+
+## Bundling and Compilation
+
+### Bundling
+
+```bash
+bun build ./src/index.ts --outdir ./dist           # Bundle to directory
+bun build ./src/index.ts --outfile ./dist/out.js    # Bundle to single file
+bun build ./src/index.ts --target browser           # Target: browser (default), bun, node
+bun build ./src/index.ts --format esm               # Format: esm (default), cjs, iife
+bun build ./src/index.ts --minify                   # Minify output
+bun build ./src/index.ts --sourcemap external        # Sourcemaps: external, inline, linked, none
+bun build ./src/index.ts --splitting                # Code splitting (ESM only)
+bun build ./src/index.ts --splitting --min-chunk-size=16384   # Fold tiny side-effect-free chunks into their loaders (v1.4.1+)
+bun build ./src/index.ts --outdir ./dist --check    # Type check first; nothing is written on an error (v1.4.3+)
+```
+
+**Changed in 1.4.1 -- splitting output.** Code shared between an entry and its lazy routes stays
+in the entry's chunk (fewer, smaller files), browser builds get `<link rel="modulepreload">`
+for every chunk an entry or `import()` loads (`--no-module-preload` to disable), `--target bun`
+turns `require()` of an ES module into its own chunk (`--no-split-require` to inline), and
+`export * as` / `const { x } = await import()` tree-shake unused exports -- `zod` and `effect`
+bundles shrink 50-80%. Snapshot tests of build output will change.
+
+**Changed in 1.4.3 -- chunk names.** Large `--splitting` builds no longer fail with
+`Multiple files share the same output path`: two different chunks whose 8-character `[hash]`
+collided now both get extra characters until they differ. `[hash9]` through `[hash13]` set a
+wider minimum (`[hash13]` is the full 64-bit hash; 1.4.2 printed the token literally and failed).
+Shared code no longer folds into an entry chunk whose name has no `[hash]`, so an entry loaded
+with a query string (`index.js?v=1`) cannot run twice -- a 1.4.1 regression. Each split
+`import()` in `metafile.inputs` names the file it loads in `entryPoint`.
+
+### Standalone Executables
+
+```bash
+bun build ./src/cli.ts --compile                    # Create self-contained executable
+bun build ./src/cli.ts --compile --target bun-linux-x64    # Cross-compile
+bun build ./src/cli.ts --compile --minify           # Minified executable
+```
+
+Available compilation targets: `bun-linux-x64`, `bun-linux-arm64`, `bun-darwin-x64`, `bun-darwin-arm64`, `bun-windows-x64`.
+
+Browser target (v1.3.10+) -- compile to a self-contained HTML file:
+```bash
+bun build --compile --target=browser ./app.tsx --outfile ./dist/app.html
+```
+
+### Build Options
+
+```bash
+bun build ... --external pkg        # Exclude from bundle
+bun build ... --define 'KEY=VALUE'  # Define compile-time constants
+bun build ... --loader .ext=type    # Custom loaders (js, jsx, ts, tsx, json, css, text, file, base64, dataurl, binary)
+bun build ... --entry-naming [dir]/[name].[ext]   # Output naming pattern
+bun build ... --chunk-naming 'chunk-[hash13].[ext]'   # Wider minimum hash: [hash9]..[hash13] (v1.4.3+)
+bun build ... --public-path /cdn/   # Public path prefix for assets
+bun build ... --react-compiler      # React auto-memoization, no Babel/SWC (v1.4+)
+bun build ... --metafile meta.json  # esbuild-format build metadata
+bun build ... --metafile-md meta.md # Module graph as Markdown, for reading or an LLM (v1.3.8+)
+bun build ... --feature=FLAG        # Compile-time flag for `feature()` from bun:bundle
+bun build ./src/cli.ts --compile --asset ./public --asset ./templates   # Embed files/dirs (v1.4+)
+bun build ./src/cli.ts --compile --bytecode --bytecode-depth=1   # Bytecode for top-level + one nesting level (v1.4.1+)
+bun build ... --no-deprecated-namespace-object-setters   # Getter-only `import * as ns` objects, the future default (v1.4.1+)
+```
+
+`--asset` (v1.4+) embeds a file or directory into a `--compile` executable keeping original
+filenames, so `path.join(import.meta.dir, ...)` resolves the same as on disk. `node:fs` treats
+`/$bunfs/` as a real tree, so `readdirSync` (including `recursive`/`withFileTypes`) works
+inside the binary -- static file servers that enumerate a directory at startup run unmodified.
+
+**Changed in v1.3.4:** `--compile` binaries no longer auto-load `tsconfig.json` or
+`package.json` from the runtime working directory (opt back in with
+`--compile-autoload-tsconfig` / `--compile-autoload-package-json`); `.env` and `bunfig.toml`
+still auto-load.
+`--bytecode` gained ES module support back in **v1.3.9** (`--format=esm`, requires
+`--compile`), enabling top-level await,
+`import.meta`, dynamic imports, and code splitting -- it previously forced CommonJS.
+As of **v1.4.1** bytecode is about 3x the source size instead of 9x, `--bytecode-depth=N`
+limits ahead-of-time compilation to N nesting levels (deeper functions compile on first call),
+and cross-compiling with `--bytecode` works for every target, `bun-windows-x64` from macOS or
+Linux included, with byte-identical output.
+
+**Profile-guided bytecode layout (v1.4.3+).** `--bytecode-order` puts the bytecode a recorded
+run used at the front of a `--compile --bytecode` executable, so it reads and decodes less of
+itself (one large CLI: cold start 1.01 s to 0.53 s). It requires `--compile --bytecode`.
+
+```bash
+bun build ./src/cli.ts --compile --bytecode --outfile mycli                               # 1. build
+BUN_BYTECODE_ORDER_OUT=mycli.order ./mycli --help                                         # 2. run it as users do; written on exit
+bun build ./src/cli.ts --compile --bytecode --bytecode-order=mycli.order --outfile mycli  # 3. rebuild with the profile
+```
+
+Functions are matched by a hash of their syntax, so last week's profile still applies --
+commit or cache it. `--bytecode-order=a.order,b.order` takes several, most common first, and
+`bytecodeOrderStats()` from `bun:jsc` reports how much of a run the profile covered.
+`--compile-jit-policy <n>` starts the executable with JIT tier-up thresholds scaled by `n`, so
+run-once startup code stays in the interpreter; call `Bun.unsafe.setJITPolicy(1)` once the app
+is interactive. `--no-optimize-bytecode` skips the build-time bytecode optimizer.
+
+> **Reference**: See `references/bundling-and-compilation.md` for complete options.
+
+## Project Initialization
+
+```bash
+bun init                       # Initialize new project (creates package.json, tsconfig.json, index.ts)
+bun init -y                    # Accept defaults, no template picker
+bun init --react               # React template (also --react=tailwind, --react=shadcn)
+bun init --minimal             # Type definitions only
+bun create template-name       # Create from template
+bun create next-app my-app     # Example: create Next.js app
+```
+
+`bun init` also writes a **`CLAUDE.md` of Bun's own agent rules** into the project root
+(copied from `node_modules/bun-types/CLAUDE.md`) — "use `bun` not `node`/`npm`", the API
+substitution list, and the HTML-imports frontend pattern. Recommend running it in new Bun
+projects: it gives every agent working in the repo the same baseline, and points at the
+shipped docs.
+
+**Changed in 1.4.3:** `bun init` adds a `"typecheck": "bun check"` script (make it
+`bun --check` if the project has a `check` script), and the copied rules say `bun check` instead
+of `tsc --noEmit`. It still adds `"@types/bun": "latest"` with
+`"types": ["bun"]`, which resolves to the previous release for a day or more after each Bun
+release -- swap it for `bun-types` (see "Check the Version").
+
+**Changed in 1.4:** `bun init` writes `typescript: ^7` (it wrote `^5`, or nothing in the React
+templates), and with a non-TTY stdin (CI, a piped spawn) it behaves as `bun init -y` instead
+of opening the template picker. `bun update -i` with a non-TTY stdin now exits 1 -- use
+`bun update` or `bun outdated`.
+
+## Configuration (bunfig.toml)
+
+Key sections:
+
+```toml
+[run]
+bun = true                     # Always use Bun runtime (not Node)
+
+[install]
+exact = true                   # Pin exact versions by default
+peer = false                   # Don't auto-install peer deps
+production = false             # Include devDeps
+frozenLockfile = false         # Don't fail on lockfile mismatch
+globalDir = "~/.bun/install/global"  # Global install location
+linker = "isolated"            # "isolated" or "hoisted" -- see gotchas
+globalStore = true             # Share package files across projects (requires isolated)
+offline = false                # true: never touch the network, every package must be cached (v1.4.1+)
+prefer = "online"              # "offline": cached metadata regardless of age (v1.4.1+); "latest": always check
+
+[install.scopes]
+"@myorg" = { token = "$NPM_TOKEN", url = "https://npm.pkg.github.com/" }
+
+[test]
+coverage = false               # Enable coverage by default
+coverageReporter = ["text", "lcov"]
+timeout = 5000                 # Default test timeout
+pathIgnorePatterns = ["**/e2e/**"]   # Exclude test files by glob
+
+[bundle]
+entryPoints = ["./src/index.ts"]
+outdir = "./dist"
+```
+
+> **Reference**: See `references/configuration.md` for complete bunfig.toml reference.
+
+## Debugging and Profiling
+
+```bash
+bun --inspect file.ts              # Start debugger (WebSocket, connect via Chrome DevTools)
+bun --inspect-wait file.ts         # Wait for debugger to attach before executing
+bun --inspect-brk file.ts         # Break on first line
+bun --cpu-prof file.ts             # Generate CPU profile
+bun --cpu-prof-md file.ts          # CPU profile as Markdown (v1.3.7+)
+bun --heap-prof file.ts            # Generate heap profile
+bun --heap-prof-md file.ts         # Heap profile as Markdown (v1.3.7+)
+BUN_JSC_logJITCodeForPerf=1 bun file.ts  # Linux perf integration
+```
+
+## Environment Variables
+
+```bash
+bun --env-file .env file.ts        # Load .env file
+bun --env-file .env.local --env-file .env file.ts  # Load multiple (left takes precedence)
+```
+
+Bun auto-loads `.env`, `.env.production`, `.env.local`, `.env.production.local` by default based on `NODE_ENV`.
+
+## Built-in Features That Replace External Tools
+
+Bun has many capabilities built in that eliminate the need for external packages or tooling:
+
+### Native TypeScript
+Bun runs `.ts`, `.tsx` files directly — no `tsc`, `ts-node`, or `tsx` needed. The transpiler is built into the runtime. Use `bun file.ts` to run any TypeScript file immediately.
+
+### Built-in Type Checker
+`bun check` (v1.4.3+) replaces `tsc --noEmit`, and `--check` gates `bun <file>`, `bun test`, and `bun build` on a clean type check — no `typescript` package needed. Keep `tsc` only to emit `.d.ts` files.
+
+### Workspace Catalogs
+Bun supports `catalog:` protocol in `package.json` for centralized dependency version management across monorepo workspaces — no need for tools like `syncpack` or `manypkg`:
+
+```json
+// Root package.json
+{
+  "workspaces": ["packages/*"],
+  "catalog": {
+    "react": "^19.0.0",
+    "typescript": "^5.7.0"
+  }
+}
+
+// packages/app/package.json
+{
+  "dependencies": {
+    "react": "catalog:"
+  }
+}
+```
+
+### Built-in Test Runner
+`bun test` is a full Jest-compatible test runner with snapshot testing, mocking, coverage — no need for `jest`, `vitest`, or `mocha`.
+
+### Built-in Bundler
+`bun build` replaces `esbuild`, `webpack`, `rollup` for many use cases. Supports code splitting, tree shaking, minification, and standalone executable compilation.
+
+### Built-in SQLite
+`import { Database } from 'bun:sqlite'` — zero-dependency SQLite3 with prepared statements and transactions. No need for `better-sqlite3` or `sql.js`.
+
+### Built-in Shell
+`Bun.$` tagged template — cross-platform shell execution with automatic escaping. Replaces `execa`, `shelljs`, `zx`.
+
+### Built-in File I/O
+`Bun.file()` and `Bun.write()` — fast file operations without importing `fs`. Auto-detects MIME types.
+
+### Built-in Glob
+`new Bun.Glob(pattern)` — fast glob matching and file scanning. Replaces `glob`, `fast-glob`, `minimatch`.
+
+### Built-in Password Hashing
+`Bun.password.hash()` and `.verify()` with bcrypt and argon2id. Replaces `bcrypt`, `argon2` packages.
+
+### Built-in Compression
+`Bun.gzipSync()`, `Bun.deflateSync()`, `Bun.zstdCompressSync()` — no need for `zlib` wrapper packages.
+
+### Built-in Semver
+`Bun.semver.satisfies()`, `.order()` — replaces `semver` package.
+
+### Built-in Runtime APIs
+For Bun's built-in runtime helpers (`Bun.s3`, `Bun.redis`, `Bun.Archive`, `JSONC`, `JSON5`, `JSONL`, `markdown`, `cron`), see the `bun-api` skill.
+
+### Zero-Config Frontend Dev Server
+`bun ./index.html` — serve HTML with auto-bundling of JS/TS/CSS, HMR, and React Fast Refresh. Replaces Vite/Webpack dev server for simple projects.
+
+### ES Decorators
+TC39 standard ES decorators supported natively (v1.3.10+) — no `experimentalDecorators` tsconfig needed.
+
+## Key Gotchas
+
+1. **Always use `bun` not `npm`/`node`/`npx`** in Bun projects
+2. **Lockfile format**: `bun.lock` (text, v1.2+) is the default for new projects. Legacy `bun.lockb` is binary. Don't mix with `package-lock.json`. **v1.4+** writes `lockfileVersion: 2` (and `3` when nested or version-scoped overrides are used). **Bun 1.3 cannot read version 3** -- check before committing one to a repo whose CI pins an older Bun
+3. **trustedDependencies**: Lifecycle scripts (postinstall, etc.) only run for packages listed in `trustedDependencies` in package.json. **v1.3.5+** the default trusted list applies only to packages from the npm registry, so a `file:`/`link:`/`git:`/`github:` dependency named `esbuild` gets no trust from the real esbuild's entry -- list it yourself. **v1.4+** entries match the exact package name rather than a truncated hash
+4. **`--bun` flag**: Some tools (e.g., Next.js) use Node.js by default even when run with `bun run`. Use `--bun` or `[run] bun = true` in `bunfig.toml` to force Bun runtime
+5. **Workspace protocol**: Use `"workspace:*"` in package.json to reference workspace packages
+6. **Global binaries**: Installed with `bun add -g`, located in `~/.bun/bin/`
+7. **Node.js compatibility**: Bun implements most Node.js APIs but some edge cases differ. Check https://bun.sh/docs/runtime/nodejs-apis for compatibility
+8. **TypeScript**: Bun runs TypeScript natively with no compilation step. Uses its own transpiler (not tsc), and running never type checks -- use `bun check` or `--check` (v1.4.3+)
+9. **Auto-install**: Bun can auto-install missing packages on import (disabled by default, enable with `[install] auto = true` in bunfig.toml)
+10. **`bun run` vs `bun`**: `bun run script` runs a package.json script; `bun file.ts` runs a file directly. `bun script` tries script first, then falls back to file
+11. **`--filter` is not a name filter for tests.** In `bun test` it filters **file paths**, same as a positional argument (`-F` is rejected; workspace selection is `bun run --filter '*' test`). `bun test -t <regex>` (or `--grep`) filters test names. Getting this wrong matches nothing and exits 1 -- unless `--pass-with-no-tests` is set, which turns it into a green run that tested nothing
+12. **Coverage reporters are `text` and `lcov` only** -- `--coverage-reporter=json` is rejected. As of v1.4.3 the flag implies `--coverage`
+13. **`bunfig.toml` is strict TOML as of v1.4.** Unquoted values, missing newlines between pairs, and integers past `Number.MAX_SAFE_INTEGER` now fail at startup with a `SyntaxError`. `linker = isolated` must be `linker = "isolated"`
+14. **Bun invoked as `node` no longer loads `.env` (v1.4+).** Under `bun --bun`, `bunx --bun`, or a `node` symlink, a script calling `node` sees those variables as `undefined`. Pass `--env-file`, matching Node's behavior
+15. **The isolated linker is not on by default for existing projects** -- it is chosen by the lockfile's `configVersion`, not the Bun version. See "Install Layout" above
+16. **x64 builds are baseline-only (v1.4+).** The `-march=haswell` build is gone; the `-baseline` download URLs and npm packages still exist and contain the same binary, and the `CPU lacks AVX support` warning is removed
+17. **`bun feedback` was removed in 1.4**
+18. **Bundled namespace objects will become getter-only.** `import * as ns` / `export * as ns` from `bun build` currently accept `ns.x = 1` silently; `--no-deprecated-namespace-object-setters` (or `deprecatedNamespaceObjectSetters: false`) opts into the future default now (v1.4.1+)
+19. **`bun run --filter`, `--workspaces`, `--parallel`, and `--sequential` ignored an auto-discovered `bunfig.toml`** before 1.4.1 unless `--config` was passed; `bun run` also reused a stale transpile cache for files of 4 KiB or more after `[define]` or `--drop` changed
+20. **Bun 1.4.1's `bun build` could rename a nested `var` onto a `let` in the same block**, so bundles importing Elysia failed to load with `SyntaxError: Cannot declare a var variable that shadows a let/const/class variable`, and a `let` could take a parameter's or `catch` binding's name and compute wrong values. Fixed in 1.4.2 -- upgrade rather than patch the output, and do not pin 1.4.1 for bundling
+21. **A `check` script shadows `bun check` (v1.4.3+).** When `package.json` defines `check`, `bun check` runs it -- from other scripts too, except those the `check` script itself starts -- so `bun init`'s `"typecheck": "bun check"` then runs the lint script. `bun --check` type checks regardless: use it in scripts. On an older Bun, `"check": "bun check"` calls itself forever
+22. **`@types/bun` lags every Bun release**, often by a day or more, so `bun check` rejects the newest APIs (`TS2339`, `TS2353`). Depend on `bun-types@<runtime-version>` with `"types": ["bun-types"]` instead; installing `bun-types` beside `@types/bun` does not change what gets type checked
+23. **Installs no longer cache what they skip (v1.4.3+).** A `--production` or `--omit` install without a lockfile downloads no tarballs for the dropped groups, so it cannot warm a cache for a later full `--offline` install. Warm it with an install that places the same packages, on the same platform
+24. **`--disallow-code-generation-from-strings` is enforced as of 1.4.3** -- Bun accepted and ignored it before. `eval()` and `new Function()` now throw `EvalError` process-wide, Workers included; `=strict` also blocks `node:vm`, `data:`/`blob:` imports, and plugins that return source text, and refuses `--inspect`
+
+## References
+
+> - `references/migration-1.4.md` -- what changed from 1.3 through 1.4.3 for the CLI, package manager, bundler, and test runner
+> - `references/package-management.md` -- install/add/update/audit/pm flags, workspaces, linkers
+> - `references/running-and-execution.md` -- runtime flags, bunx, profiling, watch/hot, code-generation lockdown
+> - `references/type-checking.md` -- `bun check`, `--check`, output formats, TypeScript 7 defaults, monorepos, CI
+> - `references/testing.md` -- test runner API, mocking, coverage, CI shaping
+> - `references/bundling-and-compilation.md` -- `bun build`, targets, standalone executables
+> - `references/configuration.md` -- full `bunfig.toml` reference
+> - `references/allowlist.md` -- copy-paste `Bash(command:*)` permission patterns

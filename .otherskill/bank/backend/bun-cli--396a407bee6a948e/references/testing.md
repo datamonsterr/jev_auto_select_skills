@@ -1,0 +1,473 @@
+# Testing Reference
+
+## bun test
+
+Built-in test runner with Jest-compatible API.
+
+```bash
+bun test [flags] [file/dir patterns...]
+```
+
+### CLI Flags
+
+| Flag | Description |
+|---|---|
+| `-t, --test-name-pattern regex` | **Filter by test name.** `--grep` is an alias (v1.3.6+) |
+| positional args | Filter by **file path**, not test name (`bun test foo bar`) |
+| `--filter pattern` | Extra **file path** filter, same as a positional arg -- see the warning below |
+| `--timeout ms` | Per-test timeout in milliseconds (default: 5000) |
+| `--bail [count]` | Stop after N failures (default: 1 if no count) |
+| `--rerun-each N` | Re-run each test **file** N times |
+| `--retry N` | Default retry count for all tests; per-test `{ retry: N }` wins (v1.3.3+) |
+| `--only` | Only run tests marked with `.only` |
+| `--todo` | Include `.todo` tests |
+| `--only-failures` | Print failures and the summary only (v1.3.1+) |
+| `--pass-with-no-tests` | Exit 0 when nothing matches (v1.3.1+) |
+| `--concurrent` | Treat every test as `test.concurrent()` |
+| `--max-concurrency N` | Max concurrent tests (default 20) |
+| `--randomize` / `--seed N` | Randomize test order / fix the seed |
+| `--watch` | Re-run on file changes |
+| `--update-snapshots` | Update snapshot files |
+| `--preload module` | Preload script before tests |
+| `--check` | Type check the test files and everything they import first; no test runs on a type error (v1.4.3+). Missing from the help's flag list, shown in its examples |
+| `--coverage` | Enable code coverage |
+| `--coverage-reporter type` | `text` and/or `lcov` only -- **there is no `json`**. Implies `--coverage` (v1.4.3+; before, it ran the tests and wrote no report) |
+| `--coverage-dir path` | Coverage output directory |
+| `--reporter name` | `junit` (requires `--reporter-outfile`) or `dots` only -- **not** `default`, `spec`, `tap`, or `json` |
+| `--reporter-outfile path` | Output file, required with `--reporter=junit` |
+| `--dots` | Shorthand for `--reporter=dots` |
+| `--verbose` | Verbose output |
+| `--silent` | Suppress output |
+| `--no-color` | Disable color output |
+| `--env-file path` | Load env file |
+| `--cwd path` | Set working directory |
+| `--path-ignore-patterns pattern` | Exclude paths from test discovery (v1.3.11+) |
+| `--isolate` | Run each test file in a fresh global environment within the same process (v1.3.13+) |
+| `--no-isolate` | With `--parallel`, let each worker reuse one global across its files |
+| `--parallel[=N]` | Distribute test files across N worker processes (default: CPU count). Implies `--isolate` (v1.3.13+) |
+| `--parallel-delay ms` | How long the first worker must stay busy before the rest spawn (default 5) |
+| `--shard=M/N` | Run shard M of N -- split test files across CI runners, round-robin (v1.3.13+) |
+| `--timings path` | Read per-file durations to balance `--shard`/`--parallel` by wall time (v1.4+) |
+| `--update-timings` | Write measured durations to the first `--timings` file (v1.4+) |
+| `--changed[=ref]` | Only run test files affected by git changes; optional ref (commit/branch/tag) (v1.3.13+) |
+
+**`--filter` does not filter test names.** In `bun test`, `--filter <pattern>` is another
+**file path** filter, identical to a positional argument; `-F` is rejected as an invalid
+argument, and neither selects workspaces (workspace selection is a package-manager feature:
+`bun run --filter '*' test`). Passing a test name usually matches no files, and `bun test`
+exits **1** ("did not match any test files") -- the mistake fails the run rather than passing
+it, but it still tested nothing. Use `-t`, `--test-name-pattern`, or `--grep`. Note that
+`--pass-with-no-tests` converts that exit 1 to 0, so combining the two does hide it.
+
+> `bun test --help` is authoritative and matches the installed binary. Concepts:
+> `node_modules/bun-types/docs/test/**/*.mdx`. 1.4 changes: `migration-1.4.md`.
+
+### Test File Discovery
+
+Patterns searched (in order):
+1. `*.test.{ts,tsx,js,jsx,mts,mjs}`
+2. `*_test.{ts,tsx,js,jsx,mts,mjs}`
+3. `*.spec.{ts,tsx,js,jsx,mts,mjs}`
+4. `*_spec.{ts,tsx,js,jsx,mts,mjs}`
+5. `__tests__/**/*.{ts,tsx,js,jsx,mts,mjs}`
+
+## Parallelism & CI Sharding
+
+Speed up large suites and split work across CI runners (v1.3.13+).
+
+```bash
+# Distribute test files across worker processes (default: CPU count)
+bun test --parallel
+bun test --parallel=8
+
+# Fresh global environment per test file, same process (isolation without workers)
+bun test --isolate
+
+# Split test files across CI runners (round-robin) -- run on each runner:
+bun test --shard=1/3
+bun test --shard=2/3
+bun test --shard=3/3
+
+# Only run test files affected by your git changes
+bun test --changed
+bun test --changed=main          # since a branch/tag/commit
+bun test --changed --watch       # re-run affected tests on save
+```
+
+`--shard=M/N` matches the syntax used by Jest, Vitest, and Playwright, and is 1-based. An
+empty shard exits 0 rather than failing. Works alongside `--changed` and `--randomize`.
+
+### Balancing by Time (v1.4+)
+
+Sharding by file count leaves fast runners idle. `--timings` reads per-file durations recorded
+by a previous run and partitions by wall time instead.
+
+```bash
+bun test --parallel --timings=timings.json --update-timings   # record
+bun test --parallel --shard=1/3 --timings=timings.json        # use, per CI machine
+```
+
+Several timings files are merged, so one per CI shard works. `--parallel` starts each worker on
+its slowest file first, and files sharing imports stay together so the module cache stays warm.
+The file is written slowest-first, so it doubles as a slow-test report.
+
+### What `--isolate` Actually Does
+
+Between files, Bun creates a new `globalThis`, clears the ESM and CommonJS module registries,
+closes servers/sockets/watchers/subprocesses the file left open, cancels its timers, restores
+fake timers, and re-runs `--preload` scripts. Transpiled source and bytecode are cached at the
+process level and shared across globals, so the second file to import a module skips reading,
+transpiling, and parsing it -- only top-level code re-runs.
+
+Workers expose their 1-indexed slot as `JEST_WORKER_ID` and `BUN_TEST_WORKER_ID`, so Jest
+setups keying a database or port off `JEST_WORKER_ID` work unchanged. Preload scripts with
+top-level `await` complete before any worker starts. Coverage and JUnit output are merged
+across workers, and `--bail` stops every worker.
+
+Bun 1.4 fixed several 1.3-era `--isolate` bugs: leaked fake timers, module-scope subprocesses
+outliving the file, `process.chdir()` bleeding into the next file, leaked handles pinning the
+previous global in memory, N-API addons pointing at the old global, unresolved debugger
+breakpoints, and a GC crash during the swap between files. If `--isolate` was ruled out on
+1.3.x, it is worth retrying on 1.4.
+
+1.4.1 closes the remaining leak: files using `mock()`, `spyOn()`, `mock.module()`, or
+`Bun.plugin()` kept the previous module graph alive, so memory grew with every file (80 mocked
+files: 1.6 GB, now 215 MB). `process.env.TZ`, proxy, and TLS settings also stop carrying into
+later files, and `--parallel --coverage` no longer under-reports function coverage for files
+split across workers.
+
+## Test API
+
+### Defining Tests
+
+```typescript
+import { describe, test, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'bun:test'
+
+// Basic test
+test('description', () => {
+  expect(1 + 1).toBe(2)
+})
+
+// Alias
+it('also works', () => {
+  expect(true).toBeTruthy()
+})
+
+// Grouped tests
+describe('group', () => {
+  test('nested', () => {})
+})
+
+// Async test
+test('async', async () => {
+  const result = await fetchData()
+  expect(result).toBeDefined()
+})
+
+// Timeout per test
+test('slow test', () => {}, { timeout: 30000 })
+
+// Skip/only/todo
+test.skip('skipped', () => {})
+test.only('only this runs', () => {})
+test.todo('not implemented yet')
+
+// Conditional
+test.if(process.platform === 'darwin')('mac only', () => {})
+test.skipIf(process.env.CI)('skip in CI', () => {})
+
+// Parameterized
+test.each([
+  [1, 2, 3],
+  [2, 3, 5],
+])('add(%i, %i) = %i', (a, b, expected) => {
+  expect(a + b).toBe(expected)
+})
+```
+
+### Lifecycle Hooks
+
+```typescript
+beforeAll(() => {
+  // Runs once before all tests in this describe block
+})
+
+afterAll(() => {
+  // Runs once after all tests
+})
+
+beforeEach(() => {
+  // Runs before each test
+})
+
+afterEach(() => {
+  // Runs after each test
+})
+```
+
+All hooks support async functions. `beforeAll`/`afterAll` run once per describe block.
+
+### Matchers (expect)
+
+```typescript
+// Equality
+expect(x).toBe(y)                    // Strict equality (===)
+expect(x).toEqual(y)                 // Deep equality
+expect(x).toStrictEqual(y)           // Deep + type equality
+
+// Truthiness
+expect(x).toBeTruthy()
+expect(x).toBeFalsy()
+expect(x).toBeNull()
+expect(x).toBeUndefined()
+expect(x).toBeDefined()
+expect(x).toBeNaN()
+
+// Numbers
+expect(x).toBeGreaterThan(y)
+expect(x).toBeGreaterThanOrEqual(y)
+expect(x).toBeLessThan(y)
+expect(x).toBeLessThanOrEqual(y)
+expect(x).toBeCloseTo(y, numDigits)
+
+// Strings
+expect(str).toMatch(/regex/)
+expect(str).toMatch('substring')
+expect(str).toContain('substring')
+expect(str).toStartWith('prefix')
+expect(str).toEndWith('suffix')
+expect(str).toHaveLength(n)
+
+// Arrays/Iterables
+expect(arr).toContain(item)
+expect(arr).toContainEqual(item)     // Deep equality
+expect(arr).toHaveLength(n)
+expect(arr).toInclude(item)
+expect(arr).toIncludeAllMembers([a, b])
+expect(arr).toSatisfy(fn)
+
+// Objects
+expect(obj).toHaveProperty('key')
+expect(obj).toHaveProperty('key', value)
+expect(obj).toMatchObject(subset)
+
+// Exceptions
+expect(() => fn()).toThrow()
+expect(() => fn()).toThrow('message')
+expect(() => fn()).toThrow(/regex/)
+expect(() => fn()).toThrow(ErrorType)
+expect(asyncFn()).rejects.toThrow()
+
+// Snapshots
+expect(value).toMatchSnapshot()
+expect(value).toMatchInlineSnapshot(`expected`)
+
+// Negation
+expect(x).not.toBe(y)
+
+// Asymmetric matchers
+expect.anything()
+expect.any(Constructor)
+expect.stringContaining(str)
+expect.stringMatching(regex)
+expect.arrayContaining(arr)
+expect.objectContaining(obj)
+```
+
+### Retries and Repeats (v1.3.3+)
+
+```typescript
+test('flaky network call', async () => {
+  await fetch('https://example.com/health')
+}, { retry: 5 })
+
+test('stress', () => {
+  if (Math.random() < 0.1) throw new Error('uh oh')
+}, { repeats: 20 })
+```
+
+`{ retry: n }` re-runs a failing test up to `n` times. `{ repeats: n }` runs it `n` **more**
+times after the initial run -- `repeats: 20` is 21 executions -- and fails if any run fails.
+`bun test --retry <N>` sets a suite-wide default.
+
+Lifecycle hooks (`beforeAll`, `beforeEach`, `afterAll`, `afterEach`) accept a numeric timeout
+or `{ timeout }` as their second argument (v1.3.2+) instead of throwing.
+
+## Mocking
+
+**Changed in 1.4 -- `resetAllMocks()` drops implementations.** `jest.resetAllMocks()` and
+`vi.resetAllMocks()` now reset each mock's implementation as well as its call history, matching
+Jest. After a reset, `jest.fn(() => 42)` returns `undefined`, and a `spyOn()` spy returns
+`undefined` until `mockRestore()`. On 1.3.x they behaved like `clearAllMocks()`.
+
+```typescript
+afterEach(() => {
+  jest.clearAllMocks()    // history only -- what the 1.3 resetAllMocks() did
+})
+```
+
+**Changed in 1.4 -- `toContain()` uses `===`**, not `Object.is`, matching Jest. So
+`expect([-0]).toContain(0)` passes and `expect([NaN]).toContain(NaN)` fails. `toBe()` still uses
+`Object.is`, and `toContainEqual()` still uses deep equality. For NaN membership:
+
+```typescript
+expect([...values].some(Number.isNaN)).toBe(true)
+```
+
+`spyOn()` and `mock()` implement `Symbol.dispose` (v1.3.9+), so `using spy = spyOn(obj, 'm')`
+restores the original at scope exit -- no `mockRestore()` or `afterEach` needed. The `vi`
+global is defined without importing (v1.3.1+).
+
+```typescript
+import { mock, spyOn, jest } from 'bun:test'
+import { foo } from './module'   // imported before mocking -- the async-factory case below
+
+// Mock function
+const fn = mock(() => 42)
+fn()
+expect(fn).toHaveBeenCalled()
+expect(fn).toHaveBeenCalledTimes(1)
+expect(fn).toHaveBeenCalledWith(/* args */)
+expect(fn).toHaveReturnedWith(42)
+
+// Spy on existing method
+const spy = spyOn(object, 'method')
+spy.mockReturnValue(42)
+spy.mockResolvedValue(42)
+spy.mockImplementation(() => 42)
+
+// Module mocking
+mock.module('module-name', () => ({
+  default: 42,
+  namedExport: 'mocked',
+}))
+
+// Async factory for ./module, already imported above: returns a promise that resolves once
+// `foo` is replaced (v1.4.3+; it spun at 100% CPU before). await it in a test or hook.
+await mock.module('./module', async () => ({ foo: (await import('./fixture.json')).default.foo }))
+
+// Timer mocking (jest-compatible API)
+jest.useFakeTimers()
+jest.advanceTimersByTime(1000)
+jest.runAllTimers()
+jest.useRealTimers()
+
+// Reset
+mock.restore()        // Restore all mocks
+fn.mockClear()        // Clear call history
+fn.mockReset()        // Clear history + implementation
+fn.mockRestore()      // Restore original
+```
+
+## Fake Timers (vi API)
+
+Bun also supports a Vitest-compatible `vi` API for fake timers, offering finer control over time-dependent code.
+
+```typescript
+import { vi, test, expect } from 'bun:test'
+
+test('fake timers with vi API', () => {
+  vi.useFakeTimers()
+
+  let called = false
+  setTimeout(() => { called = true }, 1000)
+
+  // Advance time
+  vi.advanceTimersByTime(1000)
+  expect(called).toBe(true)
+
+  vi.useRealTimers()
+})
+
+test('set system time', () => {
+  vi.useFakeTimers()
+
+  // Set a specific date/time
+  vi.setSystemTime(new Date('2025-01-01T00:00:00Z'))
+  expect(new Date().toISOString()).toBe('2025-01-01T00:00:00.000Z')
+
+  vi.useRealTimers()
+})
+```
+
+### vi Fake Timer Methods
+
+| Method | Description |
+|---|---|
+| `vi.useFakeTimers()` | Replace global timers with fakes |
+| `vi.useRealTimers()` | Restore original timers |
+| `vi.advanceTimersByTime(ms)` | Advance all timers by ms |
+| `vi.runAllTimers()` | Run all pending timers |
+| `vi.runOnlyPendingTimers()` | Run only currently pending timers |
+| `vi.setSystemTime(date)` | Set fake system time |
+| `vi.getTimerCount()` | Number of pending timers |
+| `vi.clearAllTimers()` | Clear all pending timers |
+
+Both `jest.*` and `vi.*` timer APIs are available. Use whichever matches your project's conventions.
+
+## onTestFinished Hook
+
+Run cleanup code after each individual test completes, regardless of pass/fail. Useful for teardown that depends on per-test setup done inside the test body.
+
+```typescript
+import { test, onTestFinished } from 'bun:test'
+
+test('cleanup after test', () => {
+  const resource = acquireResource()
+
+  // Runs after this test completes (after all afterEach hooks)
+  onTestFinished(() => {
+    resource.release()
+  })
+})
+```
+
+`onTestFinished` is scoped to the test it's called in. Multiple callbacks can be registered and they run in reverse order (LIFO). Not supported in concurrent tests -- use `test.serial` instead.
+
+## Coverage Configuration
+
+In `bunfig.toml`:
+```toml
+[test]
+coverage = true
+coverageReporter = ["text", "lcov"]
+coverageDir = "./coverage"
+
+# Fractions 0-1, PLURAL keys. Singular keys (line/function) are silently ignored -- the
+# gate never fires. `statements` is accepted but not enforced. A bare number
+# (coverageThreshold = 0.8) sets lines and functions at once.
+coverageThreshold = { lines = 0.8, functions = 0.8 }
+
+# Ignore patterns for coverage
+coveragePathIgnorePatterns = ["node_modules", "test", "**/*.test.ts"]
+```
+
+Or via CLI:
+```bash
+bun test --coverage --coverage-reporter lcov --coverage-dir ./coverage
+```
+
+## Test Configuration in bunfig.toml
+
+```toml
+[test]
+# Test runner options
+root = "./"                     # Root directory for test discovery
+preload = ["./setup.ts"]        # Scripts to run before tests
+timeout = 5000                  # Default test timeout (ms)
+bail = 0                        # Stop after N failures (0 = no limit)
+rerunEach = 1                   # Run each test N times
+smol = false                    # Reduce memory usage
+
+# Coverage
+coverage = false
+coverageReporter = ["text"]     # "text" and/or "lcov" -- "json" is rejected
+coverageDir = "./coverage"
+coveragePathIgnorePatterns = []
+
+# Discovery
+pathIgnorePatterns = ["**/e2e/**"]   # Exclude test files by glob (v1.3.11+)
+```
+
+`bunfig.toml` is strict TOML as of v1.4 -- every string value must be quoted, or Bun fails at
+startup with a `SyntaxError`.

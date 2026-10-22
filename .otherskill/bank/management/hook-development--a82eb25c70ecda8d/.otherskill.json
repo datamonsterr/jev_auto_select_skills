@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "logicalId": "a82eb25c70ecda8d4a7d559794845af42e7727e79430b498c57d746b7d28bdf7",
+  "source": "https://github.com/anthropics/claude-plugins-official/tree/main/plugins/plugin-dev/skills/hook-development",
+  "ref": "main",
+  "revision": "af59ee3a1051a29dda4a2e7a2af221aa457ae08b",
+  "category": "management",
+  "installedAt": "2026-10-22T07:32:34.256Z"
+}

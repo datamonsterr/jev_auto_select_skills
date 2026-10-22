@@ -1,0 +1,251 @@
+# Hashing Reference
+
+> Full API: `node_modules/bun-types/docs/runtime/hashing.mdx`.
+
+**Changed in 1.4 -- `Bun.password` argon2.** `hash()` with argon2 requires `memoryCost` of at
+least 8 and throws on out-of-range `cost`, `timeCost`, or `memoryCost` values that were
+previously wrapped or truncated into range. Hashes produced by Bun 1.3 with a lower
+`memoryCost` still verify. `Bun.CryptoHasher#update()` now throws on odd-length hex input.
+
+## Post-Quantum Algorithms (v1.4+)
+
+> Documented in `docs/runtime/nodejs-compat.mdx` (`node:crypto` and `SubtleCrypto`
+> sections), not `hashing.mdx`.
+
+NIST ML-DSA (FIPS 204 signatures, parameter sets 44/65/87) and ML-KEM (FIPS 203 key
+encapsulation, 768/1024) are available in Web Crypto. `node:crypto` covers ML-DSA
+sign/verify and ML-KEM key generation/import, but has no `encapsulate`/`decapsulate` --
+encapsulation goes through `crypto.subtle`, even for keys created with `node:crypto`.
+
+```typescript
+// Web Crypto -- key encapsulation
+const { publicKey, privateKey } = await crypto.subtle.generateKey(
+  'ML-KEM-768', true, ['encapsulateBits', 'decapsulateBits'],
+)
+const { sharedKey, ciphertext } = await crypto.subtle.encapsulateBits({ name: 'ML-KEM-768' }, publicKey)
+const secret = await crypto.subtle.decapsulateBits({ name: 'ML-KEM-768' }, privateKey, ciphertext)
+
+// node:crypto -- signatures
+import { generateKeyPairSync, sign, verify } from 'node:crypto'
+const keys = generateKeyPairSync('ml-dsa-65')
+const sig = sign(undefined, Buffer.from('hello'), keys.privateKey)
+verify(undefined, Buffer.from('hello'), keys.publicKey, sig)   // true
+```
+
+`SubtleCrypto` gains `encapsulateBits`, `encapsulateKey`, `decapsulateBits`, and
+`decapsulateKey`. Keys import/export as `spki`, `pkcs8`, `jwk` (`kty: "AKP"`), `raw-public`,
+and `raw-seed`, and survive `structuredClone`. ML-KEM-512 and SLH-DSA are not available yet.
+
+## Bun.hash (Non-Cryptographic)
+
+Fast hashing for non-security purposes: hash tables, checksums, deduplication, content fingerprinting.
+
+```typescript
+// Default: wyhash (fastest general-purpose hash)
+Bun.hash(input: string | Uint8Array | ArrayBuffer): number
+Bun.hash(input, seed: number): number
+```
+
+### Named Algorithms
+
+```typescript
+Bun.hash.wyhash(input: string | Uint8Array, seed?: number): number
+Bun.hash.crc32(input: string | Uint8Array): number
+Bun.hash.adler32(input: string | Uint8Array): number
+Bun.hash.cityHash32(input: string | Uint8Array, seed?: number): number
+Bun.hash.cityHash64(input: string | Uint8Array, seed?: number): bigint
+Bun.hash.murmur32v3(input: string | Uint8Array, seed?: number): number
+Bun.hash.murmur64v2(input: string | Uint8Array, seed?: number): bigint
+```
+
+### Algorithm Selection Guide
+
+| Algorithm | Output | Speed | Use Case |
+|-----------|--------|-------|----------|
+| `wyhash` (default) | 64-bit number | Fastest | General hash tables, dedup |
+| `crc32` | 32-bit number | Fast | Checksums, compatibility |
+| `adler32` | 32-bit number | Fast | Checksums (used in zlib) |
+| `cityHash32` | 32-bit number | Fast | Hash tables |
+| `cityHash64` | 64-bit bigint | Fast | Hash tables, fingerprinting |
+| `murmur32v3` | 32-bit number | Fast | Distributed systems |
+| `murmur64v2` | 64-bit bigint | Fast | Distributed systems |
+
+### Examples
+
+```typescript
+// Content deduplication
+const hash = Bun.hash(await Bun.file('data.bin').arrayBuffer())
+
+// Consistent hashing with seed
+const shard = Bun.hash(key, 42) % numShards
+
+// CRC32 checksum
+const checksum = Bun.hash.crc32(content)
+```
+
+## Bun.CryptoHasher
+
+Streaming cryptographic hash computation.
+
+```typescript
+const hasher = new Bun.CryptoHasher(algorithm: string)
+```
+
+### Algorithms
+
+`'sha1'`, `'sha224'`, `'sha256'`, `'sha384'`, `'sha512'`, `'sha512-224'`, `'sha512-256'`, `'sha3-224'`, `'sha3-256'`, `'sha3-384'`, `'sha3-512'`, `'shake128'`, `'shake256'`, `'md4'`, `'md5'`, `'ripemd160'`, `'blake2b256'`, `'blake2b512'`, `'blake2s256'`
+
+SHA3 (`'sha3-*'`) and SHAKE (`'shake128'`/`'shake256'`) require Bun v1.3.13+. The same SHA3 variants are also available through Node's `crypto.createHash('sha3-256')` and WebCrypto `crypto.subtle.digest('SHA3-256', data)`. WebCrypto also gained X25519 key agreement via `crypto.subtle.deriveBits()` (v1.3.13+).
+
+### Interface
+
+```typescript
+interface CryptoHasher {
+  update(data: string | Uint8Array | ArrayBuffer): CryptoHasher  // Chainable
+  digest(): Uint8Array
+  digest(encoding: 'hex' | 'base64'): string
+  copy(): CryptoHasher          // Clone current state
+
+  readonly algorithm: string
+  readonly byteLength: number   // Hash output size in bytes
+}
+```
+
+### One-Shot Hashing
+
+```typescript
+// SHA-256 hex digest
+new Bun.CryptoHasher('sha256').update('data').digest('hex')
+
+// MD5 (for compatibility, not security)
+new Bun.CryptoHasher('md5').update(content).digest('hex')
+
+// Base64 output
+new Bun.CryptoHasher('sha256').update('data').digest('base64')
+```
+
+### Streaming (Large Files)
+
+```typescript
+const hasher = new Bun.CryptoHasher('sha256')
+const stream = Bun.file('large-file.bin').stream()
+
+for await (const chunk of stream) {
+  hasher.update(chunk)
+}
+
+const hash = hasher.digest('hex')
+```
+
+### File Checksum Helper
+
+```typescript
+async function sha256(path: string): Promise<string> {
+  const hasher = new Bun.CryptoHasher('sha256')
+  for await (const chunk of Bun.file(path).stream()) {
+    hasher.update(chunk)
+  }
+  return hasher.digest('hex')
+}
+```
+
+### Forking State
+
+```typescript
+const base = new Bun.CryptoHasher('sha256')
+base.update('shared prefix')
+
+const fork1 = base.copy()
+fork1.update(' branch A')
+const hash1 = fork1.digest('hex')
+
+const fork2 = base.copy()
+fork2.update(' branch B')
+const hash2 = fork2.digest('hex')
+```
+
+## Bun.password
+
+Password hashing with bcrypt or argon2. Replaces `bcrypt` and `argon2` npm packages.
+
+### Async (Recommended)
+
+```typescript
+Bun.password.hash(password: string, options?: PasswordHashOptions): Promise<string>
+Bun.password.verify(password: string, hash: string): Promise<boolean>
+```
+
+### Sync
+
+```typescript
+Bun.password.hashSync(password: string, options?: PasswordHashOptions): string
+Bun.password.verifySync(password: string, hash: string): boolean
+```
+
+### Bcrypt (Default)
+
+```typescript
+const hash = await Bun.password.hash('password')
+// Or explicitly:
+const hash = await Bun.password.hash('password', {
+  algorithm: 'bcrypt',
+  cost: 10,              // Rounds: 4-31 (default: 10)
+})
+
+const valid = await Bun.password.verify('password', hash)  // true/false
+```
+
+### Argon2id (Recommended for New Projects)
+
+```typescript
+const hash = await Bun.password.hash('password', {
+  algorithm: 'argon2id',
+  memoryCost: 65536,     // KiB (default: 65536 = 64 MB)
+  timeCost: 2,           // Iterations (default: 2)
+})
+```
+
+### Argon2 Variants
+
+| Algorithm | Use Case |
+|-----------|----------|
+| `argon2id` | Recommended default — hybrid (resists side-channel + GPU attacks) |
+| `argon2i` | Side-channel resistant (use when timing attacks are the primary concern) |
+| `argon2d` | GPU-resistant (faster, but vulnerable to side-channel attacks) |
+
+### Raw Argon2 via node:crypto (v1.4.1+)
+
+`Bun.password` produces self-describing strings: PHC format for Argon2, Modular Crypt Format
+(`$2b$...`) for bcrypt. For a raw Argon2 tag -- verifying a hash another
+system stored as bytes, or deriving a key -- `node:crypto` implements Node's `argon2Sync()` and
+callback-style `argon2()`; both threw `ERR_CRYPTO_ARGON2_NOT_SUPPORTED` before 1.4.1. Output
+matches Node byte-for-byte; `argon2d`, `argon2i`, and `argon2id` are supported, and the async
+form runs on the thread pool. There is no `crypto.promises.argon2` -- promisify it.
+
+```typescript
+import { argon2, argon2Sync, randomBytes } from 'node:crypto'
+import { promisify } from 'node:util'
+
+const params = {
+  message: 'password',
+  nonce: randomBytes(16),  // >= 8 bytes; string or Buffer -- store it next to the tag
+  parallelism: 1,
+  tagLength: 32,        // output bytes
+  memory: 65536,        // KiB
+  passes: 3,
+}
+const tag = argon2Sync('argon2id', params)            // Buffer(32)
+const same = await promisify(argon2)('argon2id', params)
+```
+
+### Verify Auto-Detects Algorithm
+
+`Bun.password.verify()` automatically detects the algorithm from the hash string — you don't need to specify it:
+
+```typescript
+const bcryptHash = await Bun.password.hash('pw')
+const argonHash = await Bun.password.hash('pw', { algorithm: 'argon2id' })
+
+await Bun.password.verify('pw', bcryptHash)  // true (detects bcrypt)
+await Bun.password.verify('pw', argonHash)   // true (detects argon2)
+```

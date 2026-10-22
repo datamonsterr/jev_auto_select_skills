@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "logicalId": "2ed05c7ba5dd764fc76c5b82502cf73447db1b83a3e36f2bfaa97bfab2a96a36",
+  "source": "https://github.com/dmythro/agent-skills/tree/main/skills/bun-api",
+  "ref": "main",
+  "revision": "18e3101b8e0cf16b1f793ebdc2522e8a8ac9a399",
+  "category": "backend",
+  "installedAt": "2026-10-22T07:32:22.973Z"
+}
