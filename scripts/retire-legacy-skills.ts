@@ -95,7 +95,7 @@ export async function retireLegacySkills(options: {
   };
   fs.writeFileSync(
     result.manifestPath,
-    JSON.stringify(manifest, null, 2) + "\n",
+    `${JSON.stringify(manifest, null, 2)}\n`,
     { mode: 0o600 },
   );
   try {
@@ -106,7 +106,7 @@ export async function retireLegacySkills(options: {
     manifest.status = "complete";
     fs.writeFileSync(
       result.manifestPath,
-      JSON.stringify(manifest, null, 2) + "\n",
+      `${JSON.stringify(manifest, null, 2)}\n`,
       { mode: 0o600 },
     );
   } catch (error) {

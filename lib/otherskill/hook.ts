@@ -74,9 +74,7 @@ export function hookInput(
             );
             return { prompt: match?.[1] ?? entry.content, cwd, skip: false };
           }
-        } catch {
-          continue;
-        }
+        } catch {}
       }
     } catch {
       /* Empty context on unavailable transcript. */

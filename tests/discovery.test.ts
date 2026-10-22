@@ -2,11 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import {
-  resolveSkillsSearchPaths,
-  resolveSkillsBankPath,
-  loadSkillsFromDir,
-} from "../index";
+import { resolveSkillsSearchPaths, loadSkillsFromDir } from "../index";
 
 describe("Skills Bank discovery and search precedence", () => {
   const origEnv = { ...process.env };

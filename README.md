@@ -61,11 +61,11 @@ bun otherskill.ts setup --non-interactive --agent codex --scope project \
 
 Setup preserves unrelated native settings, hooks and skills. It refuses malformed config, unowned launcher/adapter collisions, modified companions and pre-existing native bank exposure. `--no-companion` installs only hooks. It never moves/removes native skills or exposes the bank through links or `skills.paths`.
 
-| Harness | Global hook/adapter | Project hook/adapter | Companion relative to scope root |
-| --- | --- | --- | --- |
-| Claude | `~/.claude/settings.json` | `.claude/settings.json` | `.claude/skills/use-otherskill/SKILL.md` |
-| Codex | `~/.codex/hooks.json` | `.codex/hooks.json` | `.agents/skills/use-otherskill/SKILL.md` |
-| Antigravity | `~/.gemini/config/hooks.json` | `.agents/hooks.json` | `.agents/skills/use-otherskill/SKILL.md` |
+| Harness      | Global hook/adapter                        | Project hook/adapter              | Companion relative to scope root         |
+| ------------ | ------------------------------------------ | --------------------------------- | ---------------------------------------- |
+| Claude       | `~/.claude/settings.json`                  | `.claude/settings.json`           | `.claude/skills/use-otherskill/SKILL.md` |
+| Codex        | `~/.codex/hooks.json`                      | `.codex/hooks.json`               | `.agents/skills/use-otherskill/SKILL.md` |
+| Antigravity  | `~/.gemini/config/hooks.json`              | `.agents/hooks.json`              | `.agents/skills/use-otherskill/SKILL.md` |
 | OpenCode 1.x | `~/.config/opencode/plugins/otherskill.ts` | `.opencode/plugins/otherskill.ts` | `.agents/skills/use-otherskill/SKILL.md` |
 
 All generated integrations use the same launcher and **`find --agent <harness>`**. Claude/Codex `UserPromptSubmit` hooks read native stdin payloads. Codex may require trust review through `/hooks`. Antigravity uses a named `PreInvocation` group, skips repeated invocations, and reads the original request from the supplied transcript when needed. OpenCode uses `experimental.chat.messages.transform`, appends a synthetic text part, caches per user message and passes the prompt through a subprocess argument array. Global hooks honor the event workspace's config; project hooks pin project config explicitly.

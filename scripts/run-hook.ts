@@ -4,7 +4,12 @@ import { handleClaudeHook } from "../hooks/claude";
 import { handleAntigravityHook } from "../hooks/antigravity";
 import { selectSkills } from "../index";
 
-export type HookEnvironment = "codex" | "claude" | "opencode" | "antigravity" | "cli";
+export type HookEnvironment =
+  | "codex"
+  | "claude"
+  | "opencode"
+  | "antigravity"
+  | "cli";
 
 /**
  * Detect runtime caller environment
@@ -12,13 +17,19 @@ export type HookEnvironment = "codex" | "claude" | "opencode" | "antigravity" | 
 export function detectEnvironment(
   argv: string[] = process.argv,
   env: NodeJS.ProcessEnv = process.env,
-  rawInput: string = ""
+  rawInput: string = "",
 ): HookEnvironment {
   // Check CLI flag override
   for (const arg of argv) {
     if (arg.startsWith("--mode=")) {
       const mode = arg.split("=")[1]?.toLowerCase();
-      if (mode === "codex" || mode === "claude" || mode === "opencode" || mode === "antigravity" || mode === "cli") {
+      if (
+        mode === "codex" ||
+        mode === "claude" ||
+        mode === "opencode" ||
+        mode === "antigravity" ||
+        mode === "cli"
+      ) {
         return mode as HookEnvironment;
       }
     }
@@ -39,10 +50,14 @@ export function detectEnvironment(
   }
 
   // Probe raw input for Antigravity-specific JSON keys
-  if (rawInput && rawInput.trim().startsWith("{")) {
+  if (rawInput?.trim().startsWith("{")) {
     try {
       const parsed = JSON.parse(rawInput);
-      if ("invocationNum" in parsed || "transcriptPath" in parsed || "artifactDirectoryPath" in parsed) {
+      if (
+        "invocationNum" in parsed ||
+        "transcriptPath" in parsed ||
+        "artifactDirectoryPath" in parsed
+      ) {
         return "antigravity";
       }
     } catch {}
@@ -56,9 +71,10 @@ export function detectEnvironment(
  */
 export async function runHookDispatcher(
   input: string,
-  env?: HookEnvironment
+  env?: HookEnvironment,
 ): Promise<string> {
-  const resolvedEnv = env || detectEnvironment(process.argv, process.env, input);
+  const resolvedEnv =
+    env || detectEnvironment(process.argv, process.env, input);
   switch (resolvedEnv) {
     case "antigravity": {
       const res = await handleAntigravityHook(input);
@@ -73,12 +89,15 @@ export async function runHookDispatcher(
     }
     case "opencode": {
       const res = await selectSkills({ userPrompt: input });
-      return JSON.stringify({
-        primarySkill: res.primarySkill,
-        skills: res.selectedSkills,
-      }, null, 2);
+      return JSON.stringify(
+        {
+          primarySkill: res.primarySkill,
+          skills: res.selectedSkills,
+        },
+        null,
+        2,
+      );
     }
-    case "cli":
     default: {
       const res = await selectSkills({ userPrompt: input });
       return JSON.stringify(res, null, 2);
@@ -98,7 +117,10 @@ if (import.meta.main) {
       input = Buffer.concat(chunks).toString("utf-8").trim();
     } else {
       // Collect non-flag arguments
-      input = process.argv.slice(2).filter((a) => !a.startsWith("--")).join(" ");
+      input = process.argv
+        .slice(2)
+        .filter((a) => !a.startsWith("--"))
+        .join(" ");
     }
 
     const env = detectEnvironment(process.argv, process.env, input);

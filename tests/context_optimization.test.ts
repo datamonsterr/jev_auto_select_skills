@@ -46,8 +46,7 @@ describe("Context optimization and injection formatting", () => {
   });
 
   it("does not silently truncate mandatory skill instructions when content is rendered", () => {
-    const longInstructions =
-      "Step A\n" + "x".repeat(3000) + "\nStep Z: Mandatory final verification";
+    const longInstructions = `Step A\n${"x".repeat(3000)}\nStep Z: Mandatory final verification`;
     const skillWithLongInstructions: SelectedSkill[] = [
       {
         name: "verification",

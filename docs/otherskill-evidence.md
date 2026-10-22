@@ -12,15 +12,15 @@ A baseline legacy setup test generated a checkout-local `.env` identical to the 
 
 System `/tmp` reached the user's tmpfs quota (`EDQUOT`) during temporary-fixture writes. Verification uses a writable checkout-local ignored `.tmp` via `TMPDIR`; no unrelated temporary files were removed.
 
-| Command | Measured result |
-| --- | --- |
-| `bun install --frozen-lockfile` | Passed; 18 installs across 19 packages checked |
-| `TMPDIR="$PWD/.tmp" bun test tests/` | 115 passed, 0 failed; 115 collected/executed test cases across 25 files |
-| `bunx tsc --noEmit` | Passed, no errors |
-| `bun run build` | Passed, Bun-target CLI bundle in ignored `.tmp` |
-| `TMPDIR="$PWD/.tmp" python3 scripts/smoke-interactive.py` | Actual PTY setup/config menus passed; synthetic key absent from captured output; mode 0600; project Codex and global Claude scopes verified |
+| Command                                                    | Measured result                                                                                                                                                                          |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bun install --frozen-lockfile`                            | Passed; 18 installs across 19 packages checked                                                                                                                                           |
+| `TMPDIR="$PWD/.tmp" bun test tests/`                       | 115 passed, 0 failed; 115 collected/executed test cases across 25 files                                                                                                                  |
+| `bunx tsc --noEmit`                                        | Passed, no errors                                                                                                                                                                        |
+| `bun run build`                                            | Passed, Bun-target CLI bundle in ignored `.tmp`                                                                                                                                          |
+| `TMPDIR="$PWD/.tmp" python3 scripts/smoke-interactive.py`  | Actual PTY setup/config menus passed; synthetic key absent from captured output; mode 0600; project Codex and global Claude scopes verified                                              |
 | `TMPDIR="$PWD/.tmp" bun test tests/otherskill-cli.test.ts` | Isolated subprocess workflows for help/setup/add/find/config and all exposed management/routing aliases; repeated setup, settings/hooks/skills preservation and malformed-config refusal |
-| `git diff --check` | Passed |
+| `git diff --check`                                         | Passed                                                                                                                                                                                   |
 
 There was no baseline lint script. OtherSkill source formatting is checked with `bunx prettier@3.6.2 --check` over the changed OtherSkill source/tests; no skill prose is formatted or edited.
 
@@ -28,27 +28,27 @@ The test totals above count collected/executed test cases rather than commands/C
 
 ## Requirement evidence map
 
-| Requirement | Implementation and behavioral evidence |
-| --- | --- |
-| Canonical setup/add/find/config; correct aliases/help | `otherskill.ts`; `tests/otherskill-cli.test.ts` executes real subprocess commands, with a controlled HTTP preload for successful model cases |
-| Interactive harness/scope/key/model/category choices | `lib/otherskill/menu.ts`; `scripts/smoke-interactive.py` uses PTY input/output and reloads persisted settings |
-| Secure key storage; no project key or echo | `lib/otherskill/credentials.ts`; CLI tests assert synthetic key never reaches output/config, file mode 0600; PTY smoke verifies hidden entry |
-| Explicit/project/global/default precedence | `lib/otherskill/config.ts`; precedence test covers nearest ancestor, explicit override, global scope bypass and global fallback |
-| Config-defined nested taxonomy and safety | Config tests cover stable nested IDs, duplicates/traversal, paid models/fallback arrays, native overlap and symlink aliases |
-| Every matching category gets a complete tree | `lib/otherskill/bank.ts`; bank test checks nested references, executable scripts, licenses, multiple matches and repeatability |
-| Same-name copies remain scoped | Bank and routing tests verify distinct sources survive, category instance identities differ and same logical imports deduplicate only at injection |
-| Full prompt and all descriptions, 1+N, genuine concurrency | Routing tests inspect request payloads, use a two-request barrier, verify 3 calls for 2 categories and verify concurrency cap 2 across 5 category calls |
-| No silent candidate/context/result truncation | Routing tests assert explicit failure before category requests when candidates/context exceed limits and safe failure when result limits overflow |
-| Free default/overrides/retries/response validation | Config and routing tests reject paid chains/overrides, bound HTTP retries, avoid retrying permanent errors, reject unknown choices and invalid distributions |
-| Partial/error responses never invent selections | Routing tests verify empty stage-one failure and explicit partial status with only validated successful categories; upstream text is absent from diagnostics |
-| Native hidden bank and only companion installed | Setup uses `.claude/skills/use-otherskill` or `.agents/skills/use-otherskill`; tests verify global/project adapters without `skills.paths`; native symlink/config exposure is refused |
-| Explicit harness and non-blocking hook protocols | Adapter and CLI tests verify all four empty-output protocols, original stdin prompt extraction, Antigravity transcript and invocation guards |
-| OpenCode native API and safe prompt transport | Adapter test checks literal argument transport, synthetic context, per-message cache and repeated transformations; no shell interpolation |
-| Idempotent setup/preservation/malformed refusal | CLI/setup tests preserve unrelated native skill bytes, hook groups and settings; repeated installation does not duplicate hooks; malformed config remains unchanged |
-| Doctor detects stale installations | Adapter test modifies the temporary managed launcher and verifies source-path mismatch diagnostics |
-| Online source/ref/path validation and real search | Bank tests reject ref/path injection and traversal; real GitHub search/import observations below |
-| Destructive setup retired | Shell/PowerShell scripts are thin canonical CLI wrappers; legacy programmatic setup delegates to safe setup; neither consolidates native skills |
-| Companion authorship | Orchestrator's `examples/polly/skills/use-otherskill/SKILL.md` included unchanged; SHA256 `e7138a1cfe8a198d634138eddf94b23a10b4757aa204e2c7b08e3572f74aed0b` |
+| Requirement                                                | Implementation and behavioral evidence                                                                                                                                                |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Canonical setup/add/find/config; correct aliases/help      | `otherskill.ts`; `tests/otherskill-cli.test.ts` executes real subprocess commands, with a controlled HTTP preload for successful model cases                                          |
+| Interactive harness/scope/key/model/category choices       | `lib/otherskill/menu.ts`; `scripts/smoke-interactive.py` uses PTY input/output and reloads persisted settings                                                                         |
+| Secure key storage; no project key or echo                 | `lib/otherskill/credentials.ts`; CLI tests assert synthetic key never reaches output/config, file mode 0600; PTY smoke verifies hidden entry                                          |
+| Explicit/project/global/default precedence                 | `lib/otherskill/config.ts`; precedence test covers nearest ancestor, explicit override, global scope bypass and global fallback                                                       |
+| Config-defined nested taxonomy and safety                  | Config tests cover stable nested IDs, duplicates/traversal, paid models/fallback arrays, native overlap and symlink aliases                                                           |
+| Every matching category gets a complete tree               | `lib/otherskill/bank.ts`; bank test checks nested references, executable scripts, licenses, multiple matches and repeatability                                                        |
+| Same-name copies remain scoped                             | Bank and routing tests verify distinct sources survive, category instance identities differ and same logical imports deduplicate only at injection                                    |
+| Full prompt and all descriptions, 1+N, genuine concurrency | Routing tests inspect request payloads, use a two-request barrier, verify 3 calls for 2 categories and verify concurrency cap 2 across 5 category calls                               |
+| No silent candidate/context/result truncation              | Routing tests assert explicit failure before category requests when candidates/context exceed limits and safe failure when result limits overflow                                     |
+| Free default/overrides/retries/response validation         | Config and routing tests reject paid chains/overrides, bound HTTP retries, avoid retrying permanent errors, reject unknown choices and invalid distributions                          |
+| Partial/error responses never invent selections            | Routing tests verify empty stage-one failure and explicit partial status with only validated successful categories; upstream text is absent from diagnostics                          |
+| Native hidden bank and only companion installed            | Setup uses `.claude/skills/use-otherskill` or `.agents/skills/use-otherskill`; tests verify global/project adapters without `skills.paths`; native symlink/config exposure is refused |
+| Explicit harness and non-blocking hook protocols           | Adapter and CLI tests verify all four empty-output protocols, original stdin prompt extraction, Antigravity transcript and invocation guards                                          |
+| OpenCode native API and safe prompt transport              | Adapter test checks literal argument transport, synthetic context, per-message cache and repeated transformations; no shell interpolation                                             |
+| Idempotent setup/preservation/malformed refusal            | CLI/setup tests preserve unrelated native skill bytes, hook groups and settings; repeated installation does not duplicate hooks; malformed config remains unchanged                   |
+| Doctor detects stale installations                         | Adapter test modifies the temporary managed launcher and verifies source-path mismatch diagnostics                                                                                    |
+| Online source/ref/path validation and real search          | Bank tests reject ref/path injection and traversal; real GitHub search/import observations below                                                                                      |
+| Destructive setup retired                                  | Shell/PowerShell scripts are thin canonical CLI wrappers; legacy programmatic setup delegates to safe setup; neither consolidates native skills                                       |
+| Companion authorship                                       | Orchestrator's `examples/polly/skills/use-otherskill/SKILL.md` included unchanged; SHA256 `e7138a1cfe8a198d634138eddf94b23a10b4757aa204e2c7b08e3572f74aed0b`                          |
 
 ## Live evidence and limits (2026-10-22 UTC)
 

@@ -11,23 +11,23 @@ Reviewed on 2026-10-22. Each source is a real skill with YAML `name` and
 `description`, substantial instructions and supporting material. Licenses are
 included beside each imported `SKILL.md`; upstream content is preserved verbatim.
 
-| Skill | Category | Source | License | Why it fits |
-| --- | --- | --- | --- | --- |
-| `crafting-effective-readmes` | `docs` | [softaworks/agent-toolkit](https://github.com/softaworks/agent-toolkit/tree/main/skills/crafting-effective-readmes) | MIT | Audience-specific README templates, installation/usage sections, review checklists and prose guidance. |
-| `bun-cli` | `backend` | [dmythro/agent-skills](https://github.com/dmythro/agent-skills/tree/main/skills/bun-cli) | MIT | Bun package management, `bun test`, bundling and standalone CLI executables, with version checks and references. |
-| `bun-api` | `backend` | [dmythro/agent-skills](https://github.com/dmythro/agent-skills/tree/main/skills/bun-api) | MIT | Bun runtime APIs for CLI implementation: arguments, file I/O, subprocesses, environment and a CLI script template. Complements `bun-cli`. |
-| `openrouter` | `backend` | [nateslabach/skills](https://github.com/nateslabach/skills/tree/main/skills/openrouter) | MIT | API authentication, model discovery, provider routing, structured outputs and diagnostic metadata; includes live catalog helpers. |
-| `skill-creator` | `management` | [anthropics/skills](https://github.com/anthropics/skills/tree/main/skills/skill-creator) | Apache-2.0 | Authoring skills, improving descriptions for routing, constructing eval prompts and measuring selection behavior. |
-| `hook-development` | `management` | [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/plugin-dev/skills/hook-development) | Apache-2.0 | Claude Code hook authoring, including `UserPromptSubmit`, payload handling, validation scripts and examples. |
+| Skill                        | Category     | Source                                                                                                                                           | License    | Why it fits                                                                                                                               |
+| ---------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `crafting-effective-readmes` | `docs`       | [softaworks/agent-toolkit](https://github.com/softaworks/agent-toolkit/tree/main/skills/crafting-effective-readmes)                              | MIT        | Audience-specific README templates, installation/usage sections, review checklists and prose guidance.                                    |
+| `bun-cli`                    | `backend`    | [dmythro/agent-skills](https://github.com/dmythro/agent-skills/tree/main/skills/bun-cli)                                                         | MIT        | Bun package management, `bun test`, bundling and standalone CLI executables, with version checks and references.                          |
+| `bun-api`                    | `backend`    | [dmythro/agent-skills](https://github.com/dmythro/agent-skills/tree/main/skills/bun-api)                                                         | MIT        | Bun runtime APIs for CLI implementation: arguments, file I/O, subprocesses, environment and a CLI script template. Complements `bun-cli`. |
+| `openrouter`                 | `backend`    | [nateslabach/skills](https://github.com/nateslabach/skills/tree/main/skills/openrouter)                                                          | MIT        | API authentication, model discovery, provider routing, structured outputs and diagnostic metadata; includes live catalog helpers.         |
+| `skill-creator`              | `management` | [anthropics/skills](https://github.com/anthropics/skills/tree/main/skills/skill-creator)                                                         | Apache-2.0 | Authoring skills, improving descriptions for routing, constructing eval prompts and measuring selection behavior.                         |
+| `hook-development`           | `management` | [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/plugin-dev/skills/hook-development) | Apache-2.0 | Claude Code hook authoring, including `UserPromptSubmit`, payload handling, validation scripts and examples.                              |
 
 Imported revisions and upstream commit dates:
 
-| Repository | Revision | Date |
-| --- | --- | --- |
-| `softaworks/agent-toolkit` | `3027f20f3181758385a1bb8c022d4041dfb4de84` | 2026-03-05 |
-| `dmythro/agent-skills` | `18e3101b8e0cf16b1f793ebdc2522e8a8ac9a399` | 2026-10-10 |
-| `nateslabach/skills` | `ce8b6e289f8f32b720058c6c69b03de99fe56f00` | 2026-09-29 |
-| `anthropics/skills` | `dbd4588f9e1033efb41dad4bef2f7947c8993d44` | 2026-10-09 |
+| Repository                           | Revision                                   | Date       |
+| ------------------------------------ | ------------------------------------------ | ---------- |
+| `softaworks/agent-toolkit`           | `3027f20f3181758385a1bb8c022d4041dfb4de84` | 2026-03-05 |
+| `dmythro/agent-skills`               | `18e3101b8e0cf16b1f793ebdc2522e8a8ac9a399` | 2026-10-10 |
+| `nateslabach/skills`                 | `ce8b6e289f8f32b720058c6c69b03de99fe56f00` | 2026-09-29 |
+| `anthropics/skills`                  | `dbd4588f9e1033efb41dad4bef2f7947c8993d44` | 2026-10-09 |
 | `anthropics/claude-plugins-official` | `af59ee3a1051a29dda4a2e7a2af221aa457ae08b` | 2026-10-21 |
 
 The README skill is older than the others but has focused, complete templates
@@ -103,7 +103,6 @@ management  skill-creator
 
 Six temporary Bun acceptance tests exercised the public `list` CLI. Each was
 observed failing before its corresponding import and passing afterward:
-
 - `project list exposes a README writing skill in docs`
 - `project list exposes Bun CLI toolchain guidance in backend`
 - `project list exposes Bun runtime APIs for CLI implementation`
@@ -118,11 +117,11 @@ repository to respect this worker's prohibition on editing `tests/**`.
 The following real OpenRouter probes used `find --json --agent claude --scope
 project --cwd <repo> --home <temporary-home> --prompt <prompt>`:
 
-| Prompt | Expected skills | Actual result |
-| --- | --- | --- |
-| `rewrite the README with install guide` | `crafting-effective-readmes` | `failed`, `selected: []`, `openrouter_http_401` |
-| `Build a TypeScript CLI with Bun: parse command line arguments, read files with Bun.file, spawn subprocesses, test with bun test and bundle a standalone executable` | `bun-cli`, `bun-api` | `failed`, `selected: []`, `openrouter_http_401` |
-| `Integrate the OpenRouter API into a TypeScript application: configure the provider, discover models, authenticate with OPENROUTER_API_KEY and validate structured JSON outputs` | `openrouter` | `failed`, `selected: []`, `openrouter_http_401` |
+| Prompt                                                                                                                                                                           | Expected skills              | Actual result                                   |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- | ----------------------------------------------- |
+| `rewrite the README with install guide`                                                                                                                                          | `crafting-effective-readmes` | `failed`, `selected: []`, `openrouter_http_401` |
+| `Build a TypeScript CLI with Bun: parse command line arguments, read files with Bun.file, spawn subprocesses, test with bun test and bundle a standalone executable`             | `bun-cli`, `bun-api`         | `failed`, `selected: []`, `openrouter_http_401` |
+| `Integrate the OpenRouter API into a TypeScript application: configure the provider, discover models, authenticate with OPENROUTER_API_KEY and validate structured JSON outputs` | `openrouter`                 | `failed`, `selected: []`, `openrouter_http_401` |
 
 Each probe made one logical category request, returned no categories and exited
 0 because `find` fails open for harness hooks. The probe assertions failed: a zero

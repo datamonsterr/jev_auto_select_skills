@@ -43,7 +43,9 @@ async function runGoldenEvaluation() {
   for (let i = 0; i < testcases.length; i++) {
     const tc = testcases[i];
     if (!tc) continue;
-    process.stdout.write(`[${i + 1}/${testcases.length}] Evaluating ${tc.id} (${tc.category})... `);
+    process.stdout.write(
+      `[${i + 1}/${testcases.length}] Evaluating ${tc.id} (${tc.category})... `,
+    );
 
     const startTime = Date.now();
     try {
@@ -65,7 +67,9 @@ async function runGoldenEvaluation() {
         passedCount++;
         console.log(`✅ PASS (${durationMs}ms) -> [${actualPrimary}]`);
       } else {
-        console.log(`❌ FAIL (${durationMs}ms) -> Expected: ${JSON.stringify(tc.expectedSkills)}, Got: [${actualPrimary}]`);
+        console.log(
+          `❌ FAIL (${durationMs}ms) -> Expected: ${JSON.stringify(tc.expectedSkills)}, Got: [${actualPrimary}]`,
+        );
       }
 
       results.push({
@@ -101,7 +105,9 @@ async function runGoldenEvaluation() {
   const accuracy = (passedCount / testcases.length) * 100;
   console.log(`\n======================================================`);
   console.log(`📊 Golden Set Evaluation Summary`);
-  console.log(`Passed: ${passedCount}/${testcases.length} (${accuracy.toFixed(1)}%)`);
+  console.log(
+    `Passed: ${passedCount}/${testcases.length} (${accuracy.toFixed(1)}%)`,
+  );
   console.log(`======================================================\n`);
 
   console.table(
@@ -111,13 +117,15 @@ async function runGoldenEvaluation() {
       Status: r.passed ? "PASS" : "FAIL",
       Expected: r.expected.join(", "),
       Actual: r.actualPrimary || "none",
-      "Conf %": (r.confidence * 100).toFixed(0) + "%",
+      "Conf %": `${(r.confidence * 100).toFixed(0)}%`,
       "Time (ms)": r.durationMs,
-    }))
+    })),
   );
 
   if (accuracy < 80) {
-    console.error(`Evaluation failed: accuracy (${accuracy.toFixed(1)}%) is below 80% threshold.`);
+    console.error(
+      `Evaluation failed: accuracy (${accuracy.toFixed(1)}%) is below 80% threshold.`,
+    );
     process.exit(1);
   }
 

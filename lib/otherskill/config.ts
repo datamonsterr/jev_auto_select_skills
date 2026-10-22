@@ -246,7 +246,7 @@ export function loadConfig(options: ConfigOptions = {}): Config {
     throw new Error(
       "invalid OtherSkill config: " +
         parsed.error.issues
-          .map((x) => x.path.join(".") + ": " + x.message)
+          .map((x) => `${x.path.join(".")}: ${x.message}`)
           .join("; "),
     );
   const config = parsed.data;
@@ -353,7 +353,7 @@ export function writeConfig(
     throw new Error("too many categories");
   if (!dryRun) {
     fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, JSON.stringify(parsed.data, null, 2) + "\n");
+    fs.writeFileSync(file, `${JSON.stringify(parsed.data, null, 2)}\n`);
   }
   return { ...parsed.data, bankPath: bank, home, cwd, configPath: file };
 }

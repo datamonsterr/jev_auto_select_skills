@@ -15,7 +15,11 @@ describe("assess.ts skill placement", () => {
   });
 
   it("classifies caveman persona skill as ALWAYS_ON", async () => {
-    const tmpDir = path.join(dirnameCompat(import.meta), "fixtures", "mock_caveman");
+    const tmpDir = path.join(
+      dirnameCompat(import.meta),
+      "fixtures",
+      "mock_caveman",
+    );
     fs.mkdirSync(tmpDir, { recursive: true });
     fs.writeFileSync(
       path.join(tmpDir, "SKILL.md"),
@@ -25,7 +29,7 @@ description: Ultra terse caveman persona for short answers.
 ---
 # Caveman Mode
 Me speak short.
-`
+`,
     );
 
     try {
@@ -34,14 +38,20 @@ Me speak short.
       });
 
       expect(result.classification).toBe("ALWAYS_ON");
-      expect(result.recommendedDir).toContain(path.join(".agents", "skills", "caveman"));
+      expect(result.recommendedDir).toContain(
+        path.join(".agents", "skills", "caveman"),
+      );
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
   });
 
   it("classifies docker deployment skill as JEV_ROUTED", async () => {
-    const tmpDir = path.join(dirnameCompat(import.meta), "fixtures", "mock_docker");
+    const tmpDir = path.join(
+      dirnameCompat(import.meta),
+      "fixtures",
+      "mock_docker",
+    );
     fs.mkdirSync(tmpDir, { recursive: true });
     fs.writeFileSync(
       path.join(tmpDir, "SKILL.md"),
@@ -51,7 +61,7 @@ description: Deploy multi-container apps using Docker Compose. Use when user ask
 ---
 # Docker Deploy
 Instructions...
-`
+`,
     );
 
     try {
@@ -60,7 +70,9 @@ Instructions...
       });
 
       expect(result.classification).toBe("JEV_ROUTED");
-      expect(result.recommendedDir).toContain(path.join(".agents", "other_skills", "docker-deploy"));
+      expect(result.recommendedDir).toContain(
+        path.join(".agents", "other_skills", "docker-deploy"),
+      );
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }

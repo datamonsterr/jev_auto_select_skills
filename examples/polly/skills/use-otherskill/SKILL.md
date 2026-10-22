@@ -1,4 +1,5 @@
 ---
+
 name: use-otherskill
 description: Use the OtherSkill CLI to configure harness hooks and OpenRouter routing, add categorized skills, select skills for a prompt, and edit skill-set settings.
 ---

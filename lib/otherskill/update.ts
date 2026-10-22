@@ -119,7 +119,7 @@ export async function update(
     !wrapper ||
     wrapper === "." ||
     wrapper === ".." ||
-    [...entries.keys()].some((name) => !name.startsWith(wrapper + "/"))
+    [...entries.keys()].some((name) => !name.startsWith(`${wrapper}/`))
   )
     throw new Error("invalid update archive root");
   for (const file of ["package.json", "bun.lock", "otherskill.ts"])
@@ -161,11 +161,11 @@ export async function update(
     );
     fs.writeFileSync(
       path.join(snapshot, ".otherskill-version"),
-      JSON.stringify(
+      `${JSON.stringify(
         { commit: remote.data.sha, ref, installedAt: new Date().toISOString() },
         null,
         2,
-      ) + "\n",
+      )}\n`,
     );
     // Setup can persist references before a later failure; keep that snapshot for recovery.
     retain = true;

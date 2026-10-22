@@ -10,7 +10,7 @@ import {
 
 describe("golden_set integration", () => {
   const testsetPath = path.resolve(__dirname, "../golden_set/testset.json");
-  const skillsDir = resolveSkillsBankPath();
+  const _skillsDir = resolveSkillsBankPath();
 
   const backupBank = path.join(
     process.env.HOME || "",

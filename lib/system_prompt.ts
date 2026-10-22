@@ -9,7 +9,7 @@ export const DEFAULT_SYSTEM_PROMPT =
  * Build concise choice instructions for Jev
  */
 export function buildJevInstructions(
-  role: "primary" | "secondary" | "followup" | "single" = "single"
+  role: "primary" | "secondary" | "followup" | "single" = "single",
 ): string {
   switch (role) {
     case "primary":
@@ -18,7 +18,6 @@ export function buildJevInstructions(
       return "Select the secondary implementation or testing skill, or 'none'.";
     case "followup":
       return "Select any follow-up verification, documentation, git, or completion skill, or 'none'.";
-    case "single":
     default:
       return "Select the most relevant specialized skill for the task, or 'none'.";
   }

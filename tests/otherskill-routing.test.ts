@@ -17,7 +17,7 @@ function fixture(run: (config: Config) => Promise<void>) {
   const source = createSkill(
     path.join(root, "source"),
     "same",
-    "Complete description " + "detail ".repeat(100),
+    `Complete description ${"detail ".repeat(100)}`,
     "BODY NEVER INJECTED",
   );
   installLocal(config, source, ["frontend/ui-ux", "testing"]);
@@ -48,7 +48,7 @@ export function answer(
 }
 test("two stages forward original full prompt and every complete description in 1+N genuinely concurrent calls, deduplicating logical copies", () =>
   fixture(async (config) => {
-    const prompt = "Original full prompt " + "long context ".repeat(700);
+    const prompt = `Original full prompt ${"long context ".repeat(700)}`;
     const requests: DecisionRequest[] = [];
     let active = 0,
       peak = 0;
@@ -179,7 +179,7 @@ test("all category candidates retain scoped identity, even when two distinct sou
     const second = createSkill(
       path.join(config.cwd, "second"),
       "same",
-      "Second independent skill " + "complete ".repeat(90),
+      `Second independent skill ${"complete ".repeat(90)}`,
       "Other body",
     );
     installLocal(config, second, ["testing"]);

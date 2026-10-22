@@ -11,7 +11,11 @@ import {
   formatSkillContent,
 } from "./lib/model";
 import { JevProvider } from "./lib/provider";
-import { loadSkillsFromDir, parseSkillFile, parseSkillContent } from "./lib/parse_skill";
+import {
+  loadSkillsFromDir,
+  parseSkillFile,
+  parseSkillContent,
+} from "./lib/parse_skill";
 import { DEFAULT_SYSTEM_PROMPT } from "./lib/system_prompt";
 import { loadEnvironment } from "./lib/env";
 import { dirnameCompat } from "./lib/compat";
@@ -73,7 +77,9 @@ export function resolveSkillsSearchPaths(options?: {
 
   const addPath = (p: string | null | undefined): boolean => {
     if (!p) return false;
-    const resolved = p.startsWith("~") ? path.join(homeDir, p.slice(1)) : path.resolve(cwd, p);
+    const resolved = p.startsWith("~")
+      ? path.join(homeDir, p.slice(1))
+      : path.resolve(cwd, p);
     if (!fs.existsSync(resolved)) return false;
 
     let real = resolved;
@@ -137,7 +143,10 @@ export function resolveSkillsSearchPaths(options?: {
     process.env.SKILLS_BANK_PATH ||
     process.env.SKILLS_DIR;
   if (envPath) {
-    const parts = envPath.split(/[:;,]/).map((p) => p.trim()).filter(Boolean);
+    const parts = envPath
+      .split(/[:;,]/)
+      .map((p) => p.trim())
+      .filter(Boolean);
     for (const p of parts) {
       addPath(p);
     }
@@ -170,7 +179,9 @@ export function resolveSkillsSearchPaths(options?: {
  */
 export function resolveSkillsBankPath(customPath?: string): string {
   const searchPaths = resolveSkillsSearchPaths({ customPath });
-  return searchPaths[0] || path.resolve(process.cwd(), ".agents", "other_skills");
+  return (
+    searchPaths[0] || path.resolve(process.cwd(), ".agents", "other_skills")
+  );
 }
 
 export {
@@ -193,7 +204,13 @@ export {
   runSetupCli,
 } from "./scripts/setup-agent";
 export { migrateSkills, DEFAULT_KEEP_SKILLS } from "./lib/migrate";
-export type { Skill, SelectedSkill, SkillSelectionResult, SkillSelectorOptions, UsageMetrics };
+export type {
+  Skill,
+  SelectedSkill,
+  SkillSelectionResult,
+  SkillSelectorOptions,
+  UsageMetrics,
+};
 
 /**
  * High-level programmatic API to select skills using Jev decision model
@@ -279,7 +296,11 @@ async function main() {
   }
 
   // Delegate to migrate command if requested
-  if (args[0] === "migrate" || args[0] === "migrate-skill" || args[0] === "migrate-skills") {
+  if (
+    args[0] === "migrate" ||
+    args[0] === "migrate-skill" ||
+    args[0] === "migrate-skills"
+  ) {
     const { runMigrateCli } = await import("./scripts/migrate-skills");
     await runMigrateCli(args.slice(1));
     return;
@@ -326,17 +347,24 @@ async function main() {
     const searchDirs = resolveSkillsSearchPaths({ skillsDir: customSkillsDir });
     const allSkills = loadSkillsFromDir(searchDirs);
     const found = allSkills.find(
-      (s) => s.name.toLowerCase() === directSkillName!.toLowerCase()
+      (s) => s.name.toLowerCase() === directSkillName!.toLowerCase(),
     );
     if (!found) {
-      console.error(`Skill "${directSkillName}" not found in search paths: ${searchDirs.join(", ")}`);
+      console.error(
+        `Skill "${directSkillName}" not found in search paths: ${searchDirs.join(", ")}`,
+      );
       process.exit(1);
     }
-    const content = found.path && fs.existsSync(found.path) ? fs.readFileSync(found.path, "utf-8") : found.description;
+    const content =
+      found.path && fs.existsSync(found.path)
+        ? fs.readFileSync(found.path, "utf-8")
+        : found.description;
     if (jsonOutput) {
       console.log(JSON.stringify({ skill: found, content }, null, 2));
     } else {
-      console.log(`\n### Skill: ${found.name}\n*Path: ${found.path || "embedded"}*\n\n${content}`);
+      console.log(
+        `\n### Skill: ${found.name}\n*Path: ${found.path || "embedded"}*\n\n${content}`,
+      );
     }
     return;
   }
@@ -361,7 +389,9 @@ async function main() {
   }
 
   if (!prompt) {
-    console.error("Error: No prompt provided. Provide a prompt as argument or via stdin.");
+    console.error(
+      "Error: No prompt provided. Provide a prompt as argument or via stdin.",
+    );
     process.exit(1);
   }
 
@@ -376,19 +406,26 @@ async function main() {
     if (jsonOutput) {
       console.log(JSON.stringify(result, null, 2));
     } else if (showContent) {
-      console.log("\n" + formatSkillContent(result.selectedSkills, { userPrompt: prompt }));
+      console.log(
+        "\n" +
+          formatSkillContent(result.selectedSkills, { userPrompt: prompt }),
+      );
     } else {
       console.log("\n🎯 Jev Skill Selection Result");
       console.log(`Prompt: "${prompt}"`);
       console.log(`Primary Choice: ${result.primarySkill || "none"}`);
-      console.log(`Confidence: ${result.answers?.selected_skill?.confidence ?? "N/A"}\n`);
+      console.log(
+        `Confidence: ${result.answers?.selected_skill?.confidence ?? "N/A"}\n`,
+      );
 
       if (result.selectedSkills.length === 0) {
         console.log("No specialized skills matched the threshold.");
       } else {
         console.log("Selected Skills:");
         for (const s of result.selectedSkills) {
-          console.log(`  • ${s.name.padEnd(30)} Prob: ${(s.probability * 100).toFixed(1)}% | Conf: ${(s.confidence * 100).toFixed(1)}%`);
+          console.log(
+            `  • ${s.name.padEnd(30)} Prob: ${(s.probability * 100).toFixed(1)}% | Conf: ${(s.confidence * 100).toFixed(1)}%`,
+          );
           if (s.description) {
             console.log(`    ${s.description}`);
           }
@@ -398,12 +435,20 @@ async function main() {
       if (result.usage) {
         console.log("\n📊 Token Usage Breakdown:");
         console.log(`  • Total Used Tokens:    ${result.usage.total_tokens}`);
-        console.log(`  • Input Prompt Tokens:  ${result.usage.user_prompt_tokens}`);
-        console.log(`  • System Prompt Tokens: ${result.usage.system_prompt_tokens}`);
-        console.log(`  • API Input Tokens:     ${result.usage.input_tokens} (including skills criteria)`);
+        console.log(
+          `  • Input Prompt Tokens:  ${result.usage.user_prompt_tokens}`,
+        );
+        console.log(
+          `  • System Prompt Tokens: ${result.usage.system_prompt_tokens}`,
+        );
+        console.log(
+          `  • API Input Tokens:     ${result.usage.input_tokens} (including skills criteria)`,
+        );
         console.log(`  • Output Tokens:        ${result.usage.output_tokens}`);
         if (result.usage.cost !== undefined) {
-          console.log(`  • Estimated Cost:       $${result.usage.cost.toFixed(6)}`);
+          console.log(
+            `  • Estimated Cost:       $${result.usage.cost.toFixed(6)}`,
+          );
         }
       }
     }
