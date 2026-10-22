@@ -1,0 +1,76 @@
+{
+  "bankPath": ".",
+  "model": "inception/mercury-decide:free",
+  "scope": "project",
+  "categories": [
+    {
+      "id": "testing",
+      "description": "Testing, test-driven development, browser verification, debugging, and quality checks"
+    },
+    {
+      "id": "frontend",
+      "description": "Frontend interfaces, React components, accessibility, and visual design"
+    },
+    {
+      "id": "backend",
+      "description": "Backend APIs, databases, service architecture, and persistence"
+    },
+    {
+      "id": "docs",
+      "description": "README writing, technical writing, and API documentation"
+    },
+    {
+      "id": "git",
+      "description": "Git workflows, GitHub pull requests, and issue management"
+    },
+    {
+      "id": "cli",
+      "description": "Command-line tools, Bun, TypeScript CLI design, and package scripts"
+    },
+    {
+      "id": "llm",
+      "description": "OpenRouter, LLM prompts, structured model APIs, and evaluation"
+    },
+    {
+      "id": "devops",
+      "description": "CI/CD, GitHub Actions, containers, deployment, and observability"
+    },
+    {
+      "id": "security",
+      "description": "Security reviews, dependency risks, and secure input handling"
+    },
+    {
+      "id": "data",
+      "description": "Data analysis, SQL analytics, and data visualization"
+    },
+    {
+      "id": "management",
+      "description": "Agent skill authoring, workflow planning, and tool selection"
+    }
+  ],
+  "enabledCategories": [
+    "testing",
+    "frontend",
+    "backend",
+    "docs",
+    "git",
+    "cli",
+    "llm",
+    "devops",
+    "security",
+    "data",
+    "management"
+  ],
+  "limits": {
+    "concurrency": 4,
+    "retries": 1,
+    "retryDelayMs": 250,
+    "timeoutMs": 15000,
+    "maxRequestBytes": 60000,
+    "maxCandidates": 200,
+    "categoryThreshold": 0.05,
+    "skillThreshold": 0.05,
+    "maxCategories": 3,
+    "maxSkills": 3
+  }
+}
