@@ -25,7 +25,10 @@ interface ComplexEvalResult {
 }
 
 async function runComplexEvaluation() {
-  const testsetPath = path.resolve(__dirname, "../golden_set/complex_testset.json");
+  const testsetPath = path.resolve(
+    __dirname,
+    "../golden_set/complex_testset.json",
+  );
   if (!fs.existsSync(testsetPath)) {
     console.error(`Error: Complex testset not found at ${testsetPath}`);
     process.exit(1);
@@ -46,7 +49,9 @@ async function runComplexEvaluation() {
   for (let i = 0; i < testcases.length; i++) {
     const tc = testcases[i];
     if (!tc) continue;
-    process.stdout.write(`[${i + 1}/${testcases.length}] Evaluating ${tc.id} [${tc.type}]... `);
+    process.stdout.write(
+      `[${i + 1}/${testcases.length}] Evaluating ${tc.id} [${tc.type}]... `,
+    );
 
     const startTime = Date.now();
     try {
@@ -57,11 +62,16 @@ async function runComplexEvaluation() {
 
       const durationMs = Date.now() - startTime;
       const actualSelected = res.selectedSkills.map((s) => s.name);
-      const allValidExpected = new Set([...tc.requiredSkills, ...tc.acceptableSkills]);
+      const _allValidExpected = new Set([
+        ...tc.requiredSkills,
+        ...tc.acceptableSkills,
+      ]);
 
       // Count how many required skills or their acceptable alternatives were matched
       const matchedSkills = tc.requiredSkills.filter(
-        (req) => actualSelected.includes(req) || tc.acceptableSkills.some((acc) => actualSelected.includes(acc))
+        (req) =>
+          actualSelected.includes(req) ||
+          tc.acceptableSkills.some((acc) => actualSelected.includes(acc)),
       );
 
       // Pass if at least minSkillsExpected matched from the expected list and multiple skills were selected
@@ -71,9 +81,13 @@ async function runComplexEvaluation() {
 
       if (passed) {
         passedCount++;
-        console.log(`✅ PASS (${durationMs}ms) -> [${actualSelected.join(", ")}]`);
+        console.log(
+          `✅ PASS (${durationMs}ms) -> [${actualSelected.join(", ")}]`,
+        );
       } else {
-        console.log(`❌ FAIL (${durationMs}ms) -> Required: ${JSON.stringify(tc.requiredSkills)}, Selected: [${actualSelected.join(", ")}]`);
+        console.log(
+          `❌ FAIL (${durationMs}ms) -> Required: ${JSON.stringify(tc.requiredSkills)}, Selected: [${actualSelected.join(", ")}]`,
+        );
       }
 
       results.push({
@@ -107,7 +121,9 @@ async function runComplexEvaluation() {
   const accuracy = (passedCount / testcases.length) * 100;
   console.log(`\n======================================================`);
   console.log(`📊 Complex Multi-Step Evaluation Summary`);
-  console.log(`Passed: ${passedCount}/${testcases.length} (${accuracy.toFixed(1)}%)`);
+  console.log(
+    `Passed: ${passedCount}/${testcases.length} (${accuracy.toFixed(1)}%)`,
+  );
   console.log(`======================================================\n`);
 
   console.table(
@@ -119,11 +135,13 @@ async function runComplexEvaluation() {
       "Selected Skills": r.selected.join(", "),
       Matched: r.matchedCount,
       "Time (ms)": r.durationMs,
-    }))
+    })),
   );
 
   if (accuracy < 80) {
-    console.error(`Complex evaluation failed: accuracy (${accuracy.toFixed(1)}%) is below 80% threshold.`);
+    console.error(
+      `Complex evaluation failed: accuracy (${accuracy.toFixed(1)}%) is below 80% threshold.`,
+    );
     process.exit(1);
   }
 

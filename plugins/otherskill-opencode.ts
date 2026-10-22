@@ -45,7 +45,7 @@ export function createOpenCodePlugin(options: {
         .reverse()
         .find((m) => m.info.role === "user");
       if (!user) return;
-      const id = "otherskill-" + user.info.id;
+      const id = `otherskill-${user.info.id}`;
       for (const message of output.messages)
         message.parts = message.parts.filter(
           (part) => !(part.synthetic && part.id?.startsWith("otherskill-")),
@@ -58,7 +58,7 @@ export function createOpenCodePlugin(options: {
         .map((p) => p.text)
         .join("\n");
       if (!prompt.trim()) return;
-      const key = user.info.sessionID + ":" + user.info.id + ":" + prompt;
+      const key = `${user.info.sessionID}:${user.info.id}:${prompt}`;
       try {
         let pending = cache.get(key);
         if (!pending) {

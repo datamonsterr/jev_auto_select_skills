@@ -1,13 +1,11 @@
 import { describe, it, expect } from "bun:test";
 import {
   parseSkillContent,
-  parseSkillFile,
   loadSkillsFromDir,
   buildSkillState,
   buildSkillCriteria,
 } from "../lib/parse_skill";
-import path from "path";
-import fs from "node:fs";
+import path from "node:path";
 
 describe("parse_skill", () => {
   it("parses skill content with frontmatter and explicit When to Use section", () => {
@@ -31,8 +29,12 @@ Some details.
 
     const skill = parseSkillContent(rawMarkdown, "fallback-name");
     expect(skill.name).toBe("my-sample-skill");
-    expect(skill.description).toBe("A sample skill for testing frontmatter parsing.");
-    expect(skill.whenToUse).toContain("When you need to test parsing of markdown skills.");
+    expect(skill.description).toBe(
+      "A sample skill for testing frontmatter parsing.",
+    );
+    expect(skill.whenToUse).toContain(
+      "When you need to test parsing of markdown skills.",
+    );
     expect(skill.whenToUse).toContain("When creating automated unit tests.");
   });
 
@@ -66,7 +68,7 @@ Details here.
     const skillsDir = path.resolve(__dirname, "../skills");
     const skills = loadSkillsFromDir(skillsDir);
     expect(skills.length).toBeGreaterThanOrEqual(1);
-    
+
     const routerSkill = skills.find((s) => s.name === "skill_selector");
     expect(routerSkill).toBeDefined();
     expect(routerSkill?.description).toContain("router");
@@ -93,7 +95,11 @@ Details here.
       },
     ];
 
-    const state = buildSkillState(sampleSkills, "Please run task A", "Be accurate");
+    const state = buildSkillState(
+      sampleSkills,
+      "Please run task A",
+      "Be accurate",
+    );
     expect(state.user_prompt).toBe("Please run task A");
     expect(state.system_prompt).toBe("Be accurate");
     expect(Array.isArray(state.skills)).toBe(true);

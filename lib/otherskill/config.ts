@@ -39,6 +39,25 @@ export const starterCategories = [
 ];
 const id = z.string().regex(/^[a-z0-9][a-z0-9_-]*(\/[a-z0-9][a-z0-9_-]*)*$/);
 const agentId = z.enum(["claude", "codex", "antigravity", "opencode"]);
+const hookParams = z
+  .object({
+    maxSkills: z.number().int().min(1).max(1000).optional(),
+    maxCategories: z.number().int().min(1).max(254).optional(),
+    timeoutMs: z.number().int().min(10).max(60000).optional(),
+    categories: z.array(id).optional(),
+    model: z
+      .string()
+      .refine((value) => {
+        try {
+          freeModel(value);
+          return true;
+        } catch {
+          return false;
+        }
+      })
+      .optional(),
+  })
+  .strict();
 const schema = z
   .object({
     bankPath: z
@@ -60,6 +79,7 @@ const schema = z
         "agents must be unique",
       )
       .optional(),
+    hookParams: hookParams.optional(),
     enabledCategories: z.array(id).optional(),
     categories: z
       .array(z.object({ id, description: z.string().min(1) }).strict())
@@ -92,6 +112,40 @@ export interface ConfigOptions {
   home?: string;
   cwd?: string;
   scope?: "global" | "project";
+}
+
+export interface RoutingOverrides {
+  model?: string;
+  categories?: string[];
+  maxSkills?: number;
+  maxCategories?: number;
+  timeoutMs?: number;
+}
+/** Validate ephemeral overrides without writing the underlying configuration. */
+export function withRoutingOverrides(
+  config: Config,
+  overrides: RoutingOverrides,
+): Config {
+  const { model, categories, ...limits } = overrides;
+  const parsed = schema.parse({
+    ...configData(config),
+    ...(model !== undefined ? { model } : {}),
+    ...(categories !== undefined ? { enabledCategories: categories } : {}),
+    limits: { ...config.limits, ...limits },
+  });
+  freeModel(parsed.model);
+  if (
+    parsed.enabledCategories &&
+    (new Set(parsed.enabledCategories).size !==
+      parsed.enabledCategories.length ||
+      parsed.enabledCategories.some(
+        (id) => !parsed.categories.some((c) => c.id === id),
+      ))
+  )
+    throw new Error(
+      "enabledCategories must reference unique configured category IDs",
+    );
+  return { ...config, ...parsed, bankPath: config.bankPath };
 }
 
 // Resolve even nonexistent suffixes through real existing ancestors, detecting symlink aliases.
@@ -200,7 +254,7 @@ export function loadConfig(options: ConfigOptions = {}): Config {
     throw new Error(
       "invalid OtherSkill config: " +
         parsed.error.issues
-          .map((x) => x.path.join(".") + ": " + x.message)
+          .map((x) => `${x.path.join(".")}: ${x.message}`)
           .join("; "),
     );
   const config = parsed.data;
@@ -307,7 +361,7 @@ export function writeConfig(
     throw new Error("too many categories");
   if (!dryRun) {
     fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, JSON.stringify(parsed.data, null, 2) + "\n");
+    fs.writeFileSync(file, `${JSON.stringify(parsed.data, null, 2)}\n`);
   }
   return { ...parsed.data, bankPath: bank, home, cwd, configPath: file };
 }

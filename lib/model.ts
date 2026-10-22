@@ -1,5 +1,3 @@
-import { z } from "zod";
-
 /**
  * Representation of a skill loaded from a skill bank
  */
@@ -233,7 +231,7 @@ export function formatSkillSummary(skills: SelectedSkill[]): string {
  */
 export function formatSkillContent(
   skills: SelectedSkill[],
-  options?: { userPrompt?: string },
+  _options?: { userPrompt?: string },
 ): string {
   if (skills.length === 0) {
     return "No specialized skills required for this request.";

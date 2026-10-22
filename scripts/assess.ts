@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { parseSkillFile, parseSkillContent } from "../lib/parse_skill";
+import { parseSkillContent } from "../lib/parse_skill";
 import { JevProvider } from "../lib/provider";
 import { resolveSkillsSearchPaths } from "../index";
 
@@ -100,10 +100,16 @@ export async function assessSkill(params: {
   }
 
   if (!resolvedPath && !content) {
-    throw new Error(`Skill "${params.skillPathOrName}" not found on filesystem.`);
+    throw new Error(
+      `Skill "${params.skillPathOrName}" not found on filesystem.`,
+    );
   }
 
-  const parsed = parseSkillContent(content, skillName, resolvedPath ? path.join(resolvedPath, "SKILL.md") : undefined);
+  const parsed = parseSkillContent(
+    content,
+    skillName,
+    resolvedPath ? path.join(resolvedPath, "SKILL.md") : undefined,
+  );
   skillName = parsed.name || skillName;
 
   const combinedText = `${skillName}\n${parsed.description}\n${parsed.whenToUse}\n${content.slice(0, 1000)}`;
@@ -124,11 +130,11 @@ export async function assessSkill(params: {
     // Ambiguous: check if name matches caveman or persona explicitly
     if (/caveman|persona|tone|terse/i.test(skillName)) {
       classification = "ALWAYS_ON";
-      confidence = 0.90;
+      confidence = 0.9;
       reason = `Skill "${skillName}" modifies universal model demeanor/personality across all prompts.`;
     } else {
       classification = "JEV_ROUTED";
-      confidence = 0.80;
+      confidence = 0.8;
       reason = `Contains specific tool/domain workflows (${jevMatch.source}). Best routed on-demand by Jev to preserve context.`;
     }
   } else {
@@ -138,7 +144,10 @@ export async function assessSkill(params: {
   }
 
   // 3. Optional: Use Jev decision model if requested and API key present
-  if (params.useJevModel && (process.env.OPENROUTER_API_KEY || process.env.JEV_API_KEY)) {
+  if (
+    params.useJevModel &&
+    (process.env.OPENROUTER_API_KEY || process.env.JEV_API_KEY)
+  ) {
     try {
       const provider = new JevProvider();
       const response = await provider.sendDecisionRequest({
@@ -152,10 +161,13 @@ export async function assessSkill(params: {
         questions: {
           placement: {
             type: "choice",
-            instructions: "Determine if this skill should be ALWAYS loaded directly with LLM (universal persona/tone like caveman) or JEV_ROUTED (optional task-specific skill loaded dynamically).",
+            instructions:
+              "Determine if this skill should be ALWAYS loaded directly with LLM (universal persona/tone like caveman) or JEV_ROUTED (optional task-specific skill loaded dynamically).",
             criteria: {
-              ALWAYS_ON: "Universal persona, terse style modifier like caveman, or core behavioral guideline loaded on every prompt",
-              JEV_ROUTED: "Task-specific, domain-specific, tool-specific, or language-specific skill loaded dynamically only when needed",
+              ALWAYS_ON:
+                "Universal persona, terse style modifier like caveman, or core behavioral guideline loaded on every prompt",
+              JEV_ROUTED:
+                "Task-specific, domain-specific, tool-specific, or language-specific skill loaded dynamically only when needed",
             },
           },
         },
@@ -276,7 +288,11 @@ Options:
     global: isGlobal,
   })
     .then((res) => {
-      if (shouldMove && res.sourcePath && res.sourcePath !== res.recommendedDir) {
+      if (
+        shouldMove &&
+        res.sourcePath &&
+        res.sourcePath !== res.recommendedDir
+      ) {
         moveSkill(res.sourcePath, res.recommendedDir);
         res.moved = true;
         res.destinationPath = res.recommendedDir;
@@ -288,12 +304,16 @@ Options:
         console.log("\n🔍 Skill Placement Assessment");
         console.log(`Skill:          ${res.skillName}`);
         console.log(`Source:         ${res.sourcePath || "N/A"}`);
-        console.log(`Classification: ${res.classification === "ALWAYS_ON" ? "🟢 ALWAYS_ON (Normal Skill)" : "🎯 JEV_ROUTED (Jev Bank)"}`);
+        console.log(
+          `Classification: ${res.classification === "ALWAYS_ON" ? "🟢 ALWAYS_ON (Normal Skill)" : "🎯 JEV_ROUTED (Jev Bank)"}`,
+        );
         console.log(`Confidence:     ${(res.confidence * 100).toFixed(0)}%`);
         console.log(`Reason:         ${res.reason}`);
         console.log(`Recommended:    ${res.recommendedDir}`);
         if (res.moved) {
-          console.log(`\n✓ Successfully moved skill to: ${res.destinationPath}`);
+          console.log(
+            `\n✓ Successfully moved skill to: ${res.destinationPath}`,
+          );
         } else if (shouldMove) {
           console.log(`\n• Skill is already in the recommended directory.`);
         }

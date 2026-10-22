@@ -44,6 +44,7 @@ export function readSkill(dir: string): { name: string; description: string } {
     .safeParse(frontmatter);
   if (!parsed.success)
     throw new Error("skill requires nonempty name and complete description");
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: rejecting control characters is the point
   if (/[\x00-\x1f]/.test(parsed.data.name))
     throw new Error("invalid skill name");
   return parsed.data;
@@ -74,13 +75,11 @@ function insideNoLinks(root: string, target: string): void {
   cursor = path.parse(path.resolve(target)).root;
   for (const part of parts) {
     cursor = path.join(cursor, part);
-    {
-      try {
-        if (fs.lstatSync(cursor).isSymbolicLink())
-          throw new Error("destination symlinks are not supported");
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-      }
+    try {
+      if (fs.lstatSync(cursor).isSymbolicLink())
+        throw new Error("destination symlinks are not supported");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     }
   }
 }
@@ -200,7 +199,7 @@ export function installLocal(
       .toLowerCase()
       .replace(/[^a-z0-9_-]/g, "-")
       .slice(0, 60) || "skill";
-  const folderName = slug + "--" + logicalId.slice(0, 16);
+  const folderName = `${slug}--${logicalId.slice(0, 16)}`;
   const targets = ids.map((category) => ({
     category,
     target: path.join(config.bankPath, category, folderName),
@@ -246,8 +245,8 @@ export function installLocal(
   try {
     for (const { category, target } of targets) {
       fs.mkdirSync(path.dirname(target), { recursive: true });
-      const stage = path.join(path.dirname(target), ".import-" + randomUUID());
-      const backup = stage + "-backup";
+      const stage = path.join(path.dirname(target), `.import-${randomUUID()}`);
+      const backup = `${stage}-backup`;
       staging.push({ stage, target, backup, committed: false });
       fs.cpSync(source, stage, {
         recursive: true,
@@ -268,7 +267,7 @@ export function installLocal(
       };
       fs.writeFileSync(
         path.join(stage, metaFile),
-        JSON.stringify(metadata, null, 2) + "\n",
+        `${JSON.stringify(metadata, null, 2)}\n`,
       );
     }
     for (const item of staging) {
@@ -395,7 +394,7 @@ export async function withOnlineSkill<T>(
     return await run(dir, {
       source:
         parsed.repo +
-        (relative ? "/tree/" + (parsed.ref ?? "HEAD") + "/" + relative : ""),
+        (relative ? `/tree/${parsed.ref ?? "HEAD"}/${relative}` : ""),
       ref: parsed.ref ?? "HEAD",
       revision,
       licenseRoot: temp,
@@ -441,7 +440,7 @@ export async function findOnline(
           "GET",
           "search/code",
           "-f",
-          "q=" + q,
+          `q=${q}`,
           "-f",
           "per_page=20",
         ],

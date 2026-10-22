@@ -1,188 +1,189 @@
 # OtherSkill
 
-OtherSkill keeps categorized skills outside native discovery. A free OpenRouter model selects categories, then concurrent HTTP requests select skills inside each selected category. Hooks inject only selected names, complete descriptions and provenance, never full skill bodies automatically.
+Coding agents load every installed skill into context on every prompt. OtherSkill keeps your skills in a private, categorized bank outside native discovery. On each prompt a hook asks one free OpenRouter model which categories and skills apply, and injects only those names, descriptions and provenance. Supports Claude Code, Codex, Antigravity and OpenCode 1.x.
 
-Requires Bun, Git for online imports and a POSIX shell for the managed launcher. Supported adapters are Claude, Codex, Antigravity and OpenCode 1.x. Windows and OpenCode 2.x lifecycle integration are unverified.
+## Prerequisites
 
-## Setup
+- [Bun](https://bun.sh) >= 1.3 (never installed for you)
+- `curl` and `tar` (installer), Git (only for online skill imports), a POSIX shell
+- A free [OpenRouter](https://openrouter.ai/keys) API key in `OPENROUTER_API_KEY`
+- Linux or macOS. Windows and OpenCode 2.x are unverified.
 
-Install Jev Skill Selector (the canonical CLI is now **OtherSkill**) with Bash on Linux or macOS:
+## Install
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/datamonsterr/jev_auto_select_skills/master/install.sh | bash
-
-# Forward setup options for a scripted install:
-curl -fsSL https://raw.githubusercontent.com/datamonsterr/jev_auto_select_skills/master/install.sh | bash -s -- \
-  --non-interactive --agent codex --scope global
-
-# Choose a persistent source location and a project harness:
-curl -fsSL https://raw.githubusercontent.com/datamonsterr/jev_auto_select_skills/master/install.sh | bash -s -- \
-  --install-dir "$HOME/.local/share/otherskill/installs" -- \
-  --non-interactive --agent claude --scope project --cwd "$PWD" --no-companion
-
-# Installer help (no writes/downloads by the installer):
-curl -fsSL https://raw.githubusercontent.com/datamonsterr/jev_auto_select_skills/master/install.sh | bash -s -- --help
 ```
 
-The installer requires **Bun >= 1.3**, Bash (including macOS Bash 3.2), HTTPS-capable `curl`, `tar` with gzip support, and standard POSIX utilities. Install Bun separately from [bun.sh](https://bun.sh) first; this script does **not** bootstrap a runtime or use `sudo`. It checks PATH, `$BUN_INSTALL/bin/bun`, then `$HOME/.bun/bin/bun`. Git is unnecessary for installation; online skill imports require it later. Network access to GitHub's raw/codeload hosts and Bun's package registry is required. The commands track the current `master` branch; they are not a pinned or signed release. To inspect the script or check the initial download's exit status separately, download it with `curl -fsSL -o install.sh <raw URL above>`, inspect it, then run `bash install.sh`.
-
-Each run downloads the repository with HTTP failures treated as errors, creates a fresh private snapshot under `~/.local/share/otherskill/installs/release.*`, runs `bun install --frozen-lockfile`, and invokes the existing `otherskill.ts setup`. The original working directory is preserved for project configuration. `--install-dir DIR` changes the snapshot parent (relative paths resolve from your working directory); keep it outside native skill discovery directories. All remaining arguments go to setup unchanged. Use `--` to end installer option parsing, or `-- --help` for setup help after downloading dependencies. Supported targets are `--agent claude|codex|antigravity|opencode` (`agy` also aliases Antigravity) or `--agents claude,codex,...` for multiple hooks in one run; use one form, not both.
-
-The default menu reads from the controlling terminal even through `curl | bash`. Without a terminal, pass `--non-interactive --agent <harness>`; use `--scope global|project`, `--home DIR`, `--cwd DIR`, `--no-companion`, `--model` and `--categories` as needed. `--dry-run` previews **setup writes only**; source and dependencies are still installed. Existing native hooks/settings/skills and the private bank follow the same preservation rules described below. Setup installs the optional native `use-otherskill` companion by default (disable it with `--no-companion`); the installer itself writes only the source snapshot and never changes your shell profile.
-
-Downloads and failed dependency snapshots are cleaned up. Successful snapshots and snapshots where setup was attempted are retained because launchers and OpenCode adapters can reference them by absolute path, including after a partial setup failure. Repeated installs create new snapshots and rerun safe setup without overwriting or deleting older source or user data. Keep any snapshot still referenced by an integration; there is no automatic pruning. On setup failure, fix the reported issue and rerun `bun /path/to/retained/release.XXXXXXXX/otherskill.ts setup` with your setup options. Configs written by this version may include an optional `agents` array. Older retained snapshots use a strict schema and reject that field; to roll back, remove `agents` from the config (the current snapshot can restore the full set later) or keep using the current snapshot. Old agent-only configs remain readable.
-
-For API access, inherit `OPENROUTER_API_KEY` from your shell/secret manager or forward `--key-env OPENROUTER_API_KEY` to save it privately. Export the variable before the pipeline so Bash inherits it; never place its value in command arguments. `--key-stdin` requires downloading the installer to a file first, then piping a secret-manager command into `bash install.sh --non-interactive --agent codex --key-stdin`. The streamed installer refuses `--key-stdin` to avoid reading script text as a credential. The setup menu also offers hidden key entry. Details of key storage and precedence are below.
-
-For an existing checkout, use the same setup directly:
+Scripted, no menu:
 
 ```sh
+curl -fsSL https://raw.githubusercontent.com/datamonsterr/jev_auto_select_skills/master/install.sh | bash -s -- \
+  --non-interactive --agent claude --scope global --key-env OPENROUTER_API_KEY
+```
+
+From source:
+
+```sh
+git clone https://github.com/datamonsterr/jev_auto_select_skills && cd jev_auto_select_skills
 bun install --frozen-lockfile
-bun otherskill.ts --help
 bun otherskill.ts setup
 ```
 
-The interactive setup menu first shows a keyboard checkbox list: `.agents` is selected by default for the shared canonical companion, while Claude, Codex, Antigravity and OpenCode are optional hook targets. Arrow keys or `j`/`k` move, SPACE toggles and ENTER confirms. `.agents` is marked required and cannot be deselected while a harness is selected (unless `--no-companion` disables companion installation). It then asks for global/project scope, the hidden OpenRouter key, free model and enabled categories. Selecting a harness automatically keeps `.agents`; the companion tree lives once under `.agents/skills/use-otherskill`, and Claude's `.claude/skills/use-otherskill` path is a symlink to that shared content. `otherskill config` offers quick edits and apply using the same checklist. Explicit `--agent`/`--agents` flags start from a clean target list and, with scope/`--no-companion`, take precedence over menu answers. A rerun without explicit targets prechecks saved harnesses; unchecking all intentionally clears the saved harness selection. Cancellation and `--dry-run` write nothing.
+Setup creates the launcher `~/.local/share/otherskill/bin/otherskill`; add its directory to `PATH`. Details, snapshots and flags: [docs/installation.md](docs/installation.md).
 
-Setup creates a managed launcher at `~/.local/share/otherskill/bin/otherskill`; add that directory to PATH, invoke it directly, or explicitly use `bun link`. The launcher references this checkout and Bun by absolute path: keep the checkout in place, or rerun setup after moving it. Setup never globally links the package. The package's `jev-skill-selector` binary is a deprecated alias for the canonical CLI.
-
-```sh
-# Obtain OPENROUTER_API_KEY from your shell/secret manager, never an argument literal.
-bun otherskill.ts setup --non-interactive --agent claude --scope global \
-  --key-env OPENROUTER_API_KEY --model inception/mercury-decide:free \
-  --categories frontend/ui-ux,frontend/storytelling,backend,testing,management
-
-# Configure several harness hooks against the shared .agents companion.
-bun otherskill.ts setup --non-interactive --agents claude,codex --scope global
-
-# Preview in scratch roots, without changing your real home.
-bun otherskill.ts setup --non-interactive --agent codex --scope project \
-  --home /tmp/otherskill-home --cwd /tmp/otherskill-project --dry-run
-```
-
-`--key-stdin` accepts a secret-manager pipe. Saved keys live in the selected home's `.config/otherskill/credentials.json`, mode `0600`; a newly created parent uses `0700`. Keys never enter project config, argument literals, menu echoes or diagnostics. Inherited `OPENROUTER_API_KEY` overrides the private file. OtherSkill does not copy/search `.env`; Bun's automatic `.env` loading still applies when launched from a directory containing one.
-
-Setup preserves unrelated native settings, hooks and skills. It refuses malformed config, unowned launcher/adapter collisions, modified companions, companion symlink collisions and pre-existing native bank exposure. An untouched legacy companion copy can be migrated to the shared symlink; a user-modified or extra-file copy is never replaced and the error tells you where to move it aside. The deprecated skill-only setup wrapper uses the same canonical tree, so it may also migrate an untouched Claude companion to a symlink. `--no-companion` installs only hooks and reports only the selected harness targets. It never moves/removes native skills or exposes the bank through links or `skills.paths`.
-
-| Harness | Global hook/adapter | Project hook/adapter | Companion relative to scope root |
-| --- | --- | --- | --- |
-| Claude | `~/.claude/settings.json` | `.claude/settings.json` | `.claude/skills/use-otherskill` (symlink to the `.agents` copy) |
-| Codex | `~/.codex/hooks.json` | `.codex/hooks.json` | `.agents/skills/use-otherskill/SKILL.md` (canonical) |
-| Antigravity | `~/.gemini/config/hooks.json` | `.agents/hooks.json` | `.agents/skills/use-otherskill/SKILL.md` (canonical) |
-| OpenCode 1.x | `~/.config/opencode/plugins/otherskill.ts` | `.opencode/plugins/otherskill.ts` | `.agents/skills/use-otherskill/SKILL.md` (canonical) |
-
-All generated integrations use the same launcher and **`find --agent <harness>`**. Claude/Codex `UserPromptSubmit` hooks read native stdin payloads. Codex may require trust review through `/hooks`. Antigravity uses a named `PreInvocation` group, skips repeated invocations, and reads the original request from the supplied transcript when needed. OpenCode uses `experimental.chat.messages.transform`, appends a synthetic text part, caches per user message and passes the prompt through a subprocess argument array. Global hooks honor the event workspace's config; project hooks pin project config explicitly.
-
-## Add complete skills
+## Quick start
 
 ```sh
-otherskill add ./my-skill
-otherskill add github:anthropics/skills --path skills/frontend-design
-otherskill add owner/repository --ref release/v1 --path skills/design
-otherskill add https://skills.sh/owner/repository/skill-name
-
-# Explicit offline classification or manual correction:
-otherskill add ./my-skill --category frontend/ui-ux --category testing
-otherskill classify ./my-skill --category frontend/ui-ux --category testing
-otherskill list
+otherskill setup --agent claude       # menu: scope, key, model, categories
+otherskill doctor                     # checks config, hook, bank; no network
+otherskill doctor --live              # one tiny free-model request
+otherskill find --agent claude --prompt 'Design an accessible form' --json
 ```
 
-Automatic classification sends complete skill name/description and configured taxonomy to the free model. Every category meeting `categoryThreshold` receives a **real complete copy**, preserving scripts, references, assets, file modes and attribution. Disabled routing categories may still hold classified copies. `none` means no import; use explicit categories if necessary.
+Preview without writing: `otherskill setup --non-interactive --agent claude --dry-run --home "$(mktemp -d)"`.
 
-Select one directory containing `SKILL.md`; use `--path` for multi-skill repositories. GitHub tree URLs are accepted; refs containing slashes should use `--ref`. Symlinks/special files are rejected; `.git` internals are excluded. Repository-root licenses/notices are copied when absent from the skill directory. Review imported code/licenses before executing it.
+### Setup targets
+
+Plain `otherskill setup` opens a checkbox list of targets: `.agents` (the shared `use-otherskill` companion, selected by default) plus Claude, Codex, Antigravity and OpenCode hooks. Arrow keys or `j`/`k` move, SPACE toggles, ENTER confirms. Reruns precheck the saved harnesses.
+
+Non-interactively, pass one harness with `--agent` or several with `--agents` (not both):
+
+```sh
+otherskill setup --non-interactive --agents claude,codex --scope global
+```
+
+Setup saves the primary `agent` and the full `agents` list; `config --apply` and `update` reapply hooks for every saved harness. `config set agent X` narrows the list to `[X]`. The companion lives once under `.agents/skills/use-otherskill`; Claude's `.claude/skills/use-otherskill` is a symlink to it.
+
+## How it works
 
 ```text
-~/.local/share/otherskill/bank/
-  frontend/ui-ux/design--<source-hash>/
-    SKILL.md
-    scripts/...
-    references/...
-    assets/...
-    .otherskill.json
-  testing/design--<source-hash>/
-    SKILL.md
-    scripts/...
-    references/...
-    assets/...
-    .otherskill.json
+prompt -> harness hook -> otherskill find
+                            |-- stage 1: free model picks categories
+                            |-- stage 2: one request per category picks skills
+                            v
+          additionalContext: skill names + descriptions + provenance
 ```
 
-Metadata records source URL/path, requested ref, resolved Git revision, category and logical identity. Distinct sources with the same name remain distinct; category copies have scoped instance identities. Re-adding stages complete trees before replacing only owned destinations. Reclassification adds/replaces requested memberships and preserves existing memberships; it does not silently delete copies. The source remains unchanged.
+1. The harness fires `UserPromptSubmit` (or its equivalent) and runs `otherskill find --agent <harness>`.
+2. Stage 1 sends the prompt and all category descriptions; categories above the threshold win.
+3. Stage 2 sends, per selected category, the prompt and every skill description, concurrently.
+4. Selected skills are deduplicated and injected as context. The agent reads a skill body only if it decides to.
+5. Any failure injects nothing and exits 0, so the hook never blocks your prompt.
 
-`install` aliases `add`. Optional local creation emits ordinary YAML frontmatter and supplied instructions, then classifies/copies the result. It refuses an existing source destination. If automatic classification fails, the generated source remains available for retry.
+More: [docs/architecture.md](docs/architecture.md).
+
+## Configuration
+
+Config is one JSON file. Precedence: `--config` / `OTHERSKILL_CONFIG` > nearest ancestor `otherskill.config.json` (project) > `~/.config/otherskill/otherskill.config.json` (global) > defaults. Files are not merged.
+
+```jsonc
+{
+  "bankPath": ".otherskill/bank", // relative to this file; global default ~/.local/share/otherskill/bank
+  "model": "inception/mercury-decide:free", // exactly one :free model; paid models rejected
+  "scope": "project", // global | project
+  "agent": "claude",
+  "categories": [
+    // routing taxonomy; ids may nest, e.g. frontend/ui-ux
+    { "id": "docs", "description": "README writing, installation guides" }
+  ],
+  "limits": {
+    "maxCategories": 20,
+    "maxSkills": 10,
+    "timeoutMs": 10000,
+    "concurrency": 4
+  }
+}
+```
+
+Starter file: [otherskill.config.example.json](otherskill.config.example.json). This repo's own project config is [otherskill.config.json](otherskill.config.json) ([docs/project-skills.md](docs/project-skills.md)).
+
+The API key is never in config. `OPENROUTER_API_KEY` in the environment wins over the private file `<home>/.config/otherskill/credentials.json` (mode `0600`, written by `--key-env` or `--key-stdin`).
+
+## Hook params
+
+`find` accepts per-invocation overrides, never written to config:
+
+| Flag                                   | Effect                      |
+| -------------------------------------- | --------------------------- |
+| `--max-skills N`, `--max-categories N` | cap selections              |
+| `--timeout-ms N`                       | per-request deadline        |
+| `--categories a,b`                     | restrict enabled categories |
+| `--model id:free`                      | override model              |
+| `--config FILE`, `--home DIR`          | config and home roots       |
+
+`setup` / `config --apply` embed these flags in the hook command, installing one idempotent `UserPromptSubmit` entry and keeping all other hooks:
 
 ```sh
-otherskill create ./my-skill --name my-skill \
-  --description 'When this reusable capability applies' \
-  --instructions-file ./instructions.md --category management
-otherskill search 'accessibility'
+otherskill setup --non-interactive --agent claude --scope global --max-skills 5 --timeout-ms 8000
 ```
 
-`search` performs real GitHub code search with `path:SKILL.md` and returns source links. It uses authenticated `gh api` or `GH_TOKEN`; unavailable access is an explicit error. `find` exclusively means routing.
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 54,
+            "command": "'$HOME/.local/share/otherskill/bin/otherskill' 'find' '--agent' 'claude' '--home' '$HOME' '--max-skills' '5' '--timeout-ms' '8000'"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
 
-## Find skills
+(Real files contain absolute paths.) Setup also removes the legacy `hooks/claude.ts` / `skill_selector` entry and reports it as `removedLegacyHooks`.
+
+## Update
 
 ```sh
-otherskill find --agent codex --prompt 'Design an accessible form and test it'
-printf '%s' '{"prompt":"Design an accessible form and test it"}' | otherskill find --agent claude
-otherskill find --agent opencode --prompt 'Review an API change' --json
+otherskill update --check     # compare installed commit with remote HEAD, no writes
+otherskill update             # new snapshot of master, repoint launcher, reapply hooks
+otherskill update --ref v1.2 --dry-run
 ```
 
-Invoke through an argument array or proper shell quoting. Never interpolate prompt text into executable shell code. `--agent` overrides detection. `hook` aliases `find`; `select` returns JSON routing results. Native output is Claude/Codex `hookSpecificOutput.additionalContext`, Antigravity `injectSteps`, or an OpenCode selected-skill list plus `context`.
+In a git checkout it prints `git pull` instructions and exits 0.
 
-Stage one receives the original full prompt and all enabled category descriptions. Each selected nonempty category gets a concurrent request containing the same full prompt and **all candidates with complete descriptions**. Logical calls equal `1 + N`; bounded retries can add HTTP attempts. These are HTTP requests, never harness subagents. Injection deduplicates logical copies while retaining category provenance and preserves distinct same-name sources.
-
-Choices, finite probabilities, normalization and winning choice are validated. Inputs are never silently truncated or candidates omitted. Context/candidate/selection overflow returns a safe diagnostic so you can raise limits or reorganize categories. Only one explicit `provider/model:free` is accepted. Paid overrides, fallback chains and silent model substitution are forbidden.
-
-A stage-one failure injects nothing. Category failures can return validated successful categories with explicit `partial` status. Hook failures exit successfully with protocol-correct empty context. Fixed diagnostics never include prompts, keys or upstream response bodies. JSON results retain status, category/instance provenance and logical call counts.
-
-## Config and doctor
-
-Precedence: **`--config` / `OTHERSKILL_CONFIG` > nearest ancestor `otherskill.config.json` > `~/.config/otherskill/otherskill.config.json` > defaults**. The chosen file is complete, with schema defaults filling absent fields; global/project files are not implicitly merged. Relative bank paths resolve beside that file; `~/` uses the selected home. Invalid config is an error, never a fallback.
-
-[otherskill.config.example.json](otherskill.config.example.json) contains editable starter categories and limits. Stable category IDs support arbitrary nesting. Traversal, duplicate IDs, unknown enabled IDs, native overlap and symlink aliases into native paths are rejected.
+## Managing skills
 
 ```sh
-otherskill config
-otherskill config show
-otherskill config get model
-otherskill config get categories
-otherskill config set model inception/mercury-decide:free
-otherskill config set categories frontend/ui-ux,testing
-otherskill config set key --key-env OPENROUTER_API_KEY
-otherskill config show --scope global
-otherskill config set scope project --apply --agent codex
-otherskill config set limits '{"concurrency":2,"retries":1}'
-otherskill doctor
-otherskill doctor --live
+otherskill add github:anthropics/skills --path skills/frontend-design   # classify + copy into bank
+otherskill add ./my-skill --category testing                            # explicit category
+otherskill list                                                         # bank instances
+otherskill search 'accessibility'                                       # GitHub search; needs gh auth or GH_TOKEN
+otherskill config show                                                  # also: get/set model|categories|limits, --apply
 ```
 
-`categories` edits enabled routing IDs. `get taxonomy` returns all IDs/descriptions; `set taxonomy '<JSON array>'` changes taxonomy. `get key` only reports configured/unavailable. `--scope global` bypasses project config; project scope targets the project. `--apply` updates harness hooks. Setup persists the primary `agent` and full `agents` set; reapply reuses both unless `--agent`/`--agents` is supplied. `config set agent X` is an explicit single-target change and intentionally narrows the saved set to `[X]`. Scope changes preserve the previous scope's hooks/config.
+`--scope project` writes into the project bank. Full command reference: `otherskill --help`.
 
-Defaults: concurrency 4, retries after the initial request 1, timeout 10 seconds, retry delay 250ms, request bytes 60000, candidates 200, category/skill thresholds 0.05, selected categories 20, selected skills 10. All have validated configuration bounds. Doctor checks paths, native exposure and companion presence. Ordinary doctor does not call a provider; `--live` makes one tiny free-only request. Configured paths/key presence do not prove running-harness activation or valid credentials.
-
-## Migration and verification
-
-Legacy backup/setup scripts now delegate to safe setup; they do not migrate/remove native skills, copy `.env`, globally link the checkout or expose a bank. Existing legacy installations remain intact: explicitly disable old routing hooks before activating the new hook to avoid duplicate routing. This PR does not activate any real home installation.
-
-The only installation skill source is the orchestrator-authored [use-otherskill](examples/polly/skills/use-otherskill/SKILL.md). Legacy root/bundled selector skill prose remains unchanged for history and is not installed. Commands integrate the requested capability areas of skill-creator, skill-installer, find-skills, write-a-skill and writing-skills; their prose/code was not copied wholesale. Imported skills retain upstream files/licenses and source metadata.
+## Development
 
 ```sh
-bun install --frozen-lockfile
-mkdir -p .tmp
-TMPDIR="$PWD/.tmp" bun test tests/
-bunx tsc --noEmit
-bun run build
-TMPDIR="$PWD/.tmp" python3 scripts/smoke-interactive.py
-TMPDIR="$PWD/.tmp" bun test tests/setup-checkboxes.test.ts
-# Optional network installer smoke: real GitHub/dependencies, disposable HOME,
-# scripted project setup and the curl-style interactive pipe on a real PTY.
-TMPDIR="$PWD/.tmp" python3 scripts/smoke-installer.py
-TMPDIR="$PWD/.tmp" bun scripts/smoke-live.ts
+bun install --frozen-lockfile    # also sets git hooks via `prepare`
 ```
 
-Use a writable scratch directory if system `/tmp` quota is exhausted. Offline tests exercise full copies, identities, actual concurrency at the HTTP boundary, response validation, CLI subprocesses and adapters. Menu smoke uses a real PTY and synthetic key. The inherited evaluation tests use controlled HTTP fixtures; their results are offline evidence. Real online evaluation scripts remain separate and were not run without credentials. Live smoke checks the public decision-model catalog and, only with an existing credential, tiny Mercury and two-stage requests. See [measured evidence and limitations](docs/otherskill-evidence.md).
+| Script                     | Runs                                                           |
+| -------------------------- | -------------------------------------------------------------- |
+| `bun run test`             | unit tests (no network)                                        |
+| `bun run test:integration` | real OpenRouter; skipped without key                           |
+| `bun run test:e2e`         | 100-case golden set through `find --json`; skipped without key |
+| `bun run test:all`         | everything under `tests/`                                      |
+| `bun run check`            | Biome format check, lint, `tsc --noEmit`                       |
+| `bun run format`           | Biome format write                                             |
+| `bun run audit`            | `bun audit`                                                    |
 
-`bun test tests/installer.test.ts` exercises installer failures, argument forwarding, runtime discovery and repeated real setup against controlled download/dependency fixtures in disposable homes. The opt-in installer smoke additionally requires Python 3 on a POSIX host and network access; it makes no provider calls and never uses real API credentials.
+Git hooks (`.githooks`): pre-commit = `check`; pre-push = `audit` + unit tests. E2E reports hit-rate and fails below `E2E_MIN_HIT` (default 0.6); `E2E_LIMIT=N` samples N cases. Set both only with `OPENROUTER_API_KEY` exported.
 
-Primary protocol references: [OpenRouter Decisions example](https://openrouter.ai/blog/tutorials/jev-vs-llm-when-to-use-each/), [decision model catalog](https://openrouter.ai/api/v1/models?output_modalities=decisions), [Claude hooks](https://code.claude.com/docs/en/hooks), [Codex hooks](https://learn.chatgpt.com/docs/hooks), [Antigravity hooks](https://antigravity.google/docs/hooks), [OpenCode plugins](https://opencode.ai/docs/plugins/).
+CI (`.github/workflows/ci.yml`): `check` job (format, lint, typecheck, audit, unit) on push and PR; `live` job (integration + e2e) on master pushes and manual dispatch, skipped for forks, using repository secret `OPENROUTER_API_KEY`. Terms: [CONTEXT.md](CONTEXT.md). Decisions: [docs/adr](docs/adr). Evidence: [docs/otherskill-evidence.md](docs/otherskill-evidence.md).
+
+## Troubleshooting
+
+- `openrouter_http_401` in `find --json`: key missing or rejected. Export `OPENROUTER_API_KEY`, rerun `doctor --live`. Hooks still exit 0.
+- Nothing injected: run `find --json` and read `status` and `diagnostics`; check `doctor` shows `configured: true` for your harness, then restart the harness.
+- Duplicate routing: a legacy hook is still active. Rerun setup (Claude) or remove the old hook (other harnesses).
+- `bun: command not found` in the hook: setup records absolute paths; rerun setup after moving Bun or the checkout.
+- Codex ignores the hook: review and trust it through `/hooks`.

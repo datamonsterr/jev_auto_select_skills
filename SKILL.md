@@ -1,4 +1,5 @@
 ---
+
 name: skill_selector
 description: Fast, calibrated multi-skill router using free decision models on OpenRouter (inception/mercury-decide:free). Dynamically filters and injects only relevant skills from your skills bank per prompt to eliminate context bloat. Use on every prompt or before agent task execution.
 ---
@@ -12,6 +13,7 @@ Instead of polluting the agent's context window by loading 70+ skills on startup
 ## Quick Start
 
 ### 1. Run Skill Selector and Get Full Skill Content (When Cannot Use Hooks)
+
 If your agent harness cannot use lifecycle hooks, invoke `skill_selector` CLI (globally available via `bun link` or via `./run.sh`) to select skills:
 
 ```bash
@@ -31,6 +33,7 @@ skill_selector --skill tdd
 ```
 
 ### 2. Fast Skill Selection Overview
+
 To inspect routing probabilities without full file dumps:
 
 ```bash
@@ -90,6 +93,7 @@ The tool acts as a gatekeeper before your agent starts planning:
 When the agent harness does not support lifecycle hooks:
 1. `skill_selector` is installed into the harness's skill folder (`~/.agents/skills/skill_selector`).
 2. The agent calls:
+
    ```bash
    skill_selector "<task description>" --content
    ```

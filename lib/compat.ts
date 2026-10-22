@@ -12,8 +12,8 @@ import { fileURLToPath } from "node:url";
 
 export function dirnameCompat(meta: ImportMeta): string {
   return (
-    (meta as any).dir ??                           // Bun
-    (meta as any).dirname ??                        // Node ≥21
-    path.dirname(fileURLToPath(meta.url))           // Node <21 / tsx
+    (meta as any).dir ?? // Bun
+    (meta as any).dirname ?? // Node ≥21
+    path.dirname(fileURLToPath(meta.url)) // Node <21 / tsx
   );
 }

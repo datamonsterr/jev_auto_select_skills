@@ -17,7 +17,7 @@ try {
     "https://openrouter.ai/api/v1/models?output_modalities=decisions",
     { signal: AbortSignal.timeout(20000) },
   );
-  if (!response.ok) throw new Error("catalog HTTP " + response.status);
+  if (!response.ok) throw new Error(`catalog HTTP ${response.status}`);
   const catalog = (await response.json()) as {
     data: Array<{
       id: string;

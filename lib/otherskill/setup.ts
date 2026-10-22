@@ -8,6 +8,7 @@ import {
   overlaps,
   realPath,
   auditNativeExposure,
+  withRoutingOverrides,
 } from "./config";
 export const agents = ["claude", "codex", "antigravity", "opencode"] as const;
 export type Agent = (typeof agents)[number];
@@ -198,6 +199,21 @@ function validateCompanionLink(
   if (!stat.isDirectory() || !managedCompanionCopy(link, content))
     throw modifiedCompanionError(link);
 }
+function legacyClaudeHook(command: string): string | undefined {
+  // Recognize executable/script positions, not incidental text in unrelated commands.
+  const words =
+    command
+      .match(/(?:[^\s'";&|]+|'[^']*'|"[^"]*")+/g)
+      ?.map((word) => word.replace(/^['"]|['"]$/g, "")) ?? [];
+  if (path.basename(words[0] ?? "") === "bun") {
+    words.shift();
+    if (words[0] === "run") words.shift();
+    if (/(?:^|\/)hooks\/claude\.ts$/.test(words[0] ?? ""))
+      return "hooks/claude.ts";
+  }
+  if (path.basename(words[0] ?? "") === "skill_selector")
+    return "skill_selector";
+}
 export interface SetupFile {
   path: string;
   content?: string;
@@ -215,6 +231,7 @@ export interface SetupPlan {
   commands: string[];
   companion: boolean;
   shared: boolean;
+  removedLegacyHooks: string[];
 }
 export interface SetupOptions {
   scope?: "global" | "project";
@@ -232,6 +249,7 @@ function planHook(
   launcher: string,
   command: string,
   commandArgs: string[],
+  removedLegacyHooks: string[],
 ): SetupFile {
   const hook = hookFile(agent, root, scope);
   const batches =
@@ -321,6 +339,12 @@ function planHook(
           hooks: entry.hooks.filter((h) => {
             const hook = record(h);
             if (typeof hook.command !== "string") return true;
+            const legacy =
+              agent === "claude" ? legacyClaudeHook(hook.command) : undefined;
+            if (legacy) {
+              removedLegacyHooks.push(legacy);
+              return false;
+            }
             return !hook.command.startsWith(
               quote(launcher) + " 'find' '--agent' " + quote(agent),
             );
@@ -338,6 +362,7 @@ export function planMultiSetup(
   selectedAgents: Agent[],
   options: SetupOptions = {},
 ): SetupPlan {
+  config = withRoutingOverrides(config, config.hookParams ?? {});
   auditNativeExposure(config);
   const scope = options.scope ?? config.scope;
   const root =
@@ -360,6 +385,7 @@ export function planMultiSetup(
     throw new Error("refusing unrelated launcher collision");
   files.push({ path: launcher, content: launcherContent, mode: 0o755 });
   const commands: string[] = [];
+  const removedLegacyHooks: string[] = [];
   for (const agent of agentList) {
     const commandArgs = [
       launcher,
@@ -378,6 +404,20 @@ export function planMultiSetup(
           ]
         : []),
     ];
+    for (const [field, flag] of [
+      ["maxSkills", "--max-skills"],
+      ["maxCategories", "--max-categories"],
+      ["timeoutMs", "--timeout-ms"],
+      ["categories", "--categories"],
+      ["model", "--model"],
+    ] as const) {
+      const value = config.hookParams?.[field];
+      if (value !== undefined)
+        commandArgs.push(
+          flag,
+          Array.isArray(value) ? value.join(",") : String(value),
+        );
+    }
     // Native payloads travel on stdin; no interpolation of prompt text into a shell command.
     const command = commandArgs.map(quote).join(" ");
     commands.push(command);
@@ -391,6 +431,7 @@ export function planMultiSetup(
         launcher,
         command,
         commandArgs,
+        removedLegacyHooks,
       ),
     );
   }
@@ -446,6 +487,7 @@ export function planMultiSetup(
     commands,
     companion: installCompanion,
     shared: sharedTarget,
+    removedLegacyHooks,
   };
 }
 export function planSetup(
