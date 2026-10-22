@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "logicalId": "8a7784776c1d7d1da2d9eec1c9949bb4e1da46c4e0881130bff69585dfe627af",
+  "source": "https://github.com/anthropics/skills/tree/main/skills/skill-creator",
+  "ref": "main",
+  "revision": "dbd4588f9e1033efb41dad4bef2f7947c8993d44",
+  "category": "management",
+  "installedAt": "2026-10-22T07:32:29.272Z"
+}

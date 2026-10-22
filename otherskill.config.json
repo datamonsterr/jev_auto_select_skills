@@ -1,0 +1,32 @@
+{
+  "bankPath": ".otherskill/bank",
+  "model": "inception/mercury-decide:free",
+  "scope": "project",
+  "agent": "claude",
+  "categories": [
+    {
+      "id": "docs",
+      "description": "GitHub README writing, installation guides, usage examples and project documentation"
+    },
+    {
+      "id": "backend",
+      "description": "Bun runtime, command-line tools, TypeScript and OpenRouter API provider integrations"
+    },
+    {
+      "id": "management",
+      "description": "Agent skill authoring, routing, Jev decision models and Claude Code hook workflows"
+    }
+  ],
+  "limits": {
+    "concurrency": 4,
+    "retries": 1,
+    "retryDelayMs": 250,
+    "timeoutMs": 10000,
+    "maxRequestBytes": 60000,
+    "maxCandidates": 200,
+    "categoryThreshold": 0.05,
+    "skillThreshold": 0.05,
+    "maxCategories": 20,
+    "maxSkills": 10
+  }
+}
