@@ -8,6 +8,7 @@ import {
   overlaps,
   realPath,
   auditNativeExposure,
+  withRoutingOverrides,
 } from "./config";
 export const agents = ["claude", "codex", "antigravity", "opencode"] as const;
 export type Agent = (typeof agents)[number];
@@ -85,6 +86,21 @@ function assertRealTarget(file: string): void {
   if (realPath(file) !== path.resolve(file))
     throw new Error("refusing installation through symlink paths");
 }
+function legacyClaudeHook(command: string): string | undefined {
+  // Recognize executable/script positions, not incidental text in unrelated commands.
+  const words =
+    command
+      .match(/(?:[^\s'";&|]+|'[^']*'|"[^"]*")+/g)
+      ?.map((word) => word.replace(/^['"]|['"]$/g, "")) ?? [];
+  if (path.basename(words[0] ?? "") === "bun") {
+    words.shift();
+    if (words[0] === "run") words.shift();
+    if (/(?:^|\/)hooks\/claude\.ts$/.test(words[0] ?? ""))
+      return "hooks/claude.ts";
+  }
+  if (path.basename(words[0] ?? "") === "skill_selector")
+    return "skill_selector";
+}
 export interface SetupPlan {
   agent: Agent;
   scope: "global" | "project";
@@ -92,6 +108,7 @@ export interface SetupPlan {
   files: Array<{ path: string; content: string; mode?: number }>;
   command: string;
   companion: boolean;
+  removedLegacyHooks: string[];
 }
 export function planSetup(
   config: Config,
@@ -103,6 +120,7 @@ export function planSetup(
     companion?: boolean;
   } = {},
 ): SetupPlan {
+  config = withRoutingOverrides(config, config.hookParams ?? {});
   auditNativeExposure(config);
   const scope = options.scope ?? config.scope;
   const root =
@@ -114,6 +132,7 @@ export function planSetup(
   const cli = path.join(repo, "otherskill.ts");
   if (!fs.existsSync(cli)) throw new Error("OtherSkill CLI source not found");
   const files: SetupPlan["files"] = [];
+  const removedLegacyHooks: string[] = [];
   const launcherContent = `#!/bin/sh\n# OtherSkill managed launcher\nexec ${quote(process.execPath)} ${quote(cli)} "$@"\n`;
   if (
     fs.existsSync(launcher) &&
@@ -138,6 +157,20 @@ export function planSetup(
         ]
       : []),
   ];
+  for (const [field, flag] of [
+    ["maxSkills", "--max-skills"],
+    ["maxCategories", "--max-categories"],
+    ["timeoutMs", "--timeout-ms"],
+    ["categories", "--categories"],
+    ["model", "--model"],
+  ] as const) {
+    const value = config.hookParams?.[field];
+    if (value !== undefined)
+      commandArgs.push(
+        flag,
+        Array.isArray(value) ? value.join(",") : String(value),
+      );
+  }
   // Native payloads travel on stdin; no interpolation of prompt text into a shell command.
   const command = commandArgs.map(quote).join(" ");
   const hook = hookFile(agent, root, scope);
@@ -228,6 +261,12 @@ export function planSetup(
             hooks: entry.hooks.filter((h) => {
               const hook = record(h);
               if (typeof hook.command !== "string") return true;
+              const legacy =
+                agent === "claude" ? legacyClaudeHook(hook.command) : undefined;
+              if (legacy) {
+                removedLegacyHooks.push(legacy);
+                return false;
+              }
               return !hook.command.startsWith(
                 quote(launcher) + " 'find' '--agent' " + quote(agent),
               );
@@ -260,7 +299,7 @@ export function planSetup(
   for (const native of nativePaths(root))
     if (overlaps(config.bankPath, native))
       throw new Error("bank overlaps native discovery");
-  return { agent, scope, root, files, command, companion };
+  return { agent, scope, root, files, command, companion, removedLegacyHooks };
 }
 export function applySetup(plan: SetupPlan, dryRun = false): void {
   if (dryRun) return;

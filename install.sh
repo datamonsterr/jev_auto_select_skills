@@ -137,6 +137,21 @@ HELP
   (cd "$release_dir" && "$bun_bin" install --frozen-lockfile) \
     || fail 'dependency installation failed; check Bun version and package registry access'
 
+  # GitHub codeload archives carry the exact commit in the global PAX comment.
+  # Read it from the downloaded bytes, avoiding a branch/HEAD race or another API call.
+  "$bun_bin" -e '
+    import fs from "node:fs";
+    import path from "node:path";
+    import { gunzipSync } from "node:zlib";
+    const [archive, release] = process.argv.slice(1);
+    const tar = gunzipSync(fs.readFileSync(archive));
+    const size = parseInt(tar.subarray(124, 136).toString().replace(/\0/g, "").trim(), 8);
+    const pax = tar[156] === 103 ? tar.subarray(512, 512 + size).toString() : "";
+    const commit = pax.match(/^\d+ comment=([a-f0-9]{40})\n/m)?.[1] ?? null;
+    if (!commit) console.error("[otherskill installer] Archive commit unavailable; update --check will report installedCommit: null.");
+    fs.writeFileSync(path.join(release, ".otherskill-version"), JSON.stringify({ commit, ref: "master", installedAt: new Date().toISOString() }, null, 2) + "\n");
+  ' "$work_dir/source.tar.gz" "$release_dir" || fail 'could not record installed version'
+
   # From here setup can persist absolute references, even before a later failure.
   retain_release=1
   printf '[otherskill installer] Running setup; keeping source at %s\n' "$release_dir" >&2
