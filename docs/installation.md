@@ -55,6 +55,30 @@ Setup creates `~/.local/share/otherskill/bin/otherskill`. Add that directory to 
 
 Setup preserves unrelated settings, hooks and skills. It refuses malformed config, unowned launcher/adapter collisions, modified companions and pre-existing native bank exposure. It never moves native skills or exposes the bank through links or `skills.paths`. Windows and OpenCode 2.x are unverified.
 
+## Portable project hooks
+
+For a repository other people clone, write hooks without absolute home or project paths:
+
+```sh
+otherskill setup --scope project --agents claude,codex --portable   # persists "portableHooks": true
+otherskill config set portableHooks false --apply                  # back to absolute hooks
+```
+
+Requirements: project scope, the project config at `otherskill.config.json` or `.otherskill/config.json` in the project root, a bankPath relative to that file (for example `.otherskill/bank` or, from `.otherskill/config.json`, `bank`), and the launcher installed at `$HOME/.local/share/otherskill/bin/otherskill` on every machine. Otherwise setup fails with "portable hooks require project scope with otherskill.config.json or .otherskill/config.json at the project root".
+
+To keep everything OtherSkill owns in one folder, use `.otherskill/config.json` with `"bankPath": "bank"`, giving `.otherskill/config.json` plus `.otherskill/bank/`. `update` and `config --apply` keep honoring the saved flag.
+
+Generated hooks:
+- Claude: `"$HOME/.local/share/otherskill/bin/otherskill" 'find' '--agent' 'claude' '--config' "$CLAUDE_PROJECT_DIR/<config path relative to the project root>"`
+- Codex and Antigravity: the same command without `--config`; `find` loads the nearest config from the payload `cwd` or `workspacePaths[0]`.
+- OpenCode: a self-contained plugin (marker `// otherskill:portable`) that inlines the adapter and resolves the launcher from `os.homedir()`.
+
+Limits: Antigravity relies on `$HOME` expansion, so it must run hook commands through a shell. Bank provenance files (`.otherskill.json`) still record the original source path.
+
 ## Migration from legacy hooks
 
 `otherskill setup --agent claude` removes the legacy `hooks/claude.ts` / `skill_selector` `UserPromptSubmit` entry and lists it under `removedLegacyHooks`. For other harnesses disable old routing hooks yourself to avoid double routing. Legacy backup/setup scripts delegate to safe setup and never copy `.env`.
+
+## Project and global config together
+
+A project config inherits the global config (`~/.config/otherskill/otherskill.config.json`) when it exists: categories are the union by id (project order first, project description wins), enabled categories are the union of both sides (`--categories` replaces the union), and skills are read from the project bank and the global bank, deduplicated by instance and logical ID with the project copy kept. `add`, `create` and `classify` write only to the project bank. Set `"inheritGlobal": false` in the project config, or use `--scope global`, to route with the project alone.

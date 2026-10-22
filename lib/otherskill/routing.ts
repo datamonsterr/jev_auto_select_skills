@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { type Config, freeModel } from "./config";
+import { type Config, freeModel, routingView } from "./config";
 import { discoverBank, type BankSkill, readSkill } from "./bank";
 export const DECISIONS_URL = "https://openrouter.ai/api/alpha/decisions";
 export interface DecisionRequest {
@@ -173,8 +173,9 @@ export async function classify(
   provider = new Decisions(config),
 ): Promise<string[]> {
   const skill = readSkill(sourceDir);
+  const known = routingView(config).categories;
   const criteria = Object.fromEntries(
-    config.categories.map((c, i) => [`c${i}`, c.description]),
+    known.map((c, i) => [`c${i}`, c.description]),
   );
   criteria.none = "No category matches this skill.";
   const response = await provider.decide(
@@ -183,7 +184,7 @@ export async function classify(
       state: {
         user_prompt: JSON.stringify(skill),
         stage: "classify",
-        categories: config.categories,
+        categories: known,
       },
       questions: {
         selection: {
@@ -201,7 +202,7 @@ export async function classify(
     throw new RoutingError("no_matching_categories_use_explicit_category");
   if (keys.length > config.limits.maxCategories)
     throw new RoutingError("category_selection_limit_exceeded");
-  return keys.map((key) => config.categories[Number(key.slice(1))]!.id);
+  return keys.map((key) => known[Number(key.slice(1))]!.id);
 }
 export interface Selected extends BankSkill {
   categories: string[];
@@ -237,9 +238,9 @@ export async function route(
   try {
     if (!prompt.trim()) throw new RoutingError("missing_prompt");
     const bank = discoverBank(config);
-    const categories = config.categories.filter(
-      (c) =>
-        !config.enabledCategories || config.enabledCategories.includes(c.id),
+    const view = routingView(config);
+    const categories = view.categories.filter(
+      (c) => !view.enabledCategories || view.enabledCategories.includes(c.id),
     );
     if (!categories.length) return result;
     const criteria = Object.fromEntries(

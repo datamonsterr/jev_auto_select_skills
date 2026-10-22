@@ -75,7 +75,7 @@ More: [docs/architecture.md](docs/architecture.md).
 
 ## Configuration
 
-Config is one JSON file. Precedence: `--config` / `OTHERSKILL_CONFIG` > nearest ancestor `otherskill.config.json` (project) > `~/.config/otherskill/otherskill.config.json` (global) > defaults. Files are not merged.
+Config is one JSON file. Precedence: `--config` / `OTHERSKILL_CONFIG` > nearest ancestor `otherskill.config.json` or `.otherskill/config.json` (project; the root file wins when a directory has both) > `~/.config/otherskill/otherskill.config.json` (global) > defaults. A project config also inherits the global config: routing (`find`, `select`, `list`, `doctor`, `classify`) sees the categories and banks of both as one pool, and writes go only to the project bank. Set `"inheritGlobal": false` to opt out.
 
 ```jsonc
 {

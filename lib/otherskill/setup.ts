@@ -7,8 +7,11 @@ import {
   type Config,
   nativePaths,
   overlaps,
+  projectConfigNames,
+  projectRoot,
   realPath,
   auditNativeExposure,
+  routingView,
   withRoutingOverrides,
 } from "./config";
 export const agents = ["claude", "codex", "antigravity", "opencode"] as const;
@@ -43,6 +46,14 @@ export function quote(value: string): string {
 }
 export function launcherPath(home: string): string {
   return path.join(home, ".local/share/otherskill/bin/otherskill");
+}
+export const portableLauncher =
+  '"$HOME/.local/share/otherskill/bin/otherskill"';
+export const portableMarker = "// otherskill:portable";
+export const portableError =
+  "portable hooks require project scope with otherskill.config.json or .otherskill/config.json at the project root";
+export function portablePrefix(agent: Agent): string {
+  return `${portableLauncher} 'find' '--agent' ${quote(agent)}`;
 }
 export function hookFile(
   agent: Agent,
@@ -215,6 +226,12 @@ function validateCompanionLink(
   if (!stat.isDirectory() || !managedCompanionCopy(link, content))
     throw modifiedCompanionError(link);
 }
+function ownsCommand(command: string, agent: Agent, launcher: string): boolean {
+  return (
+    command.startsWith(quote(launcher) + " 'find' '--agent' " + quote(agent)) ||
+    command.startsWith(portablePrefix(agent))
+  );
+}
 function legacyClaudeHook(command: string): string | undefined {
   // Recognize executable/script positions, not incidental text in unrelated commands.
   const words =
@@ -256,6 +273,18 @@ export interface SetupOptions {
   companion?: boolean;
   shared?: boolean;
 }
+/** Self-contained OpenCode adapter: inlines the shared source, resolves the launcher from the user's home. */
+function portablePlugin(
+  repo: string,
+  flags: string[],
+  timeoutMs: number,
+): string {
+  const source = fs
+    .readFileSync(path.join(repo, "plugins/otherskill-opencode.ts"), "utf8")
+    .replace(/^export /gm, "");
+  const args = JSON.stringify(["find", "--agent", "opencode", ...flags]);
+  return `// OtherSkill managed adapter\n${portableMarker}\nimport {homedir} from "node:os";\n${source}\nexport const OtherSkill = async ({directory}:{directory:string}) => createOpenCodePlugin({command:[homedir()+"/.local/share/otherskill/bin/otherskill",...${args}],cwd:directory,timeoutMs:${timeoutMs}});\n`;
+}
 function planHook(
   config: Config,
   agent: Agent,
@@ -265,14 +294,17 @@ function planHook(
   launcher: string,
   command: string,
   commandArgs: string[],
+  flags: string[] | undefined,
   removedLegacyHooks: string[],
 ): SetupFile {
   const hook = hookFile(agent, root, scope);
   const batches =
     1 +
     Math.ceil(
-      Math.min(config.limits.maxCategories, config.categories.length) /
-        config.limits.concurrency,
+      Math.min(
+        config.limits.maxCategories,
+        routingView(config).categories.length,
+      ) / config.limits.concurrency,
     );
   const timeoutMs =
     batches *
@@ -283,7 +315,9 @@ function planHook(
     const module = pathToFileURL(
       path.join(repo, "plugins/otherskill-opencode.ts"),
     ).href;
-    const plugin = `// OtherSkill managed adapter\nimport {createOpenCodePlugin} from ${JSON.stringify(module)};\nexport const OtherSkill = async ({directory}:{directory:string}) => createOpenCodePlugin({command:${JSON.stringify(commandArgs)},cwd:directory,timeoutMs:${timeoutMs}});\n`;
+    const plugin = flags
+      ? portablePlugin(repo, flags, timeoutMs)
+      : `// OtherSkill managed adapter\nimport {createOpenCodePlugin} from ${JSON.stringify(module)};\nexport const OtherSkill = async ({directory}:{directory:string}) => createOpenCodePlugin({command:${JSON.stringify(commandArgs)},cwd:directory,timeoutMs:${timeoutMs}});\n`;
     if (
       fs.existsSync(hook) &&
       !fs.readFileSync(hook, "utf8").startsWith("// OtherSkill managed adapter")
@@ -331,8 +365,10 @@ function planHook(
           (h) =>
             !h ||
             typeof h !== "object" ||
-            !String((h as Record<string, unknown>).command).startsWith(
-              quote(launcher) + " 'find' '--agent' 'antigravity'",
+            !ownsCommand(
+              String((h as Record<string, unknown>).command),
+              "antigravity",
+              launcher,
             ),
         )
       )
@@ -361,9 +397,7 @@ function planHook(
               removedLegacyHooks.push(legacy);
               return false;
             }
-            return !hook.command.startsWith(
-              quote(launcher) + " 'find' '--agent' " + quote(agent),
-            );
+            return !ownsCommand(hook.command, agent, launcher);
           }),
         };
       })
@@ -384,8 +418,18 @@ export function planMultiSetup(
   const root =
     scope === "global"
       ? config.home
-      : path.resolve(options.projectRoot ?? config.cwd);
+      : path.resolve(options.projectRoot ?? projectRoot(config));
   const repo = path.resolve(options.repoDir ?? repoRoot);
+  const portable = config.portableHooks === true;
+  const portableConfig = config.configPath
+    ? path.relative(root, path.resolve(config.configPath))
+    : "";
+  if (
+    portable &&
+    (scope !== "project" ||
+      !(projectConfigNames as readonly string[]).includes(portableConfig))
+  )
+    throw new Error(portableError);
   const launcher = launcherPath(config.home);
   const cli = path.join(repo, "otherskill.ts");
   if (!fs.existsSync(cli)) throw new Error("OtherSkill CLI source not found");
@@ -403,6 +447,7 @@ export function planMultiSetup(
   const commands: string[] = [];
   const removedLegacyHooks: string[] = [];
   for (const agent of agentList) {
+    const flags: string[] = [];
     const commandArgs = [
       launcher,
       "find",
@@ -429,13 +474,22 @@ export function planMultiSetup(
     ] as const) {
       const value = config.hookParams?.[field];
       if (value !== undefined)
-        commandArgs.push(
+        flags.push(
           flag,
           Array.isArray(value) ? value.join(",") : String(value),
         );
     }
+    commandArgs.push(...flags);
     // Native payloads travel on stdin; no interpolation of prompt text into a shell command.
-    const command = commandArgs.map(quote).join(" ");
+    const command = portable
+      ? [
+          portablePrefix(agent),
+          ...(agent === "claude"
+            ? [`'--config' "$CLAUDE_PROJECT_DIR/${portableConfig}"`]
+            : []),
+          ...flags.map(quote),
+        ].join(" ")
+      : commandArgs.map(quote).join(" ");
     commands.push(command);
     files.push(
       planHook(
@@ -447,6 +501,7 @@ export function planMultiSetup(
         launcher,
         command,
         commandArgs,
+        portable ? flags : undefined,
         removedLegacyHooks,
       ),
     );
@@ -581,7 +636,7 @@ export function inspectInstallation(
   companion: boolean;
   diagnostics: string[];
 } {
-  const root = config.scope === "global" ? config.home : config.cwd;
+  const root = config.scope === "global" ? config.home : projectRoot(config);
   const hook = hookFile(agent, root, config.scope);
   const launcher = launcherPath(config.home);
   const diagnostics: string[] = [];
@@ -590,7 +645,13 @@ export function inspectInstallation(
     agent === "opencode"
       ? JSON.stringify([launcher, "find", "--agent", agent]).slice(0, -1)
       : [launcher, "find", "--agent", agent].map(quote).join(" ");
-  let configured = content.includes(expected);
+  let configured =
+    content.includes(expected) ||
+    (agent === "opencode"
+      ? content.startsWith("// OtherSkill managed adapter") &&
+        content.includes(portableMarker) &&
+        content.includes('"--agent","opencode"')
+      : content.includes(JSON.stringify(portablePrefix(agent)).slice(1, -1)));
   if (content.includes("otherskill") && !configured)
     diagnostics.push("hook_installation_path_or_agent_mismatch");
   if (
