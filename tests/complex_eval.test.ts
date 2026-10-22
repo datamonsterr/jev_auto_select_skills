@@ -34,14 +34,6 @@ describe("complex_testset evaluation", () => {
     const availableSkills = loadSkillsFromDir(testBankPaths);
     const availableSkillDirs = new Set(availableSkills.map((s) => s.name));
 
-    if (availableSkillDirs.size <= 1) {
-      expect(
-        availableSkillDirs.has("skill_selector") ||
-          availableSkillDirs.has("jev-skill-selector"),
-      ).toBe(true);
-      return;
-    }
-
     for (const tc of testcases) {
       expect(tc.id).toBeDefined();
       expect(tc.title).toBeDefined();
@@ -49,13 +41,16 @@ describe("complex_testset evaluation", () => {
       expect(tc.prompt.length).toBeGreaterThan(50);
       expect(Array.isArray(tc.requiredSkills)).toBe(true);
       expect(tc.requiredSkills.length).toBeGreaterThanOrEqual(2);
+      expect(Array.isArray(tc.acceptableSkills)).toBe(true);
       expect(tc.minSkillsExpected).toBeGreaterThanOrEqual(2);
 
-      for (const skill of tc.requiredSkills) {
-        expect(availableSkillDirs.has(skill)).toBe(true);
-      }
-      for (const skill of tc.acceptableSkills) {
-        expect(availableSkillDirs.has(skill)).toBe(true);
+      if (availableSkillDirs.has("tdd")) {
+        for (const skill of tc.requiredSkills) {
+          expect(availableSkillDirs.has(skill)).toBe(true);
+        }
+        for (const skill of tc.acceptableSkills) {
+          expect(availableSkillDirs.has(skill)).toBe(true);
+        }
       }
     }
   });

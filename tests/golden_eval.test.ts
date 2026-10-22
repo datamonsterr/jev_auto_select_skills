@@ -31,23 +31,16 @@ describe("golden_set integration", () => {
     const availableSkills = loadSkillsFromDir(testBankPaths);
     const availableSkillDirs = new Set(availableSkills.map((s) => s.name));
 
-    if (availableSkillDirs.size <= 1) {
-      // Standalone repo mode without test bank
-      expect(
-        availableSkillDirs.has("skill_selector") ||
-          availableSkillDirs.has("jev-skill-selector"),
-      ).toBe(true);
-      return;
-    }
-
     for (const tc of testcases) {
       expect(tc.id).toBeDefined();
       expect(tc.prompt).toBeDefined();
       expect(Array.isArray(tc.expectedSkills)).toBe(true);
       expect(tc.expectedSkills.length).toBeGreaterThan(0);
 
-      for (const skillName of tc.expectedSkills) {
-        expect(availableSkillDirs.has(skillName)).toBe(true);
+      if (availableSkillDirs.has("tdd")) {
+        for (const skillName of tc.expectedSkills) {
+          expect(availableSkillDirs.has(skillName)).toBe(true);
+        }
       }
     }
   });
