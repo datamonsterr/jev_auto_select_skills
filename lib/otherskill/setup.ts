@@ -141,11 +141,22 @@ export function planSetup(
   // Native payloads travel on stdin; no interpolation of prompt text into a shell command.
   const command = commandArgs.map(quote).join(" ");
   const hook = hookFile(agent, root, scope);
+  const batches =
+    1 +
+    Math.ceil(
+      Math.min(config.limits.maxCategories, config.categories.length) /
+        config.limits.concurrency,
+    );
+  const timeoutMs =
+    batches *
+      ((config.limits.retries + 1) * config.limits.timeoutMs +
+        config.limits.retryDelayMs * (2 ** config.limits.retries - 1)) +
+    5000;
   if (agent === "opencode") {
     const module = pathToFileURL(
       path.join(repo, "plugins/otherskill-opencode.ts"),
     ).href;
-    const plugin = `// OtherSkill managed adapter\nimport {createOpenCodePlugin} from ${JSON.stringify(module)};\nexport const OtherSkill = async ({directory}:{directory:string}) => createOpenCodePlugin({command:${JSON.stringify(commandArgs)},cwd:directory});\n`;
+    const plugin = `// OtherSkill managed adapter\nimport {createOpenCodePlugin} from ${JSON.stringify(module)};\nexport const OtherSkill = async ({directory}:{directory:string}) => createOpenCodePlugin({command:${JSON.stringify(commandArgs)},cwd:directory,timeoutMs:${timeoutMs}});\n`;
     if (
       fs.existsSync(hook) &&
       !fs.readFileSync(hook, "utf8").startsWith("// OtherSkill managed adapter")
@@ -180,7 +191,7 @@ export function planSetup(
     const handler = {
       type: "command",
       command,
-      timeout: 60,
+      timeout: Math.ceil(timeoutMs / 1000),
       ...(agent === "codex" ? { additionalContextLimit: 100000 } : {}),
     };
     if (agent === "antigravity") {

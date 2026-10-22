@@ -48,13 +48,13 @@ describe("hooks and plugin", () => {
       selectSkillsFn: mockSelectSkills as any,
     });
 
-    expect(output).toContain("Recommended Agent Skills");
+    expect(output).toContain("Skill Selector");
     expect(output).toContain("tdd");
   });
 
   it("creates a valid OpenCode plugin object with chat hook and tool", () => {
     const plugin = jevSkillSelectorPlugin();
-    expect(plugin.name).toBe("jev-skill-selector");
+    expect(plugin.name).toBe("skill_selector");
     expect(typeof plugin.hooks?.["chat:before"]).toBe("function");
     expect(Array.isArray(plugin.tools)).toBe(true);
     expect(plugin.tools[0]?.name).toBe("select_skill");
@@ -83,7 +83,7 @@ describe("hooks and plugin", () => {
     );
 
     expect(result.injectSteps).toHaveLength(1);
-    expect(result.injectSteps[0]?.ephemeralMessage).toContain("Recommended Agent Skills");
+    expect(result.injectSteps[0]?.ephemeralMessage).toContain("Skill Selector");
     expect(result.injectSteps[0]?.ephemeralMessage).toContain("writing-srs");
   });
 

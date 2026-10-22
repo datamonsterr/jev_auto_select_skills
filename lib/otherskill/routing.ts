@@ -71,43 +71,69 @@ export class Decisions {
     if (!this.apiKey)
       throw new RoutingError("openrouter_credential_unavailable");
     for (let attempt = 0; attempt <= limits.retries; attempt++) {
-      let response: Response;
+      const controller = new AbortController();
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      let completed: { ok: boolean; status: number; data?: unknown };
       try {
-        response = await this.fetchFn(DECISIONS_URL, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${this.apiKey}`,
-            "Content-Type": "application/json",
-            "X-Title": "OtherSkill",
-          },
-          body,
-          signal: AbortSignal.timeout(limits.timeoutMs),
+        const deadline = new Promise<never>((_, reject) => {
+          timer = setTimeout(() => {
+            reject(new RoutingError("openrouter_network_or_timeout"));
+            controller.abort();
+          }, limits.timeoutMs);
         });
-      } catch {
+        const operation = (async () => {
+          const response = await this.fetchFn(DECISIONS_URL, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${this.apiKey}`,
+              "Content-Type": "application/json",
+              "X-Title": "OtherSkill",
+            },
+            body,
+            signal: controller.signal,
+          });
+          if (!response.ok) {
+            void response.body?.cancel().catch(() => {});
+            return { ok: false, status: response.status };
+          }
+          let data: unknown;
+          try {
+            data = await response.json();
+          } catch {
+            throw new RoutingError(
+              controller.signal.aborted
+                ? "openrouter_network_or_timeout"
+                : "invalid_decision_json",
+            );
+          }
+          return { ok: true, status: response.status, data };
+        })();
+        completed = await Promise.race([operation, deadline]);
+      } catch (error) {
+        if (
+          error instanceof RoutingError &&
+          error.code === "invalid_decision_json"
+        )
+          throw error;
         if (attempt < limits.retries) {
           await Bun.sleep(limits.retryDelayMs * 2 ** attempt);
           continue;
         }
         throw new RoutingError("openrouter_network_or_timeout");
+      } finally {
+        if (timer !== undefined) clearTimeout(timer);
       }
-      if (!response.ok) {
-        // Never include upstream text: providers may echo prompts or credentials.
-        await response.body?.cancel();
+      if (!completed.ok) {
         if (
-          (response.status === 429 || response.status >= 500) &&
+          (completed.status === 429 || completed.status >= 500) &&
           attempt < limits.retries
         ) {
           await Bun.sleep(limits.retryDelayMs * 2 ** attempt);
           continue;
         }
-        throw new RoutingError(`openrouter_http_${response.status}`);
+        throw new RoutingError(`openrouter_http_${completed.status}`);
       }
-      let parsed: unknown;
-      try {
-        parsed = await response.json();
-      } catch {
-        throw new RoutingError("invalid_decision_json");
-      }
+      const parsed = completed.data;
       const result = z
         .object({ answers: z.object({ selection: answerSchema }).strict() })
         .safeParse(parsed);

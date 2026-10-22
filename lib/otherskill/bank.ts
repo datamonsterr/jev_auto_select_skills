@@ -217,6 +217,25 @@ export function installLocal(
         throw new Error("refusing to overwrite an unrelated bank directory");
     }
   }
+  const licenses: Array<{ source: string; name: string }> = [];
+  if (origin?.licenseRoot) {
+    const root = path.resolve(origin.licenseRoot);
+    if (
+      realPath(root) !== root ||
+      !(source === root || source.startsWith(root + path.sep))
+    )
+      throw new Error("invalid attribution root");
+    for (const name of fs.readdirSync(root)) {
+      if (!/^(LICENSE|LICENCE|COPYING|NOTICE)(\..*)?$/i.test(name)) continue;
+      const file = path.join(root, name),
+        stat = fs.lstatSync(file);
+      if (stat.isSymbolicLink() || realPath(file) !== file)
+        throw new Error(
+          "attribution files must be real files inside source repository",
+        );
+      if (stat.isFile()) licenses.push({ source: file, name });
+    }
+  }
   // Stage every complete copy before replacing any owned target.
   const staging: Array<{
     stage: string;
@@ -235,18 +254,9 @@ export function installLocal(
         preserveTimestamps: true,
         filter: (p) => path.basename(p) !== ".git",
       });
-      if (origin?.licenseRoot)
-        for (const file of fs.readdirSync(origin.licenseRoot)) {
-          if (
-            /^(LICENSE|LICENCE|COPYING|NOTICE)(\..*)?$/i.test(file) &&
-            fs.statSync(path.join(origin.licenseRoot, file)).isFile() &&
-            !fs.existsSync(path.join(stage, file))
-          )
-            fs.copyFileSync(
-              path.join(origin.licenseRoot, file),
-              path.join(stage, file),
-            );
-        }
+      for (const license of licenses)
+        if (!fs.existsSync(path.join(stage, license.name)))
+          fs.copyFileSync(license.source, path.join(stage, license.name));
       const metadata: Metadata = {
         version: 1,
         logicalId,

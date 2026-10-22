@@ -1,11 +1,16 @@
-/** Deprecated factory shape; setup installs the native adapter from otherskill-opencode.ts. */
+/** Deprecated factory shape; setup installs the native OtherSkill adapter. */
 import path from "node:path";
 import { repoRoot } from "../lib/otherskill/setup";
 import { createOpenCodePlugin } from "./otherskill-opencode";
+import { formatSkillSummary, type SelectedSkill } from "../lib/model";
 export interface OpenCodePluginOptions {
   skillsDir?: string | string[];
   threshold?: number;
   autoInject?: boolean;
+  selectSkillsFn?: (input: {
+    userPrompt: string;
+    skillsDir?: string | string[];
+  }) => Promise<{ selectedSkills: SelectedSkill[] }>;
 }
 export default function jevSkillSelectorPlugin(
   options: OpenCodePluginOptions = {},
@@ -17,11 +22,31 @@ export default function jevSkillSelectorPlugin(
     "--agent",
     "opencode",
   ];
-  const hooks = createOpenCodePlugin({ command, cwd: process.cwd() });
+  const run = options.selectSkillsFn
+    ? async (args: string[]) => {
+        const prompt = args[args.indexOf("--prompt") + 1] ?? "";
+        const result = await options.selectSkillsFn!({
+          userPrompt: prompt,
+          skillsDir: options.skillsDir,
+        });
+        return JSON.stringify({
+          context: result.selectedSkills.length
+            ? formatSkillSummary(result.selectedSkills)
+            : "",
+        });
+      }
+    : undefined;
+  const hooks = createOpenCodePlugin({ command, cwd: process.cwd(), run });
   return {
-    name: "jev-skill-selector",
-    version: "1.0.0",
-    hooks: { ...hooks, "chat:before": async (context: unknown) => context },
+    name: "skill_selector",
+    version: "1.1.0",
+    hooks: {
+      ...hooks,
+      ...(options.autoInject === false
+        ? { "experimental.chat.messages.transform": async () => {} }
+        : {}),
+      "chat:before": async (context: unknown) => context,
+    },
     tools: [
       {
         name: "select_skill",

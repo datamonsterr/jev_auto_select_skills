@@ -7,11 +7,11 @@ import { dirnameCompat } from "../lib/compat";
 describe("assess.ts skill placement", () => {
   it("classifies task-specific skills as JEV_ROUTED", async () => {
     const result = await assessSkill({
-      skillPathOrName: path.resolve(__dirname, "../skills/jev-skill-selector"),
+      skillPathOrName: path.resolve(__dirname, "../skills/skill_selector"),
     });
 
     expect(result.classification).toBe("JEV_ROUTED");
-    expect(result.recommendedDir).toContain("jev_skills");
+    expect(result.recommendedDir).toContain("other_skills");
   });
 
   it("classifies caveman persona skill as ALWAYS_ON", async () => {
@@ -60,7 +60,7 @@ Instructions...
       });
 
       expect(result.classification).toBe("JEV_ROUTED");
-      expect(result.recommendedDir).toContain(path.join(".agents", "jev_skills", "docker-deploy"));
+      expect(result.recommendedDir).toContain(path.join(".agents", "other_skills", "docker-deploy"));
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }

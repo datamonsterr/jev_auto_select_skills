@@ -1,13 +1,14 @@
 {
-  "name": "jev-skill-selector",
-  "version": "1.0.0",
+  "name": "skill_selector",
+  "version": "1.1.0",
   "description": "OtherSkill: hidden categorized skills, free OpenRouter decisions and native harness awareness",
   "main": "index.ts",
   "module": "index.ts",
   "type": "module",
   "bin": {
-    "otherskill": "./otherskill.ts",
-    "jev-skill-selector": "./otherskill.ts"
+    "skill_selector": "./index.ts",
+    "jev-skill-selector": "./otherskill.ts",
+    "otherskill": "./otherskill.ts"
   },
   "scripts": {
     "start": "bun otherskill.ts",
@@ -16,6 +17,7 @@
     "setup:codex": "bun otherskill.ts setup --agent codex",
     "setup:agy": "bun otherskill.ts setup --agent antigravity",
     "setup:opencode": "bun otherskill.ts setup --agent opencode",
+    "migrate": "bun run scripts/migrate-skills.ts",
     "test": "bun test tests/",
     "test:golden": "bun run scripts/test-golden.ts",
     "test:complex": "bun run scripts/test-complex.ts",

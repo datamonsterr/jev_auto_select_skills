@@ -3,6 +3,7 @@ import { Writable } from "node:stream";
 import { type Config, FREE_MODEL } from "./config";
 import { agentName, type Agent } from "./setup";
 export interface MenuResult {
+  config: Config;
   agent: Agent;
   scope: "global" | "project";
   model: string;
@@ -14,6 +15,12 @@ export interface MenuResult {
 export async function menu(
   config: Config,
   kind: "setup" | "config",
+  options: {
+    fixedAgent?: Agent;
+    fixedScope?: "global" | "project";
+    noCompanion?: boolean;
+    configForScope?: (scope: "global" | "project") => Config;
+  } = {},
 ): Promise<MenuResult> {
   if (!process.stdin.isTTY)
     throw new Error(
@@ -47,29 +54,33 @@ export async function menu(
     const choice = await ask(
       `Harness: 1 Claude, 2 Codex, 3 Antigravity, 4 OpenCode [${config.agent ?? "claude"}]: `,
     );
-    const agent = agentName(
-      (
-        {
-          "1": "claude",
-          "2": "codex",
-          "3": "antigravity",
-          "4": "opencode",
-        } as Record<string, string>
-      )[choice] ??
-        (choice || config.agent || "claude"),
-    );
+    const agent =
+      options.fixedAgent ??
+      agentName(
+        (
+          {
+            "1": "claude",
+            "2": "codex",
+            "3": "antigravity",
+            "4": "opencode",
+          } as Record<string, string>
+        )[choice] ??
+          (choice || config.agent || "claude"),
+      );
     const scopeChoice = await ask(
       `Hook scope: 1 global, 2 project [${config.scope}]: `,
     );
     const scope =
-      scopeChoice === "2" || scopeChoice === "project"
+      options.fixedScope ??
+      (scopeChoice === "2" || scopeChoice === "project"
         ? "project"
         : scopeChoice === "1" || scopeChoice === "global"
           ? "global"
           : scopeChoice === ""
             ? config.scope
-            : undefined;
+            : undefined);
     if (!scope) throw new Error("invalid scope");
+    config = options.configForScope?.(scope) ?? config;
     const key = await ask(
       "OpenRouter API key (hidden, blank keeps existing): ",
       true,
@@ -95,10 +106,12 @@ export async function menu(
             : value;
         })
       : (config.enabledCategories ?? config.categories.map((c) => c.id));
-    const companion =
-      (
-        await ask("Install native use-otherskill companion? [Y/n]: ")
-      ).toLowerCase() !== "n";
+    const companionChoice = (
+      await ask(
+        `Install native use-otherskill companion? [${options.noCompanion ? "y/N" : "Y/n"}]: `,
+      )
+    ).toLowerCase();
+    const companion = !options.noCompanion && companionChoice !== "n";
     const apply =
       (
         await ask(
@@ -108,6 +121,7 @@ export async function menu(
         )
       ).toLowerCase() !== "n";
     return {
+      config,
       agent,
       scope,
       key: key || undefined,

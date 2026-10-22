@@ -13,6 +13,7 @@ export interface Message {
 export function createOpenCodePlugin(options: {
   command: string[];
   cwd: string;
+  timeoutMs?: number;
   run?: (argv: string[]) => Promise<string>;
 }) {
   const cache = new Map<string, Promise<string>>();
@@ -24,7 +25,7 @@ export function createOpenCodePlugin(options: {
         stdin: "ignore",
         stdout: "pipe",
         stderr: "pipe",
-        signal: AbortSignal.timeout(60000),
+        signal: AbortSignal.timeout(options.timeoutMs ?? 60000),
       });
       const [output, errors] = await Promise.all([
         new Response(process.stdout).text(),
@@ -45,7 +46,10 @@ export function createOpenCodePlugin(options: {
         .find((m) => m.info.role === "user");
       if (!user) return;
       const id = "otherskill-" + user.info.id;
-      if (user.parts.some((p) => p.id === id)) return;
+      for (const message of output.messages)
+        message.parts = message.parts.filter(
+          (part) => !(part.synthetic && part.id?.startsWith("otherskill-")),
+        );
       const prompt = user.parts
         .filter(
           (p) =>
@@ -70,7 +74,7 @@ export function createOpenCodePlugin(options: {
           typeof result.context !== "string"
         )
           throw new Error("invalid find output");
-        if (result.context)
+        if (result.context && !user.parts.some((part) => part.id === id))
           user.parts.push({
             type: "text",
             text: result.context,

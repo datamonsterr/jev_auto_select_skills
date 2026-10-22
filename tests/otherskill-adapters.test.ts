@@ -176,3 +176,52 @@ test("doctor installation inspection detects stale launcher source paths", async
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("generated installed hook commands and the installed OpenCode module execute with safe native failures", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "otherskill-installed-"));
+  try {
+    const config = loadConfig({ home: path.join(root, "home"), cwd: root });
+    const invalid = path.join(root, "malformed.json");
+    fs.writeFileSync(invalid, "{invalid");
+    config.configPath = invalid;
+    for (const agent of agents) {
+      const plan = setup(config, agent, { scope: "global" });
+      const child = Bun.spawn(["sh", "-c", plan.command], {
+        stdin: new Blob([
+          JSON.stringify({ prompt: "literal $(touch forbidden) prompt" }),
+        ]),
+        stdout: "pipe",
+        stderr: "pipe",
+        env: { ...process.env, OPENROUTER_API_KEY: "" },
+      });
+      const [out, err, code] = await Promise.all([
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+        child.exited,
+      ]);
+      expect(code).toBe(0);
+      expect(out + err).not.toContain("literal $(touch forbidden) prompt");
+      expect(JSON.parse(out)).toEqual(hookOutput(agent));
+      if (agent === "opencode") {
+        const module = await import(
+          plan.files.find((f) => f.path.endsWith("/plugins/otherskill.ts"))!
+            .path
+        );
+        const hooks = await module.OtherSkill({ directory: root });
+        const output: { messages: Message[] } = {
+          messages: [
+            {
+              info: { role: "user", id: "turn", sessionID: "session" },
+              parts: [{ type: "text", text: "Find relevant skills" }],
+            },
+          ],
+        };
+        await hooks["experimental.chat.messages.transform"]({}, output);
+        expect(output.messages[0]?.parts).toHaveLength(1);
+      }
+    }
+    expect(fs.existsSync(path.join(root, "forbidden"))).toBe(false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}, 10000);

@@ -2,7 +2,7 @@
 
 Worktree: `.worktrees/otherskill-awareness`; branch: `polly/otherskill-awareness`.
 Contract base: `ffa748ef2cabd35e5598816e6e413d2d2234a581`.
-The PR records exact current base/head SHAs. No merge or real home activation is performed.
+Upstream PR base is `4eda5a4be869d8b9794c5ccc371147f1c03f9561` (`master`), integrated without dropping upstream tests. The PR records exact current base/head SHAs. The PR is not merged; no real home activation is performed.
 
 ## Baseline and final gates
 
@@ -15,16 +15,16 @@ System `/tmp` reached the user's tmpfs quota (`EDQUOT`) during temporary-fixture
 | Command | Measured result |
 | --- | --- |
 | `bun install --frozen-lockfile` | Passed; 18 installs across 19 packages checked |
-| `TMPDIR="$PWD/.tmp" bun test tests/` | 61 passed, 4 explicitly skipped, 0 failed; 65 test cases across 15 files |
+| `TMPDIR="$PWD/.tmp" bun test tests/` | 115 passed, 0 failed; 115 collected/executed test cases across 25 files |
 | `bunx tsc --noEmit` | Passed, no errors |
 | `bun run build` | Passed, Bun-target CLI bundle in ignored `.tmp` |
 | `TMPDIR="$PWD/.tmp" python3 scripts/smoke-interactive.py` | Actual PTY setup/config menus passed; synthetic key absent from captured output; mode 0600; project Codex and global Claude scopes verified |
 | `TMPDIR="$PWD/.tmp" bun test tests/otherskill-cli.test.ts` | Isolated subprocess workflows for help/setup/add/find/config and all exposed management/routing aliases; repeated setup, settings/hooks/skills preservation and malformed-config refusal |
 | `git diff --check` | Passed |
 
-There was no baseline lint script. New source formatting is checked with `bunx prettier@3.6.2 --check` over the changed OtherSkill source/tests; no skill prose is formatted or edited.
+There was no baseline lint script. OtherSkill source formatting is checked with `bunx prettier@3.6.2 --check` over the changed OtherSkill source/tests; no skill prose is formatted or edited.
 
-The test totals above count test cases, including explicit skips, rather than commands/CLI invocations. The CLI test functions each execute multiple subprocess cases. Four legacy live benchmark tests now require opt-in and an inherited credential; they were preserved, not relabeled as offline passes.
+The test totals above count collected/executed test cases rather than commands/CLI invocations. CLI test functions each execute multiple subprocess cases. Origin/master advanced after the original baseline; its migration/discovery/safety tests and controlled HTTP evaluation fixtures were integrated. All final evaluation fixture tests run offline; they are not live benchmarks. The four baseline credential-dependent failures are retained as historical baseline evidence.
 
 ## Requirement evidence map
 
@@ -69,3 +69,9 @@ TMPDIR="$PWD/.tmp" bun otherskill.ts add github:anthropics/skills \
 It imported one `frontend-design` instance, source `https://github.com/anthropics/skills/tree/HEAD/skills/frontend-design`, requested ref `HEAD`, resolved revision `dbd4588f9e1033efb41dad4bef2f7947c8993d44`, including `LICENSE.txt` and source metadata. This used explicit classification; it is evidence of live source transport/copy/attribution, not live automatic model classification. Imported content remains only in ignored temporary roots.
 
 Native formats were checked against [Claude hooks](https://code.claude.com/docs/en/hooks), [Codex hook/trust/output docs](https://learn.chatgpt.com/docs/hooks), [Antigravity hook docs](https://antigravity.google/docs/hooks) and installed Antigravity 1.4.4 hook documentation, and [OpenCode plugin docs](https://opencode.ai/docs/plugins/) for the installed 1.18.35 generation. Tests execute generated hooks/adapters in isolation. No claim is made that a real agent session loaded these hooks. Codex trust review/restart and actual home activation remain separate user operations. Windows and OpenCode 2.x are unverified.
+
+## Review follow-up
+
+A read-only independent contract review found attribution symlink disclosure, interactive flag precedence and global setup scope-loading issues. The implementation now validates attribution with lstat and confinement before writes, fixes explicit menu flags and target-scope reload, establishes failure output protocol before strict argument parsing, derives native hook timeouts from the routing budget, and bounds stalled response bodies. Regression tests and the PTY smoke cover these paths. The review follow-up reported no remaining blockers; the primary agent performs all source/test changes and final full verification.
+
+Upstream OpenCode deduplication assertions were ported to the native synthetic-text-part API, retaining concurrent/repeated-transform and stale-context-on-empty/failure coverage. The upstream heuristic fallback on provider errors was intentionally replaced with an empty unavailable result and fixed diagnostics to satisfy the no-invented-selection contract. Explicit legacy migration remains available but setup does not invoke it or activate other account homes.

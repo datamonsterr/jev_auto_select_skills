@@ -126,3 +126,30 @@ test("online search sends a real documented GitHub query and reports access fail
     findOnline("design", async () => new Response("denied", { status: 401 })),
   ).rejects.toThrow("HTTP 401");
 });
+
+test("online attribution symlinks cannot disclose private files into complete skill copies", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "otherskill-license-"));
+  try {
+    const config = loadConfig({ home: path.join(root, "home"), cwd: root });
+    const repo = path.join(root, "repo"),
+      source = createSkill(
+        path.join(repo, "skills/design"),
+        "design",
+        "Design",
+        "body",
+      );
+    const privateFile = path.join(root, "fake-private.json");
+    fs.writeFileSync(privateFile, "SYNTHETIC PRIVATE SENTINEL");
+    fs.symlinkSync(privateFile, path.join(repo, "LICENSE"));
+    expect(() =>
+      installLocal(config, source, ["testing"], {
+        source: "https://github.com/test/repo",
+        licenseRoot: repo,
+      }),
+    ).toThrow("attribution");
+    expect(discoverBank(config)).toEqual([]);
+    expect(fs.existsSync(config.bankPath)).toBe(false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

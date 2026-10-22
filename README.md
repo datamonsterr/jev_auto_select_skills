@@ -12,7 +12,7 @@ bun otherskill.ts --help
 bun otherskill.ts setup
 ```
 
-The interactive menu selects harness, global/project scope, hidden OpenRouter key, free model, enabled categories and companion installation. `otherskill config` offers quick edits and apply. Cancellation and `--dry-run` write nothing.
+The interactive menu selects harness, global/project scope, hidden OpenRouter key, free model, enabled categories and companion installation. `otherskill config` offers quick edits and apply. Explicit harness/scope/companion flags take precedence over menu answers. Cancellation and `--dry-run` write nothing.
 
 Setup creates a managed launcher at `~/.local/share/otherskill/bin/otherskill`; add that directory to PATH, invoke it directly, or explicitly use `bun link`. The launcher references this checkout and Bun by absolute path: keep the checkout in place, or rerun setup after moving it. Setup never globally links the package. The package's `jev-skill-selector` binary is a deprecated alias for the canonical CLI.
 
@@ -144,6 +144,6 @@ TMPDIR="$PWD/.tmp" python3 scripts/smoke-interactive.py
 TMPDIR="$PWD/.tmp" bun scripts/smoke-live.ts
 ```
 
-Use a writable scratch directory if system `/tmp` quota is exhausted. Offline tests exercise full copies, identities, actual concurrency at the HTTP boundary, response validation, CLI subprocesses and adapters. Menu smoke uses a real PTY and synthetic key. Four legacy live tests require `OTHERSKILL_LIVE_TESTS=1` and an inherited OpenRouter key; skipped tests are not passed online evidence. Live smoke checks the public decision-model catalog and, only with an existing credential, tiny Mercury and two-stage requests. See [measured evidence and limitations](docs/otherskill-evidence.md).
+Use a writable scratch directory if system `/tmp` quota is exhausted. Offline tests exercise full copies, identities, actual concurrency at the HTTP boundary, response validation, CLI subprocesses and adapters. Menu smoke uses a real PTY and synthetic key. The inherited evaluation tests use controlled HTTP fixtures; their results are offline evidence. Real online evaluation scripts remain separate and were not run without credentials. Live smoke checks the public decision-model catalog and, only with an existing credential, tiny Mercury and two-stage requests. See [measured evidence and limitations](docs/otherskill-evidence.md).
 
 Primary protocol references: [OpenRouter Decisions example](https://openrouter.ai/blog/tutorials/jev-vs-llm-when-to-use-each/), [decision model catalog](https://openrouter.ai/api/v1/models?output_modalities=decisions), [Claude hooks](https://code.claude.com/docs/en/hooks), [Codex hooks](https://learn.chatgpt.com/docs/hooks), [Antigravity hooks](https://antigravity.google/docs/hooks), [OpenCode plugins](https://opencode.ai/docs/plugins/).

@@ -13,12 +13,12 @@ REPO = Path(__file__).resolve().parent.parent
 FAKE_KEY = "synthetic-menu-key-not-a-real-credential"
 
 
-def drive(root, command, responses):
+def drive(root, command, responses, extra=()):
     home, project = root / "home", root / "project"
     project.mkdir(exist_ok=True)
     master, slave = pty.openpty()
     env = dict(os.environ, OPENROUTER_API_KEY="", OTHERSKILL_CONFIG="", OTHERSKILL_HOME=str(home))
-    process = subprocess.Popen(["bun", str(REPO / "otherskill.ts"), command, "--home", str(home), "--cwd", str(project)], stdin=slave, stdout=slave, stderr=slave, cwd=project, env=env)
+    process = subprocess.Popen(["bun", str(REPO / "otherskill.ts"), command, "--home", str(home), "--cwd", str(project), *extra], stdin=slave, stdout=slave, stderr=slave, cwd=project, env=env)
     os.close(slave)
     transcript = b""
     consumed = 0
@@ -43,7 +43,7 @@ def drive(root, command, responses):
                     break
         assert process.wait(timeout=2) == 0, "interactive process failed"
         assert FAKE_KEY.encode() not in transcript, "secret echoed by menu"
-        return len(transcript)
+        return transcript.decode()
     finally:
         if process.poll() is None:
             process.kill()
@@ -73,4 +73,8 @@ with tempfile.TemporaryDirectory(prefix="otherskill-menu-") as temp:
     assert changed["enabledCategories"] == ["testing"]
     assert (root / "home/.claude/settings.json").exists()
     assert json.loads(project_config.read_text())["model"] == "inception/mercury-decide:free"
-    print(json.dumps({"setup_menu": "passed", "config_menu": "passed", "hidden_key": "not echoed", "credential_mode": "0600", "project_and_global_scopes": "passed", "captured_bytes": setup_bytes + config_bytes}))
+    flags_output = drive(root, "setup", answers("1", "1", "", "", "", "Apply setup?"), ["--agent", "codex", "--scope", "project", "--no-companion", "--dry-run"])
+    flags_result = json.loads(flags_output[flags_output.rfind("{"):])
+    assert flags_result["agent"] == "codex" and flags_result["scope"] == "project"
+    assert not any("skills/use-otherskill" in item for item in flags_result["files"])
+    print(json.dumps({"setup_menu": "passed", "explicit_menu_flags": "passed", "config_menu": "passed", "hidden_key": "not echoed", "credential_mode": "0600", "project_and_global_scopes": "passed", "captured_bytes": len(setup_bytes) + len(config_bytes)}))

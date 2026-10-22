@@ -361,3 +361,62 @@ test("configured worker concurrency is bounded across more selected categories t
     expect(result.selected).toHaveLength(1);
     expect(result.selected[0]?.categories).toHaveLength(5);
   }));
+
+test("request deadline covers a stalled response body as well as HTTP headers", () =>
+  fixture(async (config) => {
+    config.limits.timeoutMs = 10;
+    config.limits.retries = 0;
+    const provider = new Decisions(config, {
+      apiKey: "test",
+      fetchFn: async () =>
+        new Response(new ReadableStream({ start() {} }), { status: 200 }),
+    });
+    const request: DecisionRequest = {
+      model: config.model,
+      state: { user_prompt: "private prompt", stage: "probe" },
+      questions: {
+        selection: {
+          type: "choice",
+          instructions: "choose",
+          criteria: { s0: "match", none: "none" },
+        },
+      },
+    };
+    await expect(
+      Promise.race([
+        provider.decide(request),
+        Bun.sleep(100).then(() => {
+          throw new Error("deadline_not_enforced");
+        }),
+      ]),
+    ).rejects.toThrow("openrouter_network_or_timeout");
+  }));
+
+test("validated none is a successful no-match and makes no category requests", () =>
+  fixture(async (config) => {
+    let calls = 0;
+    const result = await route(
+      config,
+      "No specialized skill needed",
+      new Decisions(config, {
+        apiKey: "test",
+        fetchFn: async (_url, init) => {
+          calls++;
+          const request = JSON.parse(String(init.body)) as DecisionRequest;
+          const probabilities = Object.fromEntries(
+            Object.keys(request.questions.selection.criteria).map((key) => [
+              key,
+              key === "none" ? 1 : 0,
+            ]),
+          );
+          return answer(request, probabilities);
+        },
+      }),
+    );
+    expect(result.status).toBe("ok");
+    expect(result.selected).toEqual([]);
+    expect(result.diagnostics).toEqual([]);
+    expect(calls).toBe(1);
+    expect(result.logicalCalls).toBe(1);
+    expect(summary(result)).toBe("");
+  }));

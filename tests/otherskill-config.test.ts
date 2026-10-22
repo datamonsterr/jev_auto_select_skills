@@ -95,3 +95,24 @@ test("explicit, nearest-project and global configuration precedence and global s
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("bank path traversal and dangling aliases into native discovery are rejected before setup", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "otherskill-dangling-"));
+  try {
+    const file = path.join(root, "otherskill.config.json");
+    fs.writeFileSync(file, JSON.stringify({ bankPath: "../escape" }));
+    expect(() =>
+      loadConfig({ home: root, cwd: root, configPath: file }),
+    ).toThrow();
+    fs.symlinkSync(path.join(root, ".agents/skills"), path.join(root, "alias"));
+    fs.writeFileSync(
+      file,
+      JSON.stringify({ bankPath: path.join(root, "alias/bank") }),
+    );
+    expect(() =>
+      loadConfig({ home: root, cwd: root, configPath: file }),
+    ).toThrow("bank");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

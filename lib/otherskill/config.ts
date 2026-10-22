@@ -40,7 +40,15 @@ export const starterCategories = [
 const id = z.string().regex(/^[a-z0-9][a-z0-9_-]*(\/[a-z0-9][a-z0-9_-]*)*$/);
 const schema = z
   .object({
-    bankPath: z.string().min(1).default("~/.local/share/otherskill/bank"),
+    bankPath: z
+      .string()
+      .min(1)
+      .refine(
+        (value) =>
+          !value.split(/[\\/]/).includes("..") && !value.includes("\0"),
+        "bank path traversal is forbidden",
+      )
+      .default("~/.local/share/otherskill/bank"),
     model: z.string().default(FREE_MODEL),
     scope: z.enum(["global", "project"]).default("global"),
     agent: z.enum(["claude", "codex", "antigravity", "opencode"]).optional(),
@@ -80,11 +88,25 @@ export interface ConfigOptions {
 
 // Resolve even nonexistent suffixes through real existing ancestors, detecting symlink aliases.
 export function realPath(p: string): string {
-  const absolute = path.resolve(p);
-  if (fs.existsSync(absolute)) return fs.realpathSync(absolute);
-  const parent = path.dirname(absolute);
-  if (parent === absolute) return absolute;
-  return path.join(realPath(parent), path.basename(absolute));
+  function resolve(input: string, depth: number): string {
+    if (depth > 128) throw new Error("path alias resolution limit exceeded");
+    const absolute = path.resolve(input);
+    try {
+      const stat = fs.lstatSync(absolute);
+      if (stat.isSymbolicLink())
+        return resolve(
+          path.resolve(path.dirname(absolute), fs.readlinkSync(absolute)),
+          depth + 1,
+        );
+      return fs.realpathSync(absolute);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+    const parent = path.dirname(absolute);
+    if (parent === absolute) return absolute;
+    return path.join(resolve(parent, depth + 1), path.basename(absolute));
+  }
+  return resolve(p, 0);
 }
 export function overlaps(a: string, b: string): boolean {
   const left = realPath(a),

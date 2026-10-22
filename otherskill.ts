@@ -116,11 +116,25 @@ function scopeValue(
 }
 export async function main(argv = process.argv.slice(2)): Promise<number> {
   let agent: Agent | undefined;
-  const routingCommand = ["find", "hook", "select"].includes(argv[0] ?? "");
+  let commandHint = argv[0];
+  try {
+    commandHint = parseArgs({
+      args: argv,
+      options,
+      allowPositionals: true,
+      strict: false,
+    }).positionals[0];
+  } catch {}
+  const routingCommand = ["find", "hook", "select"].includes(commandHint ?? "");
   // Establish an explicit output protocol even when parsing/configuration fails later.
   const index = argv.indexOf("--agent");
+  const inlineAgent = argv.find((arg) => arg.startsWith("--agent="))?.slice(8);
   try {
-    agent = index >= 0 ? agentName(argv[index + 1] ?? "") : detectAgent();
+    agent = inlineAgent
+      ? agentName(inlineAgent)
+      : index >= 0
+        ? agentName(argv[index + 1] ?? "")
+        : detectAgent();
   } catch {}
   try {
     const { values, positionals } = parseArgs({
@@ -142,7 +156,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     if (values.agent) agent = agentName(values.agent);
     let config = loadConfig({
       ...roots,
-      ...(command === "config" && values.scope
+      ...((command === "config" || command === "setup") && values.scope
         ? { scope: scopeValue(values.scope, "global") }
         : {}),
     });
@@ -169,11 +183,23 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
       let apply = command === "setup" || !!values.apply;
       let data = configData(config);
       if (!scripted) {
-        const answers = await menu(config, command);
+        const answers = await menu(
+          { ...config, agent: agent ?? config.agent, scope },
+          command,
+          {
+            fixedAgent: values.agent ? agentName(values.agent) : undefined,
+            fixedScope: values.scope ? scope : undefined,
+            noCompanion: values["no-companion"],
+            configForScope: (targetScope) =>
+              loadConfig({ ...roots, scope: targetScope }),
+          },
+        );
         if (!answers.apply) {
           console.log("Cancelled; no changes.");
           return 0;
         }
+        config = answers.config;
+        data = configData(config);
         agent = answers.agent;
         scope = answers.scope;
         companion = answers.companion;
@@ -460,7 +486,19 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
               : "invalid input/configuration"),
     );
     if (routingCommand) {
-      console.log(JSON.stringify(hookOutput(agent ?? "codex")));
+      console.log(
+        JSON.stringify(
+          argv.includes("--json") || commandHint === "select"
+            ? {
+                status: "failed",
+                selected: [],
+                categories: [],
+                logicalCalls: 0,
+                diagnostics: [diagnostic(error)],
+              }
+            : hookOutput(agent ?? "codex"),
+        ),
+      );
       return 0;
     }
     return 1;

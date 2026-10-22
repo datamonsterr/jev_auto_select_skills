@@ -26,7 +26,7 @@ const ALWAYS_ON_PATTERNS = [
   /\bcaveman\b/i,
   /\bpersona\b/i,
   /\bterse\b/i,
-  /\bconcise\b/i,
+  /\bconcise\s+(persona|mode|tone|reply|replies|answers?|style)\b|\b(be|talk|speak|keep)\s+concise\b/i,
   /\btone\b/i,
   /\balways\s+active\b/i,
   /\balways\s+use\b/i,
@@ -180,10 +180,10 @@ export async function assessSkill(params: {
       ? path.join(homeDir, ".agents", "skills", skillName)
       : path.join(cwd, ".agents", "skills", skillName);
   } else {
-    // Jev skills bank
+    // Routed skills bank
     recommendedDir = params.global
-      ? path.join(homeDir, ".agents", "jev_skills", skillName)
-      : path.join(cwd, ".agents", "jev_skills", skillName);
+      ? path.join(homeDir, ".agents", "other_skills", skillName)
+      : path.join(cwd, ".agents", "other_skills", skillName);
   }
 
   return {

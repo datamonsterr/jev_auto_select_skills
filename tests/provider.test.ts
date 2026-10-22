@@ -34,13 +34,12 @@ describe("JevProvider", () => {
             },
           },
         }),
-        { status: 200, headers: { "Content-Type": "application/json" } }
+        { status: 200, headers: { "Content-Type": "application/json" } },
       );
     });
 
     const provider = new JevProvider({
       apiKey: "test-key",
-      model: "inception/mercury-decide:free",
       fetchFn: mockFetch as any,
     });
 
@@ -63,8 +62,10 @@ describe("JevProvider", () => {
       callCount++;
       if (callCount < 3) {
         return new Response(
-          JSON.stringify({ error: { message: "Rate limit exceeded", code: 429 } }),
-          { status: 429, headers: { "Content-Type": "application/json" } }
+          JSON.stringify({
+            error: { message: "Rate limit exceeded", code: 429 },
+          }),
+          { status: 429, headers: { "Content-Type": "application/json" } },
         );
       }
       return new Response(
@@ -83,13 +84,12 @@ describe("JevProvider", () => {
             },
           },
         }),
-        { status: 200, headers: { "Content-Type": "application/json" } }
+        { status: 200, headers: { "Content-Type": "application/json" } },
       );
     });
 
     const provider = new JevProvider({
       apiKey: "test-key",
-      model: "inception/mercury-decide:free",
       fetchFn: mockFetch as any,
       retryDelayMs: 10, // Fast delay for tests
     });
@@ -103,28 +103,36 @@ describe("JevProvider", () => {
     expect(result.primarySkill).toBe("git-commit");
   });
 
-  it("throws error after exhausting all retries", async () => {
+  it("throws error in sendDecisionRequest after exhausting all retries and safely falls back in selectSkills", async () => {
     const mockFetch = mock(async () => {
       return new Response(
-        JSON.stringify({ error: { message: "Service Unavailable", code: 503 } }),
-        { status: 503, headers: { "Content-Type": "application/json" } }
+        JSON.stringify({
+          error: { message: "Service Unavailable", code: 503 },
+        }),
+        { status: 503, headers: { "Content-Type": "application/json" } },
       );
     });
 
     const provider = new JevProvider({
       apiKey: "test-key",
-      model: "inception/mercury-decide:free",
       fetchFn: mockFetch as any,
       retries: 3,
       retryDelayMs: 5,
     });
 
-    expect(
-      provider.selectSkills({
-        userPrompt: "Any prompt",
-        skills: dummySkills,
-      })
+    await expect(
+      provider.sendDecisionRequest({
+        model: "inception/mercury-decide:free",
+        state: {},
+        questions: {},
+      }),
     ).rejects.toThrow("HTTP 503");
+
+    const fallbackRes = await provider.selectSkills({
+      userPrompt: "Any prompt",
+      skills: dummySkills,
+    });
+    expect(fallbackRes.source).toBe("unavailable");
   });
 
   it("supports multi-step and continuation prompts by evaluating multiple questions and aggregating skills", async () => {
@@ -158,18 +166,18 @@ describe("JevProvider", () => {
             },
           },
         }),
-        { status: 200, headers: { "Content-Type": "application/json" } }
+        { status: 200, headers: { "Content-Type": "application/json" } },
       );
     });
 
     const provider = new JevProvider({
       apiKey: "test-key",
-      model: "inception/mercury-decide:free",
       fetchFn: mockFetch as any,
     });
 
     const result = await provider.selectSkills({
-      userPrompt: "Step 1: Write unit tests with TDD. Step 2: Commit changes using conventional commits.",
+      userPrompt:
+        "Step 1: Write unit tests with TDD. Step 2: Commit changes using conventional commits.",
       skills: dummySkills,
       options: { multiStep: true },
     });
@@ -180,4 +188,3 @@ describe("JevProvider", () => {
     expect(names).toContain("git-commit");
   });
 });
-

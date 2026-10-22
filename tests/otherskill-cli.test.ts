@@ -318,3 +318,62 @@ test("setup preserves unrelated native skills/settings/hooks and refuses malform
     fs.rmSync(root, { recursive: true, force: true });
   }
 }, 30000);
+
+test("explicit global setup loads global settings and failed routing preserves protocols across argument forms", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "otherskill-cli-flags-"));
+  try {
+    expect(
+      (
+        await cli(root, [
+          "config",
+          "set",
+          "model",
+          "global/model:free",
+          "--scope",
+          "global",
+        ])
+      ).code,
+    ).toBe(0);
+    expect(
+      (
+        await cli(root, [
+          "config",
+          "set",
+          "model",
+          "project/model:free",
+          "--scope",
+          "project",
+        ])
+      ).code,
+    ).toBe(0);
+    expect(
+      (
+        await cli(root, [
+          "setup",
+          "--non-interactive",
+          "--agent",
+          "codex",
+          "--scope",
+          "global",
+          "--no-companion",
+        ])
+      ).code,
+    ).toBe(0);
+    expect(
+      (await cli(root, ["config", "get", "model", "--scope", "global"])).json(),
+    ).toBe("global/model:free");
+    expect((await cli(root, ["config", "get", "model"])).json()).toBe(
+      "project/model:free",
+    );
+    for (const args of [
+      ["find", "--agent=antigravity", "--unknown-option"],
+      ["--agent", "antigravity", "find", "--unknown-option"],
+    ]) {
+      const result = await cli(root, args);
+      expect(result.code).toBe(0);
+      expect(result.json()).toEqual({ injectSteps: [] });
+    }
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}, 30000);
