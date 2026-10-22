@@ -80,6 +80,8 @@ const schema = z
       )
       .optional(),
     hookParams: hookParams.optional(),
+    portableHooks: z.boolean().optional(),
+    inheritGlobal: z.boolean().optional(),
     enabledCategories: z.array(id).optional(),
     categories: z
       .array(z.object({ id, description: z.string().min(1) }).strict())
@@ -102,10 +104,23 @@ const schema = z
       .prefault({}),
   })
   .strict();
-export type Config = z.infer<typeof schema> & {
+type Parsed = z.infer<typeof schema>;
+export interface Category {
+  id: string;
+  description: string;
+}
+export interface Inherited {
+  configPath: string;
+  bankPath: string;
+  categories: Category[];
+  enabledCategories?: string[];
+}
+export type Config = Parsed & {
   configPath?: string;
   home: string;
   cwd: string;
+  inherited?: Inherited;
+  categoriesFinal?: boolean;
 };
 export interface ConfigOptions {
   configPath?: string;
@@ -127,6 +142,7 @@ export function withRoutingOverrides(
   overrides: RoutingOverrides,
 ): Config {
   const { model, categories, ...limits } = overrides;
+  const known = routingView(config).categories;
   const parsed = schema.parse({
     ...configData(config),
     ...(model !== undefined ? { model } : {}),
@@ -138,14 +154,17 @@ export function withRoutingOverrides(
     parsed.enabledCategories &&
     (new Set(parsed.enabledCategories).size !==
       parsed.enabledCategories.length ||
-      parsed.enabledCategories.some(
-        (id) => !parsed.categories.some((c) => c.id === id),
-      ))
+      parsed.enabledCategories.some((id) => !known.some((c) => c.id === id)))
   )
     throw new Error(
       "enabledCategories must reference unique configured category IDs",
     );
-  return { ...config, ...parsed, bankPath: config.bankPath };
+  return {
+    ...config,
+    ...parsed,
+    bankPath: config.bankPath,
+    categoriesFinal: config.categoriesFinal || categories !== undefined,
+  };
 }
 
 // Resolve even nonexistent suffixes through real existing ancestors, detecting symlink aliases.
@@ -218,6 +237,25 @@ export function assertHiddenBank(
     );
   }
 }
+/** Project config locations inside one directory, in precedence order. */
+export const projectConfigNames = [
+  "otherskill.config.json",
+  ".otherskill/config.json",
+] as const;
+export function projectConfigFile(dir: string): string | undefined {
+  return projectConfigNames
+    .map((name) => path.join(dir, name))
+    .find((file) => fs.existsSync(file));
+}
+/** Directory that owns a project config (parent of .otherskill/ for the nested form); cwd otherwise. */
+export function projectRoot(config: Config): string {
+  const file = config.configPath && path.resolve(config.configPath);
+  if (file && file !== globalConfigFile(config.home))
+    for (const name of projectConfigNames)
+      if (file.endsWith(path.sep + name))
+        return file.slice(0, -(name.length + 1));
+  return config.cwd;
+}
 export function loadConfig(options: ConfigOptions = {}): Config {
   const home = path.resolve(
     options.home ?? process.env.OTHERSKILL_HOME ?? os.homedir(),
@@ -229,8 +267,8 @@ export function loadConfig(options: ConfigOptions = {}): Config {
   else {
     let cursor = cwd;
     for (; options.scope !== "global"; ) {
-      const candidate = path.join(cursor, "otherskill.config.json");
-      if (fs.existsSync(candidate)) {
+      const candidate = projectConfigFile(cursor);
+      if (candidate) {
         configPath = candidate;
         break;
       }
@@ -238,9 +276,46 @@ export function loadConfig(options: ConfigOptions = {}): Config {
       if (parent === cursor) break;
       cursor = parent;
     }
-    const global = path.join(home, ".config/otherskill/otherskill.config.json");
+    const global = globalConfigFile(home);
     if (!configPath && fs.existsSync(global)) configPath = global;
   }
+  const parsed = readConfigFile(configPath, home, cwd);
+  return inherit(
+    { ...parsed, home, cwd, configPath },
+    configPath,
+    options.scope,
+  );
+}
+function globalConfigFile(home: string): string {
+  return path.join(home, ".config/otherskill/otherskill.config.json");
+}
+/** Attach the global config's categories and bank when a project config is in effect. */
+function inherit(config: Config, file?: string, scope?: string): Config {
+  const global = globalConfigFile(config.home);
+  if (
+    scope === "global" ||
+    config.inheritGlobal === false ||
+    !file ||
+    !fs.existsSync(global) ||
+    realPath(file) === realPath(global)
+  )
+    return config;
+  const g = readConfigFile(global, config.home, config.cwd);
+  return {
+    ...config,
+    inherited: {
+      configPath: global,
+      bankPath: g.bankPath,
+      categories: g.categories,
+      enabledCategories: g.enabledCategories,
+    },
+  };
+}
+function readConfigFile(
+  configPath: string | undefined,
+  home: string,
+  cwd: string,
+): Parsed {
   let raw: unknown = {};
   if (configPath) {
     try {
@@ -289,12 +364,67 @@ export function loadConfig(options: ConfigOptions = {}): Config {
             config.bankPath,
           );
   assertHiddenBank(bankPath, home, cwd);
-  return { ...config, bankPath, home, cwd, configPath };
+  return { ...config, bankPath };
 }
 
+/** bankPath as written in `file` while it still resolves to `resolved`, so relative and ~ paths survive rewrites. */
+export function writtenBankPath(
+  file: string,
+  resolved: string,
+  home: string,
+): string {
+  try {
+    const raw: unknown = JSON.parse(fs.readFileSync(file, "utf8")).bankPath;
+    if (typeof raw !== "string") return resolved;
+    const target =
+      raw === "~"
+        ? home
+        : raw.startsWith("~/")
+          ? path.join(home, raw.slice(2))
+          : path.resolve(path.dirname(file), raw);
+    return target === resolved ? raw : resolved;
+  } catch {
+    return resolved;
+  }
+}
 export function configData(config: Config): Record<string, unknown> {
-  const { home, cwd, configPath, ...data } = config;
+  const { home, cwd, configPath, inherited, categoriesFinal, ...data } = config;
   return data;
+}
+export interface RoutingView {
+  categories: Category[];
+  enabledCategories?: string[];
+  banks: string[];
+}
+/** Categories, enabled set and banks routing sees: project plus inherited global as one pool. */
+export function routingView(config: Config): RoutingView {
+  const g = config.inherited;
+  if (!g)
+    return {
+      categories: config.categories,
+      enabledCategories: config.enabledCategories,
+      banks: [config.bankPath],
+    };
+  const categories = [...config.categories];
+  for (const c of g.categories)
+    if (!categories.some((x) => x.id === c.id)) categories.push(c);
+  if (categories.length > config.limits.maxCandidates)
+    throw new Error(
+      "too many categories; raise maxCandidates within API bounds",
+    );
+  let enabledCategories: string[] | undefined;
+  if (config.categoriesFinal) enabledCategories = config.enabledCategories;
+  else if (config.enabledCategories || g.enabledCategories) {
+    const ids = new Set([
+      ...(config.enabledCategories ?? config.categories.map((c) => c.id)),
+      ...(g.enabledCategories ?? g.categories.map((c) => c.id)),
+    ]);
+    enabledCategories = categories.map((c) => c.id).filter((id) => ids.has(id));
+  }
+  const banks = [config.bankPath];
+  if (realPath(g.bankPath) !== realPath(config.bankPath))
+    banks.push(g.bankPath);
+  return { categories, enabledCategories, banks };
 }
 export function configTarget(
   options: ConfigOptions & { scope?: "global" | "project" } = {},
@@ -308,7 +438,7 @@ export function configTarget(
     options.configPath ||
       process.env.OTHERSKILL_CONFIG ||
       (options.scope === "project"
-        ? path.join(cwd, "otherskill.config.json")
+        ? (projectConfigFile(cwd) ?? path.join(cwd, "otherskill.config.json"))
         : path.join(home, ".config/otherskill/otherskill.config.json")),
   );
 }
@@ -363,7 +493,10 @@ export function writeConfig(
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, `${JSON.stringify(parsed.data, null, 2)}\n`);
   }
-  return { ...parsed.data, bankPath: bank, home, cwd, configPath: file };
+  return inherit(
+    { ...parsed.data, bankPath: bank, home, cwd, configPath: file },
+    file,
+  );
 }
 
 /** Refuse pre-existing native links/config paths that would reveal the hidden bank. */

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { z } from "zod";
-import { type Config, realPath } from "./config";
+import { type Config, projectRoot, realPath } from "./config";
 import { repoRoot, quote, nativeCompanion } from "./setup";
 
 export interface UpdateOptions {
@@ -85,7 +85,7 @@ export async function update(
     throw new Error(
       "update requires a configured agent; run otherskill setup first",
     );
-  const root = config.scope === "global" ? config.home : config.cwd;
+  const root = config.scope === "global" ? config.home : projectRoot(config);
   const archiveUrl = `https://codeload.github.com/datamonsterr/jev_auto_select_skills/tar.gz/${remote.data.sha}`;
   const setupArgs = [
     "setup",
