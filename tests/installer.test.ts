@@ -226,7 +226,8 @@ test.each(["home", "BUN_INSTALL", "relative PATH"])(
           : {};
     const result = await run([...setupFlags, "--dry-run"], { env });
     expect(result.code).toBe(0);
-    expect(log("setup").slice(2)).toEqual([
+    expect(log("setup")[1]).toBe("--no-env-file");
+    expect(log("setup").slice(3)).toEqual([
       "setup",
       ...setupFlags,
       "--dry-run",
@@ -318,9 +319,10 @@ test("piped real setup preserves native hooks/skills and private bank, and retai
     expect(result.code).toBe(0);
     expect(log("install").slice(1)).toEqual(["install", "--frozen-lockfile"]);
     expect(log("setup")[0]).toBe(project);
-    expect(log("setup").slice(2)).toEqual(["setup", ...setupFlags]);
+    expect(log("setup")[1]).toBe("--no-env-file");
+    expect(log("setup").slice(3)).toEqual(["setup", ...setupFlags]);
     expect(snapshots()).toHaveLength(i + 1);
-    const currentSource = path.dirname(log("setup")[1]!);
+    const currentSource = path.dirname(log("setup")[2]!);
     expect(fs.statSync(currentSource).mode & 0o777).toBe(0o700);
     const launcher = path.join(home, ".local/share/otherskill/bin/otherskill");
     expect(fs.readFileSync(launcher, "utf8")).toContain(
@@ -371,7 +373,8 @@ test("relative install-dir and project/key options are forwarded verbatim after 
   expect(result.code).toBe(0);
   expect(result.out + result.err).not.toContain("fake-installer-key");
   expect(snapshots(path.join(project, target))).toHaveLength(1);
-  expect(log("setup").slice(2)).toEqual(["setup", ...args]);
+  expect(log("setup")[1]).toBe("--no-env-file");
+  expect(log("setup").slice(3)).toEqual(["setup", ...args]);
   expect(fs.existsSync(path.join(project, ".claude/settings.json"))).toBe(true);
   expect(fs.existsSync(path.join(project, ".claude/skills"))).toBe(false);
   expect(fs.existsSync(path.join(home, ".claude"))).toBe(false);

@@ -38,7 +38,7 @@ Each run creates a new snapshot. Failed dependency snapshots are removed. Succes
 
 ## API key
 
-Inherit `OPENROUTER_API_KEY` from your shell, or forward `--key-env OPENROUTER_API_KEY` to save it privately. Never put the value in arguments. `--key-stdin` needs the installer downloaded to a file first (stdin carries the key); the streamed installer refuses it. Saved keys live in `<home>/.config/otherskill/credentials.json`, mode `0600` (parent `0700`). The inherited environment variable overrides the file. OtherSkill does not read or copy `.env`; Bun's own `.env` loading still applies in the launch directory.
+Inherit `OPENROUTER_API_KEY` from your shell, or forward `--key-env OPENROUTER_API_KEY` to save it privately. Never put the value in arguments. `--key-stdin` needs the installer downloaded to a file first (stdin carries the key); the streamed installer refuses it. Saved keys live in `<home>/.config/otherskill/credentials.json`, mode `0600` (parent `0700`). The inherited environment variable overrides the file. OtherSkill does not read or copy `.env`; the managed launcher runs Bun with `--no-env-file`.
 
 ## Launcher
 

@@ -162,10 +162,10 @@ HELP
   retain_release=1
   printf '[otherskill installer] Running setup; keeping source at %s\n' "$release_dir" >&2
   if [ "$interactive" -eq 1 ]; then
-    "$bun_bin" "$release_dir/otherskill.ts" setup ${setup_args[@]+"${setup_args[@]}"} <&3 \
+    "$bun_bin" --no-env-file "$release_dir/otherskill.ts" setup ${setup_args[@]+"${setup_args[@]}"} <&3 \
       || fail "setup failed; source retained at $release_dir (rerun its otherskill.ts setup)"
   else
-    "$bun_bin" "$release_dir/otherskill.ts" setup ${setup_args[@]+"${setup_args[@]}"} \
+    "$bun_bin" --no-env-file "$release_dir/otherskill.ts" setup ${setup_args[@]+"${setup_args[@]}"} \
       || fail "setup failed; source retained at $release_dir (rerun its otherskill.ts setup)"
   fi
   printf '[otherskill installer] Setup finished. Keep this source directory: %s\n' "$release_dir" >&2

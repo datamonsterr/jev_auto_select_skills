@@ -187,6 +187,79 @@ describe("interactive setup menu", () => {
   });
 });
 
+describe("setup migrates shipped companion versions safely", () => {
+  let root: string;
+  beforeEach(() => {
+    root = fs.mkdtempSync(
+      path.join(os.tmpdir(), "otherskill-companion-migration-"),
+    );
+  });
+  afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  it("replaces the formatted shipped companion in the canonical directory", () => {
+    const home = path.join(root, "home");
+    const cwd = path.join(root, "project");
+    const config = configFor(home, cwd);
+    const canonical = path.join(canonicalCompanionDir(home), "SKILL.md");
+    const formatted = companionContent.replace(/^---\n/, "---\n\n");
+    fs.mkdirSync(path.dirname(canonical), { recursive: true });
+    fs.writeFileSync(canonical, formatted);
+
+    applySetup(planSetup(config, "codex"));
+
+    expect(fs.readFileSync(canonical, "utf8")).toBe(companionContent);
+  });
+
+  it("replaces a formatted shipped Claude copy but refuses an edited companion", () => {
+    const home = path.join(root, "home");
+    const cwd = path.join(root, "project");
+    const config = configFor(home, cwd);
+    const claude = path.join(companionDir("claude", home), "SKILL.md");
+    const formatted = companionContent.replace(/^---\n/, "---\n\n");
+    fs.mkdirSync(path.dirname(claude), { recursive: true });
+    fs.writeFileSync(claude, formatted);
+
+    applySetup(planSetup(config, "claude"));
+
+    expect(fs.readFileSync(claude, "utf8")).toBe(companionContent);
+    fs.writeFileSync(claude, `${companionContent}\nMy notes`);
+    expect(() => planSetup(config, "claude")).toThrow(
+      "refusing to replace modified or extended native companion",
+    );
+  });
+});
+
+it("generated launcher disables Bun env-file loading and inspection flags an old managed launcher", async () => {
+  const { inspectInstallation, launcherPath } = await import(
+    "../lib/otherskill/setup"
+  );
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "otherskill-env-launcher-"),
+  );
+  try {
+    const config = configFor(
+      path.join(root, "home"),
+      path.join(root, "project"),
+    );
+    applySetup(planSetup(config, "codex"));
+    const launcher = launcherPath(config.home);
+    expect(fs.readFileSync(launcher, "utf8")).toContain(" --no-env-file ");
+
+    fs.writeFileSync(
+      launcher,
+      `#!/bin/sh\n# OtherSkill managed launcher\nexec ${process.execPath} '${path.join(repo, "otherskill.ts")}' "$@"\n`,
+    );
+    const inspected = inspectInstallation(config, "codex");
+    expect(inspected.configured).toBe(false);
+    expect(inspected.diagnostics).toContain("launcher_loads_env_file");
+
+    applySetup(planSetup(config, "codex"));
+    expect(fs.readFileSync(launcher, "utf8")).toContain(" --no-env-file ");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 describe("multi-target setup and shared companion links", () => {
   let root: string;
   let home: string;

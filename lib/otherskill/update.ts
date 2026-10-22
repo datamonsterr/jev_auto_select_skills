@@ -106,7 +106,7 @@ export async function update(
   const steps = [
     `Download ${archiveUrl} into a new private snapshot`,
     "bun install --frozen-lockfile",
-    `bun otherskill.ts ${setupArgs.map(quote).join(" ")}`,
+    `bun --no-env-file otherskill.ts ${setupArgs.map(quote).join(" ")}`,
   ];
   if (options.dryRun) return { status: "dry-run", ...info, steps };
   const archiveResponse = await fetchFn(archiveUrl, {
@@ -172,7 +172,12 @@ export async function update(
     // Setup can persist references before a later failure; keep that snapshot for recovery.
     retain = true;
     await runCommand(
-      [process.execPath, path.join(snapshot, "otherskill.ts"), ...setupArgs],
+      [
+        process.execPath,
+        "--no-env-file",
+        path.join(snapshot, "otherskill.ts"),
+        ...setupArgs,
+      ],
       config.cwd,
     );
     return { status: "updated", ...info, snapshot };

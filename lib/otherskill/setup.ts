@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { z } from "zod";
@@ -84,6 +85,15 @@ function companionSource(): string {
     "utf8",
   );
 }
+const shippedCompanionHashes = [
+  "e7138a1cfe8a198d634138eddf94b23a10b4757aa204e2c7b08e3572f74aed0b",
+  "0a29c6344027bc4205f1749dc10b45e7e6ef3534832e2305311eeb561729911c",
+];
+function isUnmodifiedCompanion(value: string, content: string): boolean {
+  if (value === content) return true;
+  const hash = createHash("sha256").update(value).digest("hex");
+  return shippedCompanionHashes.includes(hash);
+}
 /** Valid shared companion, or a valid Claude-only legacy copy before migration. */
 export function hasValidCompanion(agent: Agent, root: string): boolean {
   const native = nativeCompanion(agent, root);
@@ -144,7 +154,10 @@ function managedCompanionCopy(dir: string, content: string): boolean {
   if (entries.length !== 1 || entries[0] !== "SKILL.md") return false;
   const skill = path.join(dir, "SKILL.md");
   const stat = lstat(skill);
-  return stat?.isFile() === true && fs.readFileSync(skill, "utf8") === content;
+  return (
+    stat?.isFile() === true &&
+    isUnmodifiedCompanion(fs.readFileSync(skill, "utf8"), content)
+  );
 }
 function modifiedCompanionError(dir: string): Error {
   return new Error(
@@ -171,7 +184,10 @@ function validateCanonicalCompanion(dir: string, content: string): void {
   const skill = path.join(dir, "SKILL.md");
   const skillStat = lstat(skill);
   if (skillStat) {
-    if (!skillStat.isFile() || fs.readFileSync(skill, "utf8") !== content)
+    if (
+      !skillStat.isFile() ||
+      !isUnmodifiedCompanion(fs.readFileSync(skill, "utf8"), content)
+    )
       throw modifiedCompanionError(skill);
     // Preserve unrelated files inside an existing companion directory.
     return;
@@ -377,7 +393,7 @@ export function planMultiSetup(
   const shared = options.shared ?? true;
   const companion = options.companion ?? true;
   const files: SetupFile[] = [];
-  const launcherContent = `#!/bin/sh\n# OtherSkill managed launcher\nexec ${quote(process.execPath)} ${quote(cli)} "$@"\n`;
+  const launcherContent = `#!/bin/sh\n# OtherSkill managed launcher\nexec ${quote(process.execPath)} --no-env-file ${quote(cli)} "$@"\n`;
   if (
     fs.existsSync(launcher) &&
     !fs.readFileSync(launcher, "utf8").includes("# OtherSkill managed launcher")
@@ -593,6 +609,9 @@ export function inspectInstallation(
     ) {
       configured = false;
       diagnostics.push("launcher_source_path_mismatch_or_missing");
+    } else if (!launcherContent.includes("--no-env-file")) {
+      configured = false;
+      diagnostics.push("launcher_loads_env_file");
     }
   }
   return {

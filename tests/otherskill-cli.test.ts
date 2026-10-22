@@ -3,6 +3,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { repoRoot, agents } from "../lib/otherskill/setup";
+import { loadConfig } from "../lib/otherskill/config";
+import { saveKey } from "../lib/otherskill/credentials";
+import { setup } from "../lib/otherskill/setup";
 
 async function cli(
   root: string,
@@ -249,6 +252,7 @@ test("setup preserves unrelated native skills/settings/hooks and refuses malform
     fs.mkdirSync(path.join(home, ".claude/skills/existing"), {
       recursive: true,
     });
+
     fs.writeFileSync(
       path.join(home, ".claude/skills/existing/SKILL.md"),
       "existing native skill",
@@ -377,3 +381,56 @@ test("explicit global setup loads global settings and failed routing preserves p
     fs.rmSync(root, { recursive: true, force: true });
   }
 }, 30000);
+
+test("generated launcher ignores project .env but doctor reports explicit and saved credential sources", async () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "otherskill-launcher-env-"),
+  );
+  try {
+    const home = path.join(root, "home");
+    const project = path.join(root, "project");
+    fs.mkdirSync(project, { recursive: true });
+    fs.writeFileSync(
+      path.join(project, ".env"),
+      "OPENROUTER_API_KEY=bogus-from-env-file\n",
+    );
+    const config = loadConfig({ home, cwd: project });
+    setup(config, "codex");
+    saveKey(home, "saved-test-key");
+    const launcher = path.join(home, ".local/share/otherskill/bin/otherskill");
+    const runDoctor = async (env: NodeJS.ProcessEnv) => {
+      const child = Bun.spawn(
+        [launcher, "doctor", "--home", home, "--cwd", project],
+        {
+          cwd: project,
+          env,
+          stdout: "pipe",
+          stderr: "pipe",
+        },
+      );
+      const [out, err, code] = await Promise.all([
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+        child.exited,
+      ]);
+      expect(code).toBe(0);
+      expect(err).toBe("");
+      return JSON.parse(out) as { credentialSource?: string };
+    };
+    const withoutExport: NodeJS.ProcessEnv = { ...process.env, HOME: home };
+    delete withoutExport.OPENROUTER_API_KEY;
+    expect((await runDoctor(withoutExport)).credentialSource).toBe(
+      "credentials_file",
+    );
+    expect(
+      (
+        await runDoctor({
+          ...withoutExport,
+          OPENROUTER_API_KEY: "explicit-test-key",
+        })
+      ).credentialSource,
+    ).toBe("env");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

@@ -21,6 +21,12 @@ export function readKey(home: string): string | undefined {
   if (!parsed.success) throw new Error("invalid private credential file");
   return parsed.data.openrouter;
 }
+export function keySource(
+  home: string,
+): "env" | "credentials_file" | "unavailable" {
+  if (process.env.OPENROUTER_API_KEY) return "env";
+  return readKey(home) ? "credentials_file" : "unavailable";
+}
 export function saveKey(home: string, key: string, dryRun = false): void {
   if (!key.trim() || /[\r\n\0]/.test(key))
     throw new Error("invalid credential input");
