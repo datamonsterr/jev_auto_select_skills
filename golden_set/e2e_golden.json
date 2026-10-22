@@ -1,0 +1,882 @@
+[
+  {
+    "id": "testing-01",
+    "prompt": "Use red-green-refactor to add a regression test for the failing date parser before fixing its implementation.",
+    "expectedSkills": [
+      "tdd"
+    ],
+    "category": "testing",
+    "source": "https://github.com/HowieHwong/MetaTool"
+  },
+  {
+    "id": "testing-02",
+    "prompt": "Please help with this task: write isolated unit tests for the pricing calculator, including boundary values and invalid inputs.",
+    "expectedSkills": [
+      "unit-testing"
+    ],
+    "category": "testing",
+    "source": "https://github.com/OpenBMB/ToolBench"
+  },
+  {
+    "id": "testing-03",
+    "prompt": "I have a repository task. Trace why this async test flakes only under parallel execution and suggest a minimal fix. Include a short explanation of the approach.",
+    "expectedSkills": [
+      "debugging"
+    ],
+    "category": "testing",
+    "source": "https://arxiv.org/abs/2304.08244"
+  },
+  {
+    "id": "testing-04",
+    "prompt": "My team needs this done carefully: Verify the checkout form in a real browser, including keyboard navigation and validation feedback. Keep the changes maintainable.",
+    "expectedSkills": [
+      "browser-testing"
+    ],
+    "category": "testing",
+    "source": "https://github.com/HowieHwong/MetaTool"
+  },
+  {
+    "id": "testing-05",
+    "prompt": "Can you guide an agent through this request? Use red-green-refactor to add a regression test for the failing date parser before fixing its implementation.",
+    "expectedSkills": [
+      "tdd"
+    ],
+    "category": "testing",
+    "source": "https://github.com/OpenBMB/ToolBench"
+  },
+  {
+    "id": "testing-06",
+    "prompt": "We need to improve our developer workflow. Write isolated unit tests for the pricing calculator, including boundary values and invalid inputs.",
+    "expectedSkills": [
+      "unit-testing"
+    ],
+    "category": "testing",
+    "source": "https://arxiv.org/abs/2304.08244"
+  },
+  {
+    "id": "testing-07",
+    "prompt": "Given the current project, trace why this async test flakes only under parallel execution and suggest a minimal fix.",
+    "expectedSkills": [
+      "debugging"
+    ],
+    "category": "testing",
+    "source": "https://github.com/HowieHwong/MetaTool"
+  },
+  {
+    "id": "testing-08",
+    "prompt": "Please handle the following request from an issue: Verify the checkout form in a real browser, including keyboard navigation and validation feedback.",
+    "expectedSkills": [
+      "browser-testing"
+    ],
+    "category": "testing",
+    "source": "https://github.com/OpenBMB/ToolBench"
+  },
+  {
+    "id": "testing-09",
+    "prompt": "I'm maintaining a software project and need help to use red-green-refactor to add a regression test for the failing date parser before fixing its implementation.",
+    "expectedSkills": [
+      "tdd"
+    ],
+    "category": "testing",
+    "source": "https://arxiv.org/abs/2304.08244"
+  },
+  {
+    "id": "frontend-01",
+    "prompt": "Build an accessible responsive settings page with a clear hierarchy and reusable form components.",
+    "expectedSkills": [
+      "frontend-ui"
+    ],
+    "category": "frontend",
+    "source": "https://github.com/HowieHwong/MetaTool"
+  },
+  {
+    "id": "frontend-02",
+    "prompt": "Please help with this task: refactor this React dashboard into small typed components with stable state boundaries.",
+    "expectedSkills": [
+      "react-components"
+    ],
+    "category": "frontend",
+    "source": "https://github.com/OpenBMB/ToolBench"
+  },
+  {
+    "id": "frontend-03",
+    "prompt": "I have a repository task. Audit this modal for keyboard support, focus trapping, labels, and screen reader announcements. Include a short explanation of the approach.",
+    "expectedSkills": [
+      "accessibility"
+    ],
+    "category": "frontend",
+    "source": "https://arxiv.org/abs/2304.08244"
+  },
+  {
+    "id": "frontend-04",
+    "prompt": "My team needs this done carefully: Build an accessible responsive settings page with a clear hierarchy and reusable form components. Keep the changes maintainable.",
+    "expectedSkills": [
+      "frontend-ui"
+    ],
+    "category": "frontend",
+    "source": "https://github.com/HowieHwong/MetaTool"
+  },
+  {
+    "id": "frontend-05",
+    "prompt": "Can you guide an agent through this request? Refactor this React dashboard into small typed components with stable state boundaries.",
+    "expectedSkills": [
+      "react-components"
+    ],
+    "category": "frontend",
+    "source": "https://github.com/OpenBMB/ToolBench"
+  },
+  {
+    "id": "frontend-06",
+    "prompt": "We need to improve our developer workflow. Audit this modal for keyboard support, focus trapping, labels, and screen reader announcements.",
+    "expectedSkills": [
+      "accessibility"
+    ],
+    "category": "frontend",
+    "source": "https://arxiv.org/abs/2304.08244"
+  },
+  {
+    "id": "frontend-07",
+    "prompt": "Given the current project, build an accessible responsive settings page with a clear hierarchy and reusable form components.",
+    "expectedSkills": [
+      "frontend-ui"
+    ],
+    "category": "frontend",
+    "source": "https://github.com/HowieHwong/MetaTool"
+  },
+  {
+    "id": "frontend-08",
+    "prompt": "Please handle the following request from an issue: Refactor this React dashboard into small typed components with stable state boundaries.",
+    "expectedSkills": [
+      "react-components"
+    ],
+    "category": "frontend",
+    "source": "https://github.com/OpenBMB/ToolBench"
+  },
+  {
+    "id": "backend-01",
+    "prompt": "Design a versioned REST endpoint for creating and listing team invitations with pagination.",
+    "expectedSkills": [
+      "api-design"
+    ],
+    "category": "backend",
+    "source": "https://arxiv.org/abs/2304.08244"
+  },
+  {
+    "id": "backend-02",
+    "prompt": "Please help with this task: add a reversible migration and indexes for storing tenant-scoped audit events.",
+    "expectedSkills": [
+      "database-migrations"
+    ],
+    "category": "backend",
+    "source": "https://github.com/HowieHwong/MetaTool"
+  },
+  {
+    "id": "backend-03",
+    "prompt": "I have a repository task. Split the notification handler into clear domain, persistence, and transport layers. Include a short explanation of the approach.",
+    "expectedSkills": [
+      "backend-architecture"
+    ],
+    "category": "backend",
+    "source": "https://github.com/OpenBMB/ToolBench"
+  },
+  {
+    "id": "backend-04",
+    "prompt": "My team needs this done carefully: Design a versioned REST endpoint for creating and listing team invitations with pagination. Keep the changes maintainable.",
+    "expectedSkills": [
+      "api-design"
+    ],
+    "category": "backend",
+    "source": "https://arxiv.org/abs/2304.08244"
+  },
+  {
+    "id": "backend-05",
+    "prompt": "Can you guide an agent through this request? Add a reversible migration and indexes for storing tenant-scoped audit events.",
+    "expectedSkills": [
+      "database-migrations"
+    ],
+    "category": "backend",
+    "source": "https://github.com/HowieHwong/MetaTool"
+  },
+  {
+    "id": "backend-06",
+    "prompt": "We need to improve our developer workflow. Split the notification handler into clear domain, persistence, and transport layers.",
+    "expectedSkills": [
+      "backend-architecture"
+    ],
+    "category": "backend",
+    "source": "https://github.com/OpenBMB/ToolBench"
+  },
+  {
+    "id": "backend-07",
+    "prompt": "Given the current project, design a versioned REST endpoint for creating and listing team invitations with pagination.",
+    "expectedSkills": [
+      "api-design"
+    ],
+    "category": "backend",
+    "source": "https://arxiv.org/abs/2304.08244"
+  },
+  {
+    "id": "backend-08",
+    "prompt": "Please handle the following request from an issue: Add a reversible migration and indexes for storing tenant-scoped audit events.",
+    "expectedSkills": [
+      "database-migrations"
+    ],
+    "category": "backend",
+    "source": "https://github.com/HowieHwong/MetaTool"
+  },
+  {
+    "id": "docs-01",
+    "prompt": "Rewrite the project README with prerequisites, installation steps, examples, and troubleshooting.",
+    "expectedSkills": [
+      "readme-writing"
+    ],
+    "category": "docs",
+    "source": "https://github.com/OpenBMB/ToolBench"
+  },
+  {
+    "id": "docs-02",
+    "prompt": "Please help with this task: explain the event processing flow for maintainers without assuming knowledge of the internals.",
+    "expectedSkills": [
+      "technical-writing"
+    ],
+    "category": "docs",
+    "source": "https://arxiv.org/abs/2304.08244"
+  },
+  {
+    "id": "docs-03",
+    "prompt": "I have a repository task. Document the request schema, response fields, errors, and a curl example for this API. Include a short explanation of the approach.",
+    "expectedSkills": [
+      "api-documentation"
+    ],
+    "category": "docs",
+    "source": "https://github.com/HowieHwong/MetaTool"
+  },
+  {
+    "id": "docs-04",
+    "prompt": "My team needs this done carefully: Rewrite the project README with prerequisites, installation steps, examples, and troubleshooting. Keep the changes maintainable.",
+    "expectedSkills": [
+      "readme-writing"
+    ],
+    "category": "docs",
+    "source": "https://github.com/OpenBMB/ToolBench"
+  },
+  {
+    "id": "docs-05",
+    "prompt": "Can you guide an agent through this request? Explain the event processing flow for maintainers without assuming knowledge of the internals.",
+    "expectedSkills": [
+      "technical-writing"
+    ],
+    "category": "docs",
+    "source": "https://arxiv.org/abs/2304.08244"
+  },
+  {
+    "id": "docs-06",
+    "prompt": "We need to improve our developer workflow. Document the request schema, response fields, errors, and a curl example for this API.",
+    "expectedSkills": [
+      "api-documentation"
+    ],
+    "category": "docs",
+    "source": "https://github.com/HowieHwong/MetaTool"
+  },
+  {
+    "id": "docs-07",
+    "prompt": "Given the current project, rewrite the project README with prerequisites, installation steps, examples, and troubleshooting.",
+    "expectedSkills": [
+      "readme-writing"
+    ],
+    "category": "docs",
+    "source": "https://github.com/OpenBMB/ToolBench"
+  },
+  {
+    "id": "docs-08",
+    "prompt": "Please handle the following request from an issue: Explain the event processing flow for maintainers without assuming knowledge of the internals.",
+    "expectedSkills": [
+      "technical-writing"
+    ],
+    "category": "docs",
+    "source": "https://arxiv.org/abs/2304.08244"
+  },
+  {
+    "id": "git-01",
+    "prompt": "Review this pull request for correctness, missing tests, and actionable inline feedback.",
+    "expectedSkills": [
+      "github-workflows"
+    ],
+    "category": "git",
+    "source": "https://github.com/HowieHwong/MetaTool"
+  },
+  {
+    "id": "git-02",
+    "prompt": "Please help with this task: help me split these mixed working-tree changes into clean, conventional commits.",
+    "expectedSkills": [
+      "git-workflow"
+    ],
+    "category": "git",
+    "source": "https://github.com/OpenBMB/ToolBench"
+  },
+  {
+    "id": "git-03",
+    "prompt": "I have a repository task. Turn this bug report into a reproducible GitHub issue with expected and actual behavior. Include a short explanation of the approach.",
+    "expectedSkills": [
+      "issue-triage"
+    ],
+    "category": "git",
+    "source": "https://arxiv.org/abs/2304.08244"
+  },
+  {
+    "id": "git-04",
+    "prompt": "My team needs this done carefully: Review this pull request for correctness, missing tests, and actionable inline feedback. Keep the changes maintainable.",
+    "expectedSkills": [
+      "github-workflows"
+    ],
+    "category": "git",
+    "source": "https://github.com/HowieHwong/MetaTool"
+  },
+  {
+    "id": "git-05",
+    "prompt": "Can you guide an agent through this request? Help me split these mixed working-tree changes into clean, conventional commits.",
+    "expectedSkills": [
+      "git-workflow"
+    ],
+    "category": "git",
+    "source": "https://github.com/OpenBMB/ToolBench"
+  },
+  {
+    "id": "git-06",
+    "prompt": "We need to improve our developer workflow. Turn this bug report into a reproducible GitHub issue with expected and actual behavior.",
+    "expectedSkills": [
+      "issue-triage"
+    ],
+    "category": "git",
+    "source": "https://arxiv.org/abs/2304.08244"
+  },
+  {
+    "id": "git-07",
+    "prompt": "Given the current project, review this pull request for correctness, missing tests, and actionable inline feedback.",
+    "expectedSkills": [
+      "github-workflows"
+    ],
+    "category": "git",
+    "source": "https://github.com/HowieHwong/MetaTool"
+  },
+  {
+    "id": "git-08",
+    "prompt": "Please handle the following request from an issue: Help me split these mixed working-tree changes into clean, conventional commits.",
+    "expectedSkills": [
+      "git-workflow"
+    ],
+    "category": "git",
+    "source": "https://github.com/OpenBMB/ToolBench"
+  },
+  {
+    "id": "cli-01",
+    "prompt": "Create a Bun CLI with typed flags, helpful errors, and a --help screen.",
+    "expectedSkills": [
+      "bun-cli"
+    ],
+    "category": "cli",
+    "source": "https://arxiv.org/abs/2304.08244"
+  },
+  {
+    "id": "cli-02",
+    "prompt": "Please help with this task: design a TypeScript command parser with subcommands and validated option values.",
+    "expectedSkills": [
+      "typescript-cli"
+    ],
+    "category": "cli",
+    "source": "https://github.com/HowieHwong/MetaTool"
+  },
+  {
+    "id": "cli-03",
+    "prompt": "I have a repository task. Organize package scripts for linting, typechecking, unit tests, and CI. Include a short explanation of the approach.",
+    "expectedSkills": [
+      "package-scripts"
+    ],
+    "category": "cli",
+    "source": "https://github.com/OpenBMB/ToolBench"
+  },
+  {
+    "id": "cli-04",
+    "prompt": "My team needs this done carefully: Create a Bun CLI with typed flags, helpful errors, and a --help screen. Keep the changes maintainable.",
+    "expectedSkills": [
+      "bun-cli"
+    ],
+    "category": "cli",
+    "source": "https://arxiv.org/abs/2304.08244"
+  },
+  {
+    "id": "cli-05",
+    "prompt": "Can you guide an agent through this request? Design a TypeScript command parser with subcommands and validated option values.",
+    "expectedSkills": [
+      "typescript-cli"
+    ],
+    "category": "cli",
+    "source": "https://github.com/HowieHwong/MetaTool"
+  },
+  {
+    "id": "cli-06",
+    "prompt": "We need to improve our developer workflow. Organize package scripts for linting, typechecking, unit tests, and CI.",
+    "expectedSkills": [
+      "package-scripts"
+    ],
+    "category": "cli",
+    "source": "https://github.com/OpenBMB/ToolBench"
+  },
+  {
+    "id": "cli-07",
+    "prompt": "Given the current project, create a Bun CLI with typed flags, helpful errors, and a --help screen.",
+    "expectedSkills": [
+      "bun-cli"
+    ],
+    "category": "cli",
+    "source": "https://arxiv.org/abs/2304.08244"
+  },
+  {
+    "id": "cli-08",
+    "prompt": "Please handle the following request from an issue: Design a TypeScript command parser with subcommands and validated option values.",
+    "expectedSkills": [
+      "typescript-cli"
+    ],
+    "category": "cli",
+    "source": "https://github.com/HowieHwong/MetaTool"
+  },
+  {
+    "id": "llm-01",
+    "prompt": "Call a free OpenRouter model with retries, request timeouts, and structured response validation.",
+    "expectedSkills": [
+      "openrouter-api"
+    ],
+    "category": "llm",
+    "source": "https://github.com/OpenBMB/ToolBench"
+  },
+  {
+    "id": "llm-02",
+    "prompt": "Please help with this task: build an evaluation set and report accuracy, precision, recall, and per-category results.",
+    "expectedSkills": [
+      "llm-evaluation"
+    ],
+    "category": "llm",
+    "source": "https://arxiv.org/abs/2304.08244"
+  },
+  {
+    "id": "llm-03",
+    "prompt": "I have a repository task. Improve this system prompt so the model chooses only valid skill IDs with calibrated confidence. Include a short explanation of the approach.",
+    "expectedSkills": [
+      "prompt-engineering"
+    ],
+    "category": "llm",
+    "source": "https://github.com/HowieHwong/MetaTool"
+  },
+  {
+    "id": "llm-04",
+    "prompt": "My team needs this done carefully: Call a free OpenRouter model with retries, request timeouts, and structured response validation. Keep the changes maintainable.",
+    "expectedSkills": [
+      "openrouter-api"
+    ],
+    "category": "llm",
+    "source": "https://github.com/OpenBMB/ToolBench"
+  },
+  {
+    "id": "llm-05",
+    "prompt": "Can you guide an agent through this request? Build an evaluation set and report accuracy, precision, recall, and per-category results.",
+    "expectedSkills": [
+      "llm-evaluation"
+    ],
+    "category": "llm",
+    "source": "https://arxiv.org/abs/2304.08244"
+  },
+  {
+    "id": "llm-06",
+    "prompt": "We need to improve our developer workflow. Improve this system prompt so the model chooses only valid skill IDs with calibrated confidence.",
+    "expectedSkills": [
+      "prompt-engineering"
+    ],
+    "category": "llm",
+    "source": "https://github.com/HowieHwong/MetaTool"
+  },
+  {
+    "id": "llm-07",
+    "prompt": "Given the current project, call a free OpenRouter model with retries, request timeouts, and structured response validation.",
+    "expectedSkills": [
+      "openrouter-api"
+    ],
+    "category": "llm",
+    "source": "https://github.com/OpenBMB/ToolBench"
+  },
+  {
+    "id": "llm-08",
+    "prompt": "Please handle the following request from an issue: Build an evaluation set and report accuracy, precision, recall, and per-category results.",
+    "expectedSkills": [
+      "llm-evaluation"
+    ],
+    "category": "llm",
+    "source": "https://arxiv.org/abs/2304.08244"
+  },
+  {
+    "id": "llm-09",
+    "prompt": "I'm maintaining a software project and need help to improve this system prompt so the model chooses only valid skill IDs with calibrated confidence.",
+    "expectedSkills": [
+      "prompt-engineering"
+    ],
+    "category": "llm",
+    "source": "https://github.com/HowieHwong/MetaTool"
+  },
+  {
+    "id": "devops-01",
+    "prompt": "Add a GitHub Actions workflow that checks formatting, types, security audit, and tests.",
+    "expectedSkills": [
+      "github-actions-ci"
+    ],
+    "category": "devops",
+    "source": "https://github.com/OpenBMB/ToolBench"
+  },
+  {
+    "id": "devops-02",
+    "prompt": "Please help with this task: package this Bun service into a small Docker image with a non-root runtime user.",
+    "expectedSkills": [
+      "docker-deployment"
+    ],
+    "category": "devops",
+    "source": "https://arxiv.org/abs/2304.08244"
+  },
+  {
+    "id": "devops-03",
+    "prompt": "I have a repository task. Add structured logs and health metrics to help diagnose production request failures. Include a short explanation of the approach.",
+    "expectedSkills": [
+      "observability"
+    ],
+    "category": "devops",
+    "source": "https://github.com/HowieHwong/MetaTool"
+  },
+  {
+    "id": "devops-04",
+    "prompt": "My team needs this done carefully: Add a GitHub Actions workflow that checks formatting, types, security audit, and tests. Keep the changes maintainable.",
+    "expectedSkills": [
+      "github-actions-ci"
+    ],
+    "category": "devops",
+    "source": "https://github.com/OpenBMB/ToolBench"
+  },
+  {
+    "id": "devops-05",
+    "prompt": "Can you guide an agent through this request? Package this Bun service into a small Docker image with a non-root runtime user.",
+    "expectedSkills": [
+      "docker-deployment"
+    ],
+    "category": "devops",
+    "source": "https://arxiv.org/abs/2304.08244"
+  },
+  {
+    "id": "devops-06",
+    "prompt": "We need to improve our developer workflow. Add structured logs and health metrics to help diagnose production request failures.",
+    "expectedSkills": [
+      "observability"
+    ],
+    "category": "devops",
+    "source": "https://github.com/HowieHwong/MetaTool"
+  },
+  {
+    "id": "devops-07",
+    "prompt": "Given the current project, add a GitHub Actions workflow that checks formatting, types, security audit, and tests.",
+    "expectedSkills": [
+      "github-actions-ci"
+    ],
+    "category": "devops",
+    "source": "https://github.com/OpenBMB/ToolBench"
+  },
+  {
+    "id": "devops-08",
+    "prompt": "Please handle the following request from an issue: Package this Bun service into a small Docker image with a non-root runtime user.",
+    "expectedSkills": [
+      "docker-deployment"
+    ],
+    "category": "devops",
+    "source": "https://arxiv.org/abs/2304.08244"
+  },
+  {
+    "id": "security-01",
+    "prompt": "Review the authentication changes for authorization bypasses, secret leaks, and unsafe defaults.",
+    "expectedSkills": [
+      "security-review"
+    ],
+    "category": "security",
+    "source": "https://github.com/HowieHwong/MetaTool"
+  },
+  {
+    "id": "security-02",
+    "prompt": "Please help with this task: assess dependency vulnerabilities and propose safe version updates with regression checks.",
+    "expectedSkills": [
+      "dependency-security"
+    ],
+    "category": "security",
+    "source": "https://github.com/OpenBMB/ToolBench"
+  },
+  {
+    "id": "security-03",
+    "prompt": "I have a repository task. Harden this file upload route against path traversal, oversized payloads, and content spoofing. Include a short explanation of the approach.",
+    "expectedSkills": [
+      "secure-input-validation"
+    ],
+    "category": "security",
+    "source": "https://arxiv.org/abs/2304.08244"
+  },
+  {
+    "id": "security-04",
+    "prompt": "My team needs this done carefully: Review the authentication changes for authorization bypasses, secret leaks, and unsafe defaults. Keep the changes maintainable.",
+    "expectedSkills": [
+      "security-review"
+    ],
+    "category": "security",
+    "source": "https://github.com/HowieHwong/MetaTool"
+  },
+  {
+    "id": "security-05",
+    "prompt": "Can you guide an agent through this request? Assess dependency vulnerabilities and propose safe version updates with regression checks.",
+    "expectedSkills": [
+      "dependency-security"
+    ],
+    "category": "security",
+    "source": "https://github.com/OpenBMB/ToolBench"
+  },
+  {
+    "id": "security-06",
+    "prompt": "We need to improve our developer workflow. Harden this file upload route against path traversal, oversized payloads, and content spoofing.",
+    "expectedSkills": [
+      "secure-input-validation"
+    ],
+    "category": "security",
+    "source": "https://arxiv.org/abs/2304.08244"
+  },
+  {
+    "id": "security-07",
+    "prompt": "Given the current project, review the authentication changes for authorization bypasses, secret leaks, and unsafe defaults.",
+    "expectedSkills": [
+      "security-review"
+    ],
+    "category": "security",
+    "source": "https://github.com/HowieHwong/MetaTool"
+  },
+  {
+    "id": "security-08",
+    "prompt": "Please handle the following request from an issue: Assess dependency vulnerabilities and propose safe version updates with regression checks.",
+    "expectedSkills": [
+      "dependency-security"
+    ],
+    "category": "security",
+    "source": "https://github.com/OpenBMB/ToolBench"
+  },
+  {
+    "id": "data-01",
+    "prompt": "Analyze this CSV for missing values, outliers, and changes in weekly conversion rate.",
+    "expectedSkills": [
+      "data-analysis"
+    ],
+    "category": "data",
+    "source": "https://arxiv.org/abs/2304.08244"
+  },
+  {
+    "id": "data-02",
+    "prompt": "Please help with this task: write a SQL query for monthly active users grouped by plan, excluding internal accounts.",
+    "expectedSkills": [
+      "sql-analytics"
+    ],
+    "category": "data",
+    "source": "https://github.com/HowieHwong/MetaTool"
+  },
+  {
+    "id": "data-03",
+    "prompt": "I have a repository task. Plot the distribution and trend in this dataset with readable labels and uncertainty intervals. Include a short explanation of the approach.",
+    "expectedSkills": [
+      "data-visualization"
+    ],
+    "category": "data",
+    "source": "https://github.com/OpenBMB/ToolBench"
+  },
+  {
+    "id": "data-04",
+    "prompt": "My team needs this done carefully: Analyze this CSV for missing values, outliers, and changes in weekly conversion rate. Keep the changes maintainable.",
+    "expectedSkills": [
+      "data-analysis"
+    ],
+    "category": "data",
+    "source": "https://arxiv.org/abs/2304.08244"
+  },
+  {
+    "id": "data-05",
+    "prompt": "Can you guide an agent through this request? Write a SQL query for monthly active users grouped by plan, excluding internal accounts.",
+    "expectedSkills": [
+      "sql-analytics"
+    ],
+    "category": "data",
+    "source": "https://github.com/HowieHwong/MetaTool"
+  },
+  {
+    "id": "data-06",
+    "prompt": "We need to improve our developer workflow. Plot the distribution and trend in this dataset with readable labels and uncertainty intervals.",
+    "expectedSkills": [
+      "data-visualization"
+    ],
+    "category": "data",
+    "source": "https://github.com/OpenBMB/ToolBench"
+  },
+  {
+    "id": "data-07",
+    "prompt": "Given the current project, analyze this CSV for missing values, outliers, and changes in weekly conversion rate.",
+    "expectedSkills": [
+      "data-analysis"
+    ],
+    "category": "data",
+    "source": "https://arxiv.org/abs/2304.08244"
+  },
+  {
+    "id": "data-08",
+    "prompt": "Please handle the following request from an issue: Write a SQL query for monthly active users grouped by plan, excluding internal accounts.",
+    "expectedSkills": [
+      "sql-analytics"
+    ],
+    "category": "data",
+    "source": "https://github.com/HowieHwong/MetaTool"
+  },
+  {
+    "id": "management-01",
+    "prompt": "Create a focused SKILL.md with useful frontmatter, concise instructions, and examples.",
+    "expectedSkills": [
+      "skill-authoring"
+    ],
+    "category": "management",
+    "source": "https://github.com/OpenBMB/ToolBench"
+  },
+  {
+    "id": "management-02",
+    "prompt": "Please help with this task: plan an agent workflow that separates independent tasks and records verification evidence.",
+    "expectedSkills": [
+      "agent-workflow"
+    ],
+    "category": "management",
+    "source": "https://arxiv.org/abs/2304.08244"
+  },
+  {
+    "id": "management-03",
+    "prompt": "I have a repository task. Choose the right specialized skill for a multi-step software maintenance request. Include a short explanation of the approach.",
+    "expectedSkills": [
+      "tool-selection"
+    ],
+    "category": "management",
+    "source": "https://github.com/HowieHwong/MetaTool"
+  },
+  {
+    "id": "management-04",
+    "prompt": "My team needs this done carefully: Create a focused SKILL.md with useful frontmatter, concise instructions, and examples. Keep the changes maintainable.",
+    "expectedSkills": [
+      "skill-authoring"
+    ],
+    "category": "management",
+    "source": "https://github.com/OpenBMB/ToolBench"
+  },
+  {
+    "id": "management-05",
+    "prompt": "Can you guide an agent through this request? Plan an agent workflow that separates independent tasks and records verification evidence.",
+    "expectedSkills": [
+      "agent-workflow"
+    ],
+    "category": "management",
+    "source": "https://arxiv.org/abs/2304.08244"
+  },
+  {
+    "id": "management-06",
+    "prompt": "We need to improve our developer workflow. Choose the right specialized skill for a multi-step software maintenance request.",
+    "expectedSkills": [
+      "tool-selection"
+    ],
+    "category": "management",
+    "source": "https://github.com/HowieHwong/MetaTool"
+  },
+  {
+    "id": "management-07",
+    "prompt": "Given the current project, create a focused SKILL.md with useful frontmatter, concise instructions, and examples.",
+    "expectedSkills": [
+      "skill-authoring"
+    ],
+    "category": "management",
+    "source": "https://github.com/OpenBMB/ToolBench"
+  },
+  {
+    "id": "management-08",
+    "prompt": "Please handle the following request from an issue: Plan an agent workflow that separates independent tasks and records verification evidence.",
+    "expectedSkills": [
+      "agent-workflow"
+    ],
+    "category": "management",
+    "source": "https://arxiv.org/abs/2304.08244"
+  },
+  {
+    "id": "negative-01",
+    "prompt": "Hi there! How is your day going?",
+    "expectedSkills": [],
+    "category": "none",
+    "source": "synthetic"
+  },
+  {
+    "id": "negative-02",
+    "prompt": "Tell me a short joke about penguins.",
+    "expectedSkills": [],
+    "category": "none",
+    "source": "synthetic"
+  },
+  {
+    "id": "negative-03",
+    "prompt": "What is the capital city of France?",
+    "expectedSkills": [],
+    "category": "none",
+    "source": "synthetic"
+  },
+  {
+    "id": "negative-04",
+    "prompt": "Thanks, that solved it. Have a nice day!",
+    "expectedSkills": [],
+    "category": "none",
+    "source": "synthetic"
+  },
+  {
+    "id": "negative-05",
+    "prompt": "Recommend a relaxing song for a quiet evening.",
+    "expectedSkills": [],
+    "category": "none",
+    "source": "synthetic"
+  },
+  {
+    "id": "negative-06",
+    "prompt": "What is two plus two?",
+    "expectedSkills": [],
+    "category": "none",
+    "source": "synthetic"
+  },
+  {
+    "id": "negative-07",
+    "prompt": "Write a friendly birthday message for my cousin.",
+    "expectedSkills": [],
+    "category": "none",
+    "source": "synthetic"
+  },
+  {
+    "id": "negative-08",
+    "prompt": "Do you prefer tea or coffee?",
+    "expectedSkills": [],
+    "category": "none",
+    "source": "synthetic"
+  },
+  {
+    "id": "negative-09",
+    "prompt": "Give me a simple recipe for tomato soup.",
+    "expectedSkills": [],
+    "category": "none",
+    "source": "synthetic"
+  },
+  {
+    "id": "negative-10",
+    "prompt": "What color is a clear daytime sky?",
+    "expectedSkills": [],
+    "category": "none",
+    "source": "synthetic"
+  }
+]

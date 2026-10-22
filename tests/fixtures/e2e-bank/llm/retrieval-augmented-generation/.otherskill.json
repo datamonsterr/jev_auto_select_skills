@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "logicalId": "5be479bf26c7541f46b6f0b360a0132d8882f9d72d182c2241cfe298bd088483",
+  "source": "fixture:retrieval-augmented-generation",
+  "category": "llm",
+  "installedAt": "2026-10-22T00:00:00.000Z"
+}
