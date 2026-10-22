@@ -8,11 +8,17 @@ import {
   configData,
   configTarget,
   writeConfig,
+  writtenBankPath,
   withRoutingOverrides,
   type RoutingOverrides,
   auditNativeExposure,
 } from "./lib/otherskill/config";
-import { readKey, saveKey, credentialPath } from "./lib/otherskill/credentials";
+import {
+  readKey,
+  saveKey,
+  credentialPath,
+  keySource,
+} from "./lib/otherskill/credentials";
 import {
   createSkill,
   installLocal,
@@ -65,6 +71,7 @@ Options:
   --scope global|project             Hook/config scope (setup/config)
   --home <dir> --cwd <dir>            Isolated home/project roots
   --config <file>                    Explicit config override (otherwise nearest ancestor, then global)
+                                     Project configs also inherit the global config's categories and bank (inheritGlobal: false opts out)
   --model <provider/model:free>       Configure one free model; paid models/fallback chains rejected
   --categories <id,id>               Enabled category IDs (setup/config/find)
   --max-skills N --max-categories N  Per-call routing limits; setup embeds them in hooks
@@ -76,12 +83,16 @@ Options:
   --no-companion                    Install hooks without the shared .agents companion
   --ref <branch-or-tag> --path <dir> GitHub skill source selection (slash refs use --ref)
   --prompt <literal text> --json     Native find output, or JSON routing result for inspection
+  --portable                        Write path-free project hooks ($HOME launcher; needs project scope and
+                                     otherskill.config.json or .otherskill/config.json at the project
+                                     root); persists portableHooks
   --apply                           Apply config settings to harness hooks
   --live                            Doctor: tiny free-model probe (no paid fallback)
   --check                           Update: compare installed commit with remote HEAD, no writes
   --help                            Show this help for any command
 Keys: environment OPENROUTER_API_KEY overrides private ~/.config/otherskill/credentials.json.
 Project configs never contain credentials. Explicit config > nearest project config > global > defaults.
+A project config is otherskill.config.json or .otherskill/config.json (the root file wins when both exist).
 `;
 const options = {
   agent: { type: "string" },
@@ -105,6 +116,7 @@ const options = {
   path: { type: "string" },
   prompt: { type: "string" },
   json: { type: "boolean" },
+  portable: { type: "boolean" },
   apply: { type: "boolean" },
   live: { type: "boolean" },
   check: { type: "boolean" },
@@ -269,6 +281,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
           ? values.categories.split(",").map((s) => s.trim())
           : [];
       data.scope = scope;
+      if (values.portable) data.portableHooks = true;
       if (Object.keys(overrides).length)
         data.hookParams = { ...config.hookParams, ...overrides };
       const file =
@@ -318,7 +331,11 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
           if (!field || value === undefined)
             throw new Error("config set requires field and value");
           if (field === "model" || field === "bankPath") data[field] = value;
-          else if (field === "scope") {
+          else if (field === "portableHooks") {
+            if (value !== "true" && value !== "false")
+              throw new Error("portableHooks must be true or false");
+            data.portableHooks = value === "true";
+          } else if (field === "scope") {
             scope = scopeValue(value, scope);
             data.scope = scope;
           } else if (field === "agent") {
@@ -389,6 +406,8 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
         !process.env.OTHERSKILL_CONFIG
           ? configTarget({ ...roots, scope })
           : file;
+      if (data.bankPath === config.bankPath)
+        data.bankPath = writtenBankPath(target, config.bankPath, config.home);
       config = writeConfig(target, data, roots, true);
       const plan = apply
         ? planMultiSetup(config, selectedAgents, {
@@ -572,9 +591,12 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
           {
             configPath: config.configPath ?? "(defaults)",
             bank: config.bankPath,
+            inheritedConfigPath: config.inherited?.configPath ?? null,
+            inheritedBank: config.inherited?.bankPath ?? null,
             instances: skills.length,
             model: config.model,
             credential: readKey(config.home) ? "configured" : "unavailable",
+            credentialSource: keySource(config.home),
             credentialFile: credentialPath(config.home),
             nativeBankExposure: "checked_by_config",
             harnesses: findings,

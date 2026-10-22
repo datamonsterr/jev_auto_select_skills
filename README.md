@@ -75,7 +75,7 @@ More: [docs/architecture.md](docs/architecture.md).
 
 ## Configuration
 
-Config is one JSON file. Precedence: `--config` / `OTHERSKILL_CONFIG` > nearest ancestor `otherskill.config.json` (project) > `~/.config/otherskill/otherskill.config.json` (global) > defaults. Files are not merged.
+Config is one JSON file. Precedence: `--config` / `OTHERSKILL_CONFIG` > nearest ancestor `otherskill.config.json` or `.otherskill/config.json` (project; the root file wins when a directory has both) > `~/.config/otherskill/otherskill.config.json` (global) > defaults. A project config also inherits the global config: routing (`find`, `select`, `list`, `doctor`, `classify`) sees the categories and banks of both as one pool, and writes go only to the project bank. Set `"inheritGlobal": false` to opt out.
 
 ```jsonc
 {
@@ -183,6 +183,7 @@ CI (`.github/workflows/ci.yml`): `check` job (format, lint, typecheck, audit, un
 ## Troubleshooting
 
 - `openrouter_http_401` in `find --json`: key missing or rejected. Export `OPENROUTER_API_KEY`, rerun `doctor --live`. Hooks still exit 0.
+- A stale `OPENROUTER_API_KEY` in the environment or Claude settings `env` overrides the saved key; check `doctor`'s `credentialSource`.
 - Nothing injected: run `find --json` and read `status` and `diagnostics`; check `doctor` shows `configured: true` for your harness, then restart the harness.
 - Duplicate routing: a legacy hook is still active. Rerun setup (Claude) or remove the old hook (other harnesses).
 - `bun: command not found` in the hook: setup records absolute paths; rerun setup after moving Bun or the checkout.

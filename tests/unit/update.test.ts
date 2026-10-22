@@ -90,6 +90,7 @@ test("update --dry-run previews pinned snapshot, frozen install and configured s
   });
   if (result.status !== "dry-run") throw new Error("expected dry-run result");
   expect(result.steps?.join(" ")).toContain("bun install --frozen-lockfile");
+  expect(result.steps?.[2]).toContain("bun --no-env-file otherskill.ts");
   expect(result.steps?.join(" ")).toContain("claude");
   expect(calls).toHaveLength(1);
   expect(fs.existsSync(f.home)).toBe(false);
@@ -204,6 +205,11 @@ test("update installs a pinned tarball in a new snapshot, records commit and rea
   expect(
     deps.commands.some(
       (args) => args.slice(1).join(" ") === "install --frozen-lockfile",
+    ),
+  ).toBe(true);
+  expect(
+    deps.commands.some(
+      (args) => args[1] === "--no-env-file" && args[3] === "setup",
     ),
   ).toBe(true);
   expect(fs.readFileSync(launcherPath(f.home), "utf8")).toContain(

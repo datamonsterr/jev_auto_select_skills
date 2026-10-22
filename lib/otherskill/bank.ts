@@ -4,7 +4,13 @@ import os from "node:os";
 import { createHash, randomUUID } from "node:crypto";
 import yaml from "yaml";
 import { z } from "zod";
-import { type Config, overlaps, realPath, assertHiddenBank } from "./config";
+import {
+  type Config,
+  overlaps,
+  realPath,
+  assertHiddenBank,
+  routingView,
+} from "./config";
 
 const metadataSchema = z.object({
   version: z.literal(1),
@@ -110,45 +116,56 @@ export function createSkill(
   return path.resolve(dir);
 }
 export function discoverBank(config: Config): BankSkill[] {
-  assertHiddenBank(config.bankPath, config.home, config.cwd);
+  const view = routingView(config);
+  for (const bank of view.banks)
+    assertHiddenBank(bank, config.home, config.cwd);
   const skills: BankSkill[] = [];
-  for (const category of config.categories) {
-    const dir = path.join(config.bankPath, category.id);
-    insideNoLinks(config.bankPath, dir);
-    if (!fs.existsSync(dir)) continue;
-    for (const entry of fs
-      .readdirSync(dir, { withFileTypes: true })
-      .sort((a, b) => a.name.localeCompare(b.name))) {
-      const folder = path.join(dir, entry.name);
-      if (entry.isSymbolicLink()) throw new Error("bank contains symlink");
-      if (
-        entry.name.startsWith(".") ||
-        !entry.isDirectory() ||
-        !fs.existsSync(path.join(folder, "SKILL.md"))
-      )
-        continue;
-      validateTree(folder);
-      let metadata: Metadata;
-      try {
-        metadata = metadataSchema.parse(
-          JSON.parse(fs.readFileSync(path.join(folder, metaFile), "utf8")),
-        );
-      } catch {
-        throw new Error(
-          "invalid or missing bank provenance; import skills with install/classify",
-        );
+  for (const category of view.categories) {
+    // Later banks only add what earlier banks (project first) did not already provide.
+    const seen = new Set<string>();
+    for (const bank of view.banks) {
+      const found = new Set<string>();
+      const dir = path.join(bank, category.id);
+      insideNoLinks(bank, dir);
+      if (!fs.existsSync(dir)) continue;
+      for (const entry of fs
+        .readdirSync(dir, { withFileTypes: true })
+        .sort((a, b) => a.name.localeCompare(b.name))) {
+        const folder = path.join(dir, entry.name);
+        if (entry.isSymbolicLink()) throw new Error("bank contains symlink");
+        if (
+          entry.name.startsWith(".") ||
+          !entry.isDirectory() ||
+          !fs.existsSync(path.join(folder, "SKILL.md"))
+        )
+          continue;
+        validateTree(folder);
+        let metadata: Metadata;
+        try {
+          metadata = metadataSchema.parse(
+            JSON.parse(fs.readFileSync(path.join(folder, metaFile), "utf8")),
+          );
+        } catch {
+          throw new Error(
+            "invalid or missing bank provenance; import skills with install/classify",
+          );
+        }
+        if (metadata.category !== category.id)
+          throw new Error("bank category provenance mismatch");
+        const skill = readSkill(folder);
+        const instanceId = `${category.id}::${entry.name}`;
+        found.add(instanceId).add(metadata.logicalId);
+        if (seen.has(instanceId) || seen.has(metadata.logicalId)) continue;
+        skills.push({
+          ...skill,
+          path: path.join(folder, "SKILL.md"),
+          category: category.id,
+          logicalId: metadata.logicalId,
+          instanceId,
+          source: metadata,
+        });
       }
-      if (metadata.category !== category.id)
-        throw new Error("bank category provenance mismatch");
-      const skill = readSkill(folder);
-      skills.push({
-        ...skill,
-        path: path.join(folder, "SKILL.md"),
-        category: category.id,
-        logicalId: metadata.logicalId,
-        instanceId: `${category.id}::${entry.name}`,
-        source: metadata,
-      });
+      for (const key of found) seen.add(key);
     }
   }
   return skills;
@@ -171,7 +188,7 @@ export function installLocal(
   const ids = [...new Set(categories)];
   if (
     !ids.length ||
-    ids.some((id) => !config.categories.some((c) => c.id === id))
+    ids.some((id) => !routingView(config).categories.some((c) => c.id === id))
   )
     throw new Error("classification requires known configured category IDs");
   let previous: Metadata | undefined;

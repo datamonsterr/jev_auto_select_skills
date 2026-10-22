@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { z } from "zod";
-import { type Config, realPath } from "./config";
+import { type Config, projectRoot, realPath } from "./config";
 import { repoRoot, quote, nativeCompanion } from "./setup";
 
 export interface UpdateOptions {
@@ -85,7 +85,7 @@ export async function update(
     throw new Error(
       "update requires a configured agent; run otherskill setup first",
     );
-  const root = config.scope === "global" ? config.home : config.cwd;
+  const root = config.scope === "global" ? config.home : projectRoot(config);
   const archiveUrl = `https://codeload.github.com/datamonsterr/jev_auto_select_skills/tar.gz/${remote.data.sha}`;
   const setupArgs = [
     "setup",
@@ -106,7 +106,7 @@ export async function update(
   const steps = [
     `Download ${archiveUrl} into a new private snapshot`,
     "bun install --frozen-lockfile",
-    `bun otherskill.ts ${setupArgs.map(quote).join(" ")}`,
+    `bun --no-env-file otherskill.ts ${setupArgs.map(quote).join(" ")}`,
   ];
   if (options.dryRun) return { status: "dry-run", ...info, steps };
   const archiveResponse = await fetchFn(archiveUrl, {
@@ -172,7 +172,12 @@ export async function update(
     // Setup can persist references before a later failure; keep that snapshot for recovery.
     retain = true;
     await runCommand(
-      [process.execPath, path.join(snapshot, "otherskill.ts"), ...setupArgs],
+      [
+        process.execPath,
+        "--no-env-file",
+        path.join(snapshot, "otherskill.ts"),
+        ...setupArgs,
+      ],
       config.cwd,
     );
     return { status: "updated", ...info, snapshot };
