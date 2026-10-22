@@ -18,6 +18,7 @@ import {
   planSetup,
   setupTargets,
 } from "../lib/otherskill/setup";
+import { checkAgentStatus } from "../scripts/setup-agent";
 
 const repo = path.resolve(import.meta.dir, "..");
 const companionSource = path.join(
@@ -101,6 +102,35 @@ describe("interactive target checkbox", () => {
       "\x1b[A " + "j" + "j" + " " + "\r",
     );
     expect(selected).toEqual(["agents", "claude", "opencode"]);
+  });
+
+  it("buffers split ESC and CSI arrow sequences across input chunks", async () => {
+    const { input, output, transcript } = streams();
+    const session = new TerminalSession(input, output, true);
+    const result = session.checkbox({
+      title: "Install targets:",
+      choices: targetChoices,
+      initial: ["agents"],
+    });
+    for (const chunk of ["\x1b", "[", "B", " "]) {
+      input.write(chunk);
+      await Bun.sleep(1);
+    }
+    input.write("\r");
+    try {
+      expect(await result).toEqual(["agents", "claude"]);
+      expect(transcript()).toContain("[x] Claude");
+    } finally {
+      session.close();
+    }
+  });
+
+  it("marks .agents required while a harness is selected and cannot deselect it", async () => {
+    const { selected, transcript } = await driveCheckbox(
+      "\x1b[B\x1b[B \x1b[A\x1b[A \r",
+    );
+    expect(selected).toEqual(["agents", "codex"]);
+    expect(transcript).toContain(".agents (required)");
   });
 });
 
@@ -236,7 +266,7 @@ describe("multi-target setup and shared companion links", () => {
     fs.writeFileSync(path.join(legacy, "SKILL.md"), "user modified companion");
     expect(() =>
       planSetup(config, "claude", { scope: "global" }),
-    ).toThrow("modified native companion");
+    ).toThrow(/modified or extended native companion/);
     expect(fs.readFileSync(path.join(legacy, "SKILL.md"), "utf8")).toBe(
       "user modified companion",
     );
@@ -258,6 +288,37 @@ describe("multi-target setup and shared companion links", () => {
       planSetup(config, "codex", { scope: "global" }),
     ).toThrow("canonical companion symlink collision");
     fs.rmSync(canonical, { force: true });
+  });
+
+  it("gives preservation guidance for a legacy companion with extra files", () => {
+    const config = configFor(home, cwd);
+    const legacy = companionDir("claude", home);
+    fs.mkdirSync(legacy, { recursive: true });
+    fs.writeFileSync(path.join(legacy, "SKILL.md"), companionContent);
+    fs.writeFileSync(path.join(legacy, "notes.txt"), "keep my notes");
+    expect(() =>
+      planSetup(config, "claude", { scope: "global" }),
+    ).toThrow(/move it aside to preserve it/);
+    expect(fs.readFileSync(path.join(legacy, "notes.txt"), "utf8")).toBe(
+      "keep my notes",
+    );
+    expect(fs.readFileSync(path.join(legacy, "SKILL.md"), "utf8")).toBe(
+      companionContent,
+    );
+  });
+
+  it("recognizes a valid Claude-only legacy companion without canonical .agents", () => {
+    const legacy = companionDir("claude", home);
+    fs.mkdirSync(legacy, { recursive: true });
+    fs.writeFileSync(path.join(legacy, "SKILL.md"), companionContent);
+    expect(fs.existsSync(canonicalCompanionDir(home))).toBe(false);
+    const status = checkAgentStatus({
+      homeDir: home,
+      projectRoot: cwd,
+      scope: "global",
+    });
+    expect(status.claude.skill).toBe(true);
+    expect(status.codex.skill).toBe(false);
   });
 
   it("keeps --no-companion hooks-only and preserves pre-existing shared skills", () => {
@@ -357,5 +418,240 @@ describe("headless CLI compatibility", () => {
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
+  }, 30000);
+});
+
+describe("headless target precedence and persistence", () => {
+  let root: string;
+  let home: string;
+  let cwd: string;
+  beforeEach(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), "otherskill-precedence-"));
+    home = path.join(root, "home");
+    cwd = path.join(root, "project");
+    fs.mkdirSync(cwd, { recursive: true });
+  });
+  afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  function env(
+    extra: Record<string, string> = {},
+  ): Record<string, string | undefined> {
+    const result: Record<string, string | undefined> = {
+      ...process.env,
+      OPENROUTER_API_KEY: "",
+      OTHERSKILL_CONFIG: "",
+      OTHERSKILL_HOME: home,
+      ...extra,
+    };
+    for (const key of [
+      "CLAUDE_CODE",
+      "CLAUDE_PLUGIN_ROOT",
+      "CODEX_THREAD_ID",
+      "CODEX",
+      "ANTIGRAVITY",
+      "GEMINI_CLI",
+      "OPENCODE",
+      "OPENCODE_VERSION",
+    ])
+      delete result[key];
+    return result;
+  }
+
+  async function run(args: string[], extra: Record<string, string> = {}) {
+    const child = Bun.spawn(
+      [
+        process.execPath,
+        path.join(repo, "otherskill.ts"),
+        ...args,
+        "--home",
+        home,
+        "--cwd",
+        cwd,
+      ],
+      {
+        cwd,
+        env: env(extra),
+        stdin: "ignore",
+        stdout: "pipe",
+        stderr: "pipe",
+      },
+    );
+    const [out, err, code] = await Promise.all([
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+      child.exited,
+    ]);
+    return { out, err, code, json: () => JSON.parse(out) };
+  }
+
+  const savedConfig = () =>
+    JSON.parse(
+      fs.readFileSync(
+        path.join(home, ".config/otherskill/otherskill.config.json"),
+        "utf8",
+      ),
+    );
+
+  it("persists --agents primary and reapply honors the full selected set", async () => {
+    const setup = await run([
+      "setup",
+      "--non-interactive",
+      "--agents",
+      "codex,opencode",
+      "--scope",
+      "global",
+    ]);
+    expect(setup.code).toBe(0);
+    expect(setup.json().agent).toBe("codex");
+    expect(setup.json().agents).toEqual(["codex", "opencode"]);
+    expect(setup.json().targets).toEqual([
+      "agents",
+      "codex",
+      "opencode",
+    ]);
+    expect(savedConfig().agent).toBe("codex");
+    expect(savedConfig().agents).toEqual(["codex", "opencode"]);
+
+    // A config edit without --apply still reports the saved primary.
+    const noApply = await run([
+      "config",
+      "set",
+      "model",
+      "inception/mercury-decide:free",
+      "--scope",
+      "global",
+    ]);
+    expect(noApply.code).toBe(0);
+    expect(noApply.json().agent).toBe("codex");
+    expect(noApply.json().agents).toEqual(["codex", "opencode"]);
+
+    // Reapply must install both saved targets, not just the primary.
+    const reapplied = await run([
+      "config",
+      "set",
+      "model",
+      "inception/mercury-decide:free",
+      "--apply",
+      "--scope",
+      "global",
+    ]);
+    expect(reapplied.code).toBe(0);
+    expect(reapplied.json().agent).toBe("codex");
+    expect(reapplied.json().agents).toEqual(["codex", "opencode"]);
+    expect(reapplied.json().targets).toEqual([
+      "agents",
+      "codex",
+      "opencode",
+    ]);
+    expect(fs.existsSync(path.join(home, ".codex/hooks.json"))).toBe(true);
+    expect(
+      fs.existsSync(
+        path.join(home, ".config/opencode/plugins/otherskill.ts"),
+      ),
+    ).toBe(true);
+    expect(fs.existsSync(path.join(home, ".claude/settings.json"))).toBe(
+      false,
+    );
+  }, 30000);
+
+  it("explicit --agents outrank CLAUDE_CODE detection and later apply", async () => {
+    const setup = await run(
+      [
+        "setup",
+        "--non-interactive",
+        "--agents",
+        "codex,opencode",
+        "--scope",
+        "global",
+      ],
+      { CLAUDE_CODE: "1" },
+    );
+    expect(setup.code).toBe(0);
+    expect(setup.json().agent).toBe("codex");
+    expect(setup.json().agents).toEqual(["codex", "opencode"]);
+    expect(savedConfig().agent).toBe("codex");
+    expect(savedConfig().agents).toEqual(["codex", "opencode"]);
+    expect(fs.existsSync(path.join(home, ".claude/settings.json"))).toBe(
+      false,
+    );
+    expect(fs.existsSync(path.join(home, ".codex/hooks.json"))).toBe(true);
+
+    const doctor = await run(["doctor"], { CLAUDE_CODE: "1" });
+    expect(doctor.code).toBe(0);
+    const harnesses = doctor.json().harnesses as Array<{
+      agent: string;
+      configured: boolean;
+    }>;
+    expect(
+      harnesses.find((entry) => entry.agent === "claude")?.configured,
+    ).toBe(false);
+    expect(
+      harnesses.find((entry) => entry.agent === "codex")?.configured,
+    ).toBe(true);
+
+    // Detection must not turn a later reapply into an unrequested Claude install.
+    const reapplied = await run(
+      [
+        "config",
+        "set",
+        "model",
+        "inception/mercury-decide:free",
+        "--apply",
+        "--scope",
+        "global",
+      ],
+      { CLAUDE_CODE: "1" },
+    );
+    expect(reapplied.code).toBe(0);
+    expect(reapplied.json().agents).toEqual(["codex", "opencode"]);
+    expect(fs.existsSync(path.join(home, ".claude/settings.json"))).toBe(
+      false,
+    );
+  }, 30000);
+
+  it("rejects combining --agent and --agents before any writes", async () => {
+    const result = await run([
+      "setup",
+      "--non-interactive",
+      "--agent",
+      "codex",
+      "--agents",
+      "claude",
+      "--scope",
+      "global",
+    ]);
+    expect(result.code).not.toBe(0);
+    expect(result.err).toContain("either --agent or --agents");
+    expect(
+      fs.existsSync(
+        path.join(home, ".config/otherskill/otherskill.config.json"),
+      ),
+    ).toBe(false);
+    expect(fs.existsSync(path.join(home, ".codex/hooks.json"))).toBe(false);
+    expect(fs.existsSync(path.join(home, ".claude/settings.json"))).toBe(
+      false,
+    );
+  }, 30000);
+
+  it("dedupes --agents and excludes .agents targets under --no-companion", async () => {
+    const result = await run([
+      "setup",
+      "--non-interactive",
+      "--agents",
+      "codex,codex,opencode",
+      "--no-companion",
+      "--scope",
+      "global",
+    ]);
+    expect(result.code).toBe(0);
+    expect(result.json().agents).toEqual(["codex", "opencode"]);
+    expect(result.json().targets).toEqual(["codex", "opencode"]);
+    expect(savedConfig().agents).toEqual(["codex", "opencode"]);
+    expect(fs.existsSync(canonicalCompanionDir(home))).toBe(false);
+    expect(
+      fs.existsSync(
+        path.join(home, ".claude/skills/use-otherskill"),
+      ),
+    ).toBe(false);
   }, 30000);
 });

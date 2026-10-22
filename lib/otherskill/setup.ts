@@ -77,6 +77,25 @@ export function companionDir(agent: Agent, root: string): string {
 export function nativeCompanion(agent: Agent, root: string): string {
   return path.join(companionDir(agent, root), "SKILL.md");
 }
+function companionSource(): string {
+  return fs.readFileSync(
+    path.join(repoRoot, "examples/polly/skills/use-otherskill/SKILL.md"),
+    "utf8",
+  );
+}
+/** Valid shared companion, or a valid Claude-only legacy copy before migration. */
+export function hasValidCompanion(agent: Agent, root: string): boolean {
+  const native = nativeCompanion(agent, root);
+  if (!fs.existsSync(native)) return false;
+  if (fs.existsSync(path.join(canonicalCompanionDir(root), "SKILL.md")))
+    return true;
+  if (agent !== "claude") return false;
+  try {
+    return fs.readFileSync(native, "utf8") === companionSource();
+  } catch {
+    return false;
+  }
+}
 function objectFile(file: string): Record<string, unknown> {
   if (!fs.existsSync(file)) return {};
   try {
@@ -126,6 +145,15 @@ function managedCompanionCopy(dir: string, content: string): boolean {
   const stat = lstat(skill);
   return stat?.isFile() === true && fs.readFileSync(skill, "utf8") === content;
 }
+function modifiedCompanionError(dir: string): Error {
+  return new Error(
+    "refusing to replace modified or extended native companion at " +
+      dir +
+      "; move it aside to preserve it (for example, " +
+      dir +
+      ".backup) and rerun setup",
+  );
+}
 function validateCanonicalCompanion(dir: string, content: string): void {
   const stat = lstat(dir);
   if (!stat) return;
@@ -141,9 +169,7 @@ function validateCanonicalCompanion(dir: string, content: string): void {
   const skillStat = lstat(skill);
   if (skillStat) {
     if (!skillStat.isFile() || fs.readFileSync(skill, "utf8") !== content)
-      throw new Error(
-        "refusing to overwrite modified native companion at " + skill,
-      );
+      throw modifiedCompanionError(skill);
     // Preserve unrelated files inside an existing companion directory.
     return;
   }
@@ -171,9 +197,7 @@ function validateCompanionLink(
     return;
   }
   if (!stat.isDirectory() || !managedCompanionCopy(link, content))
-    throw new Error(
-      "refusing to overwrite modified native companion at " + link,
-    );
+    throw modifiedCompanionError(link);
 }
 export interface SetupFile {
   path: string;
@@ -363,6 +387,7 @@ export function planMultiSetup(
     );
   }
   const installCompanion = companion && (shared || agentList.length > 0);
+  const sharedTarget = companion && (shared || agentList.length > 0);
   if (installCompanion) {
     const source = path.join(
       repo,
@@ -405,14 +430,14 @@ export function planMultiSetup(
   return {
     agent: agentList[0],
     agents: agentList,
-    targets: [...(shared ? (["agents"] as const) : []), ...agentList],
+    targets: [...(sharedTarget ? (["agents"] as const) : []), ...agentList],
     scope,
     root,
     files,
     command: commands[0] ?? "",
     commands,
     companion: installCompanion,
-    shared,
+    shared: sharedTarget,
   };
 }
 export function planSetup(
@@ -445,9 +470,7 @@ function applySymlink(file: SetupFile): void {
       !existing.isDirectory() ||
       !managedCompanionCopy(file.path, file.content)
     )
-      throw new Error(
-        "refusing to overwrite modified native companion at " + file.path,
-      );
+      throw modifiedCompanionError(file.path);
     fs.rmSync(file.path, { recursive: true, force: true });
   }
   fs.mkdirSync(path.dirname(file.path), { recursive: true });

@@ -38,6 +38,7 @@ export const starterCategories = [
   },
 ];
 const id = z.string().regex(/^[a-z0-9][a-z0-9_-]*(\/[a-z0-9][a-z0-9_-]*)*$/);
+const agentId = z.enum(["claude", "codex", "antigravity", "opencode"]);
 const schema = z
   .object({
     bankPath: z
@@ -51,7 +52,14 @@ const schema = z
       .default("~/.local/share/otherskill/bank"),
     model: z.string().default(FREE_MODEL),
     scope: z.enum(["global", "project"]).default("global"),
-    agent: z.enum(["claude", "codex", "antigravity", "opencode"]).optional(),
+    agent: agentId.optional(),
+    agents: z
+      .array(agentId)
+      .refine(
+        (value) => new Set(value).size === value.length,
+        "agents must be unique",
+      )
+      .optional(),
     enabledCategories: z.array(id).optional(),
     categories: z
       .array(z.object({ id, description: z.string().min(1) }).strict())

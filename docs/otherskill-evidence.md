@@ -15,7 +15,7 @@ System `/tmp` reached the user's tmpfs quota (`EDQUOT`) during temporary-fixture
 | Command | Measured result |
 | --- | --- |
 | `bun install --frozen-lockfile` | Passed; 18 installs across 19 packages checked |
-| `TMPDIR="$PWD/.tmp" bun test tests/` | 115 passed, 0 failed; 115 collected/executed test cases across 25 files |
+| `mkdir -p .tmp && TMPDIR="$PWD/.tmp" bun test tests/` | 115 passed, 0 failed; 115 collected/executed test cases across 25 files |
 | `bunx tsc --noEmit` | Passed, no errors |
 | `bun run build` | Passed, Bun-target CLI bundle in ignored `.tmp` |
 | `TMPDIR="$PWD/.tmp" python3 scripts/smoke-interactive.py` | Actual PTY setup/config menus passed; synthetic key absent from captured output; mode 0600; project Codex and global Claude scopes verified |
@@ -31,7 +31,7 @@ The test totals above count collected/executed test cases rather than commands/C
 | Requirement | Implementation and behavioral evidence |
 | --- | --- |
 | Canonical setup/add/find/config; correct aliases/help | `otherskill.ts`; `tests/otherskill-cli.test.ts` executes real subprocess commands, with a controlled HTTP preload for successful model cases |
-| Interactive harness/scope/key/model/category choices | `lib/otherskill/menu.ts`; `scripts/smoke-interactive.py` uses PTY input/output and reloads persisted settings |
+| Interactive target/scope/key/model/category choices | `lib/otherskill/menu.ts`; keyboard checkbox (arrows or `j`/`k`, SPACE, ENTER) for `.agents` plus optional harnesses; `scripts/smoke-interactive.py` uses PTY input/output and reloads persisted settings |
 | Secure key storage; no project key or echo | `lib/otherskill/credentials.ts`; CLI tests assert synthetic key never reaches output/config, file mode 0600; PTY smoke verifies hidden entry |
 | Explicit/project/global/default precedence | `lib/otherskill/config.ts`; precedence test covers nearest ancestor, explicit override, global scope bypass and global fallback |
 | Config-defined nested taxonomy and safety | Config tests cover stable nested IDs, duplicates/traversal, paid models/fallback arrays, native overlap and symlink aliases |
@@ -41,7 +41,7 @@ The test totals above count collected/executed test cases rather than commands/C
 | No silent candidate/context/result truncation | Routing tests assert explicit failure before category requests when candidates/context exceed limits and safe failure when result limits overflow |
 | Free default/overrides/retries/response validation | Config and routing tests reject paid chains/overrides, bound HTTP retries, avoid retrying permanent errors, reject unknown choices and invalid distributions |
 | Partial/error responses never invent selections | Routing tests verify empty stage-one failure and explicit partial status with only validated successful categories; upstream text is absent from diagnostics |
-| Native hidden bank and only companion installed | Setup uses `.claude/skills/use-otherskill` or `.agents/skills/use-otherskill`; tests verify global/project adapters without `skills.paths`; native symlink/config exposure is refused |
+| Native hidden bank and only companion installed | Setup keeps one canonical `.agents/skills/use-otherskill`; Claude's `.claude/skills/use-otherskill` is a relative symlink to it, while Codex, Antigravity and OpenCode read the canonical tree. Tests verify global/project adapters without `skills.paths`; native symlink/config exposure is refused |
 | Explicit harness and non-blocking hook protocols | Adapter and CLI tests verify all four empty-output protocols, original stdin prompt extraction, Antigravity transcript and invocation guards |
 | OpenCode native API and safe prompt transport | Adapter test checks literal argument transport, synthetic context, per-message cache and repeated transformations; no shell interpolation |
 | Idempotent setup/preservation/malformed refusal | CLI/setup tests preserve unrelated native skill bytes, hook groups and settings; repeated installation does not duplicate hooks; malformed config remains unchanged |

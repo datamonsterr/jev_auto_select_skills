@@ -58,8 +58,8 @@ Secondary commands:
   doctor [--live]                    Check config, native visibility, hook paths and optionally free API
 Aliases: install = add; hook = find; select = find --json (routing result)
 Options:
-  --agent claude|codex|antigravity|opencode   Explicit harness overrides detection
-  --agents claude,codex,...          Install hook integrations for multiple harnesses in one setup
+  --agent claude|codex|antigravity|opencode   Explicit single harness overrides detection
+  --agents claude,codex,...          Install multiple harness hooks (not with --agent)
   --scope global|project             Hook/config scope (setup/config)
   --home <dir> --cwd <dir>            Isolated home/project roots
   --config <file>                    Explicit config override (otherwise nearest ancestor, then global)
@@ -167,6 +167,23 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
       const action = positionals[1];
       const scripted =
         values["non-interactive"] || (command === "config" && !!action);
+      const explicitAgent = values.agent ? agentName(values.agent) : undefined;
+      const explicitAgents =
+        values.agents === undefined
+          ? undefined
+          : [
+              ...new Set(
+                values.agents
+                  .split(",")
+                  .map((value) => value.trim())
+                  .filter(Boolean)
+                  .map(agentName),
+              ),
+            ];
+      if (explicitAgent && explicitAgents)
+        throw new Error("choose either --agent or --agents, not both");
+      if (values.agents !== undefined && !explicitAgents?.length)
+        throw new Error("--agents requires one or more harness names");
       let key: string | undefined;
       if (values["key-env"]) {
         key = process.env[values["key-env"]];
@@ -179,29 +196,25 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
         if (key) throw new Error("choose one credential input");
         key = (await stdin()).trim();
       }
-      const agentsFlag =
-        values.agents === undefined
-          ? undefined
-          : values.agents
-              .split(",")
-              .map((value) => value.trim())
-              .filter(Boolean)
-              .map(agentName);
-      if (values.agents !== undefined && !agentsFlag?.length)
-        throw new Error("--agents requires one or more harness names");
       let scope = scopeValue(values.scope, config.scope);
       let companion = !values["no-companion"];
       let shared = true;
       let selectedAgents: Agent[] = [];
+      let agentWasSelected = false;
       let apply = command === "setup" || !!values.apply;
       let data = configData(config);
       if (!scripted) {
         const answers = await menu(
-          { ...config, agent: agent ?? config.agent, scope },
+          {
+            ...config,
+            agent: explicitAgent ?? config.agent ?? agent,
+            agents: config.agents,
+            scope,
+          },
           command,
           {
-            fixedAgent: values.agent ? agentName(values.agent) : undefined,
-            fixedAgents: agentsFlag,
+            fixedAgent: explicitAgent,
+            fixedAgents: explicitAgents,
             fixedScope: values.scope ? scope : undefined,
             noCompanion: values["no-companion"],
             configForScope: (targetScope) =>
@@ -214,8 +227,9 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
         }
         config = answers.config;
         data = configData(config);
-        agent = answers.agent;
-        selectedAgents = answers.agents;
+        selectedAgents = [...new Set(answers.agents)];
+        agent = answers.agent ?? selectedAgents[0];
+        agentWasSelected = true;
         scope = answers.scope;
         shared = answers.targets.includes("agents");
         companion = answers.companion;
@@ -233,7 +247,6 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
           ? values.categories.split(",").map((s) => s.trim())
           : [];
       data.scope = scope;
-      if (agent) data.agent = agent;
       const file =
         values.config || process.env.OTHERSKILL_CONFIG
           ? configTarget({ ...roots, scope })
@@ -286,7 +299,6 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
             data.scope = scope;
           } else if (field === "agent") {
             agent = agentName(value);
-            data.agent = agent;
           } else if (field === "categories")
             data.enabledCategories = value.trim()
               ? value.split(",").map((s) => s.trim())
@@ -299,16 +311,53 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
       } else if (command === "config" && action)
         throw new Error("unknown config action");
       if (scripted) {
-        // Resolve after config edits so `config set agent ... --apply` uses the new value.
-        selectedAgents = agentsFlag ?? (agent ? [agent] : []);
-        if (selectedAgents.length === 0 && config.agent && apply)
-          selectedAgents = [config.agent];
-        agent ??= selectedAgents[0];
+        const editedAgent =
+          command === "config" &&
+          action === "set" &&
+          positionals[2] === "agent";
+        if (explicitAgents) {
+          selectedAgents = explicitAgents;
+          agentWasSelected = true;
+        } else if (explicitAgent) {
+          selectedAgents = [explicitAgent];
+          agentWasSelected = true;
+        } else if (editedAgent && agent) {
+          selectedAgents = [agent];
+          agentWasSelected = true;
+        } else {
+          selectedAgents = [
+            ...new Set([
+              ...(config.agents ?? []),
+              ...(config.agent ? [config.agent] : []),
+            ]),
+          ];
+        }
+        if (agentWasSelected) agent = selectedAgents[0];
+        else
+          agent =
+            config.agent && selectedAgents.includes(config.agent)
+              ? config.agent
+              : selectedAgents[0];
         shared = selectedAgents.length > 0;
         if (apply && selectedAgents.length === 0)
           throw new Error(
-            "setup/apply requires --agent, --agents or interactive selection",
+            "setup/apply requires --agent, --agents or a saved harness selection",
           );
+      }
+      // Explicit targets/menu answers define the persisted primary and full set.
+      if (agentWasSelected) {
+        if (selectedAgents.length > 0) {
+          agent =
+            agent && selectedAgents.includes(agent)
+              ? agent
+              : selectedAgents[0];
+          data.agent = agent;
+          data.agents = selectedAgents;
+        } else {
+          agent = undefined;
+          delete data.agent;
+          delete data.agents;
+        }
       }
       const target =
         command === "config" &&
@@ -340,7 +389,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
             agents: selectedAgents,
             targets:
               plan?.targets ??
-              [...(shared ? (["agents"] as const) : []), ...selectedAgents],
+              [
+                ...(companion && shared ? (["agents"] as const) : []),
+                ...selectedAgents,
+              ],
             scope,
             credential: key
               ? "saved privately" + (dryRun ? " (dry-run)" : "")

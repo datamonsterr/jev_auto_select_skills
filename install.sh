@@ -22,16 +22,17 @@ Installer options (before --):
 
 All other arguments are forwarded to the existing setup command, including:
   --agent claude|codex|antigravity|opencode, --agents claude,codex,...,
+                                    (use --agent or --agents, not both),
   --scope global|project, --home DIR, --cwd DIR, --non-interactive,
   --no-companion, --dry-run, --key-env OPENROUTER_API_KEY, --model MODEL,
   --categories IDS.
 Use `-- --help` for setup's full help after downloading/installing dependencies.
 Without --non-interactive, the setup menu reads from the controlling terminal.
-Its target checklist starts with .agents selected; use arrow keys, SPACE to
-toggle optional Claude, Codex, Antigravity and OpenCode hooks, and ENTER to
-confirm. Companion content is canonical under .agents; Claude's native path is
-a symlink to it. No terminal? Pass --non-interactive and --agent (or --agents)
-explicitly.
+Its target checklist starts with .agents selected; use arrow keys or j/k, SPACE
+to toggle optional Claude, Codex, Antigravity and OpenCode hooks, and ENTER to
+confirm. .agents stays required while a harness is selected. Companion content
+is canonical under .agents; Claude's native path is a symlink to it. No
+terminal? Pass --non-interactive and --agent (or --agents) explicitly.
 
 Requires Bash, curl with HTTPS, tar with gzip support, standard POSIX utilities,
 and Bun >= 1.3. Bun is never downloaded automatically: install it separately

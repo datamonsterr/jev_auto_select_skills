@@ -43,32 +43,33 @@ export const targetChoices: CheckboxChoice[] = [
   {
     value: "agents",
     label: ".agents",
-    description: "shared canonical use-otherskill companion",
+    description: "shared canonical use-otherskill companion (required with a harness)",
   },
   { value: "claude", label: "Claude", description: "hook + linked companion" },
   { value: "codex", label: "Codex", description: "hook" },
   { value: "antigravity", label: "Antigravity", description: "hook" },
   { value: "opencode", label: "OpenCode", description: "hook" },
 ];
-function parseKeys(chunk: string): Key[] {
+function parseKeys(text: string): { keys: Key[]; pending: string } {
   const keys: Key[] = [];
-  for (let i = 0; i < chunk.length; i++) {
-    const char = chunk[i]!;
+  let index = 0;
+  for (; index < text.length; index++) {
+    const char = text[index]!;
     if (char === "\x1b") {
-      const next = chunk[i + 1];
+      if (index + 1 >= text.length) break;
+      const next = text[index + 1];
       if (next === "[" || next === "O") {
-        let end = i + 2;
-        while (end < chunk.length && !/[A-Za-z~]/.test(chunk[end]!)) end++;
-        const final = chunk[end];
+        let end = index + 2;
+        while (end < text.length && !/[A-Za-z~]/.test(text[end]!)) end++;
+        if (end >= text.length) break;
+        const final = text[end];
         if (final === "A") keys.push("up");
         else if (final === "B") keys.push("down");
         else if (final === "C") keys.push("right");
         else if (final === "D") keys.push("left");
         else keys.push("escape");
-        i = end;
-      } else {
-        keys.push("escape");
-      }
+        index = end;
+      } else keys.push("escape");
     } else if (char === "\r" || char === "\n") keys.push("enter");
     else if (char === " ") keys.push("space");
     else if (char === "\x7f" || char === "\b") keys.push("backspace");
@@ -76,7 +77,7 @@ function parseKeys(chunk: string): Key[] {
     else if (char === "\x04") keys.push("ctrl-d");
     else keys.push(char);
   }
-  return keys;
+  return { keys, pending: text.slice(index) };
 }
 /**
  * Shared raw terminal reader. It avoids readline so checkbox navigation and
@@ -87,6 +88,7 @@ export class TerminalSession {
   private output: NodeJS.WritableStream;
   private terminal: boolean;
   private queue: Key[] = [];
+  private pending = "";
   private waiter?: {
     resolve: (key: Key) => void;
     reject: (error: Error) => void;
@@ -96,10 +98,12 @@ export class TerminalSession {
   private raw = false;
   private closed = false;
   private readonly onData = (chunk: Buffer | string): void => {
-    for (const key of parseKeys(
-      typeof chunk === "string" ? chunk : chunk.toString("utf8"),
-    ))
-      this.queue.push(key);
+    const parsed = parseKeys(
+      this.pending +
+        (typeof chunk === "string" ? chunk : chunk.toString("utf8")),
+    );
+    this.pending = parsed.pending;
+    for (const key of parsed.keys) this.queue.push(key);
     this.flush();
   };
   private readonly onEnd = (): void => {
@@ -191,6 +195,7 @@ export class TerminalSession {
     choices: CheckboxChoice[];
     initial: SetupTarget[];
     hint?: string;
+    agentsRequired?: boolean;
   }): Promise<SetupTarget[]> {
     this.enableRaw();
     const selected = new Set<SetupTarget>(options.initial);
@@ -198,12 +203,19 @@ export class TerminalSession {
     let printed = 0;
     const hint = options.hint ?? "↑/↓ move, SPACE toggle, ENTER confirm";
     const render = (): void => {
+      const agentsRequired =
+        (options.agentsRequired ?? true) &&
+        [...selected].some((value) => value !== "agents");
       const rows = [
         options.title,
         ...options.choices.map((choice, index) => {
           const pointer = index === cursor ? ">" : " ";
           const box = selected.has(choice.value) ? "[x]" : "[ ]";
-          return `  ${pointer} ${box} ${choice.label} - ${choice.description}`;
+          const label =
+            choice.value === "agents" && agentsRequired
+              ? choice.label + " (required)"
+              : choice.label;
+          return `  ${pointer} ${box} ${label} - ${choice.description}`;
         }),
         `  ${selected.size === 0 ? "Select at least one target." : hint}`,
       ];
@@ -235,8 +247,18 @@ export class TerminalSession {
         cursor = (cursor + 1) % options.choices.length;
       else if (key === "space") {
         const value = options.choices[cursor]!.value;
+        if (
+          value === "agents" &&
+          (options.agentsRequired ?? true) &&
+          selected.size > 1
+        )
+          continue;
         if (selected.has(value)) selected.delete(value);
-        else selected.add(value);
+        else {
+          selected.add(value);
+          if (value !== "agents" && (options.agentsRequired ?? true))
+            selected.add("agents");
+        }
       } else continue;
       render();
     }
@@ -290,13 +312,18 @@ export async function menu(
         ? uniqueTargets(["agents", ...fixed])
         : uniqueTargets([
             "agents",
-            ...(config.agent ? [config.agent] : []),
+            ...(config.agents?.length
+              ? config.agents
+              : config.agent
+                ? [config.agent]
+                : []),
             ...fixed,
           ]);
     const chosen = await session.checkbox({
       title: "Install targets (shared .agents companion and harness hooks):",
       choices: targetChoices,
       initial,
+      agentsRequired: !options.noCompanion,
     });
     let targets = uniqueTargets([...chosen, ...fixed]);
     const agents = targets.filter(isAgentTarget);

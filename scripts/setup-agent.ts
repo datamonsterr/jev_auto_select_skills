@@ -11,7 +11,7 @@ import {
   hookFile,
   canonicalCompanionDir,
   companionDir,
-  nativeCompanion,
+  hasValidCompanion,
   launcherPath,
   repoRoot,
   type Agent,
@@ -94,9 +94,7 @@ export function checkAgentStatus(options: SetupOptions = {}) {
       hook:
         fs.existsSync(file) &&
         fs.readFileSync(file, "utf8").includes(launcherPath(home)),
-      skill:
-        fs.existsSync(nativeCompanion(agent, root)) &&
-        fs.existsSync(path.join(canonicalCompanionDir(root), "SKILL.md")),
+      skill: hasValidCompanion(agent, root),
     };
   };
   return {
