@@ -43,6 +43,21 @@ export function quote(value: string): string {
 export function launcherPath(home: string): string {
   return path.join(home, ".local/share/otherskill/bin/otherskill");
 }
+/** Managed copy of the launcher in the conventional user bin directory on PATH. */
+export function pathLauncherPath(home: string): string {
+  return path.join(home, ".local/bin/otherskill");
+}
+const managedLauncherMarker = "# OtherSkill managed launcher";
+function managedLauncher(file: string): boolean | undefined {
+  const stat = lstat(file);
+  if (!stat) return undefined;
+  if (!stat.isFile()) return false;
+  try {
+    return fs.readFileSync(file, "utf8").includes(managedLauncherMarker);
+  } catch {
+    return false;
+  }
+}
 export function hookFile(
   agent: Agent,
   root: string,
@@ -377,13 +392,17 @@ export function planMultiSetup(
   const shared = options.shared ?? true;
   const companion = options.companion ?? true;
   const files: SetupFile[] = [];
-  const launcherContent = `#!/bin/sh\n# OtherSkill managed launcher\nexec ${quote(process.execPath)} ${quote(cli)} "$@"\n`;
-  if (
-    fs.existsSync(launcher) &&
-    !fs.readFileSync(launcher, "utf8").includes("# OtherSkill managed launcher")
-  )
+  const launcherContent = `#!/bin/sh\n${managedLauncherMarker}\nexec ${quote(process.execPath)} ${quote(cli)} "$@"\n`;
+  if (managedLauncher(launcher) === false)
     throw new Error("refusing unrelated launcher collision");
   files.push({ path: launcher, content: launcherContent, mode: 0o755 });
+  // Expose the CLI on PATH; leave any unrelated ~/.local/bin/otherskill alone.
+  const pathLauncher = pathLauncherPath(config.home);
+  if (
+    managedLauncher(pathLauncher) !== false &&
+    realPath(path.dirname(pathLauncher)) === path.dirname(pathLauncher)
+  )
+    files.push({ path: pathLauncher, content: launcherContent, mode: 0o755 });
   const commands: string[] = [];
   const removedLegacyHooks: string[] = [];
   for (const agent of agentList) {

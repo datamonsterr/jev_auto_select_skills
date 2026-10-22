@@ -169,7 +169,11 @@ HELP
       || fail "setup failed; source retained at $release_dir (rerun its otherskill.ts setup)"
   fi
   printf '[otherskill installer] Setup finished. Keep this source directory: %s\n' "$release_dir" >&2
-  printf '[otherskill installer] Setup manages the launcher under <selected home>/.local/share/otherskill/bin/otherskill; add that bin directory to PATH after applying setup.\n' >&2
+  printf '[otherskill installer] Setup writes the otherskill launcher to <selected home>/.local/bin/otherskill (hooks use <selected home>/.local/share/otherskill/bin/otherskill).\n' >&2
+  case ":${PATH:-}:" in
+    *":$HOME/.local/bin:"*|*":$HOME/.local/bin/:"*) ;;
+    *) printf '[otherskill installer] %s/.local/bin is not on PATH; add it to your shell profile to run `otherskill`.\n' "$HOME" >&2 ;;
+  esac
 )
 
 # Capture this outside the function: Bash may use its own executable as

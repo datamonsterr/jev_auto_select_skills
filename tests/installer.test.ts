@@ -337,6 +337,9 @@ test("piped real setup preserves native hooks/skills and private bank, and retai
       "my-skill",
       "use-otherskill",
     ]);
+    expect(
+      fs.readFileSync(path.join(home, ".local/bin/otherskill"), "utf8"),
+    ).toBe(fs.readFileSync(launcher, "utf8"));
     const invoked = Bun.spawnSync([launcher, "--help"], {
       cwd: project,
       env: { HOME: home },
@@ -392,6 +395,7 @@ test("dry-run installs source but does not write setup config/hooks", async () =
   expect(fs.existsSync(path.join(home, ".local/share/otherskill/bin"))).toBe(
     false,
   );
+  expect(fs.existsSync(path.join(home, ".local/bin"))).toBe(false);
 });
 
 test("setup failure preserves native collision and retains source for any partial references", async () => {

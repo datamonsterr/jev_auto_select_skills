@@ -42,7 +42,7 @@ Inherit `OPENROUTER_API_KEY` from your shell, or forward `--key-env OPENROUTER_A
 
 ## Launcher
 
-Setup creates `~/.local/share/otherskill/bin/otherskill`. Add that directory to `PATH` or call it directly. It references the snapshot and Bun by absolute path; rerun setup after moving either. Setup never links the package globally. `jev-skill-selector` is a deprecated alias for the canonical CLI.
+Setup creates the launcher `~/.local/share/otherskill/bin/otherskill`, which hooks call, and a managed copy at `~/.local/bin/otherskill` so `otherskill` runs from `PATH`. The installer warns when `~/.local/bin` is not on `PATH`. Setup leaves an unrelated `~/.local/bin/otherskill` (or a symlinked `~/.local/bin`) untouched. It references the snapshot and Bun by absolute path; rerun setup after moving either. Setup never links the package globally. `jev-skill-selector` is a deprecated alias for the canonical CLI.
 
 ## Harness files
 
