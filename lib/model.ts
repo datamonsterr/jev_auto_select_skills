@@ -101,7 +101,7 @@ export interface SkillSelectionResult {
   answers: Record<string, JevChoiceAnswer>;
   usage?: UsageMetrics;
   raw?: JevDecisionResponse;
-  source?: "model" | "local_fallback" | string;
+  source?: "model" | "local_fallback" | "unavailable" | string;
   metadata?: {
     source?: string;
     model?: string;
@@ -140,7 +140,14 @@ export function filterSelectedSkills(params: {
   maxSkills?: number;
   skillMap?: Map<string, Skill>;
 }): SelectedSkill[] {
-  const { choice, probabilities, confidence, threshold = 0.05, maxSkills = 3, skillMap } = params;
+  const {
+    choice,
+    probabilities,
+    confidence,
+    threshold = 0.05,
+    maxSkills = 3,
+    skillMap,
+  } = params;
 
   // Filter out 'none'
   const items: SelectedSkill[] = Object.entries(probabilities)
@@ -163,7 +170,7 @@ export function filterSelectedSkills(params: {
     const winningIdx = items.findIndex((i) => i.name === choice);
     if (winningIdx > 0) {
       const [winningItem] = items.splice(winningIdx, 1);
-      items.unshift(winningItem);
+      if (winningItem) items.unshift(winningItem);
     } else if (winningIdx === -1 && probabilities[choice] !== undefined) {
       const skill = skillMap?.get(choice);
       items.unshift({
@@ -198,7 +205,9 @@ export function formatSkillSummary(skills: SelectedSkill[]): string {
   for (const skill of skills) {
     const conf = (skill.confidence * 100).toFixed(0);
     const prob = (skill.probability * 100).toFixed(0);
-    lines.push(`• **${skill.name}** (Confidence: ${conf}%, Probability: ${prob}%)`);
+    lines.push(
+      `• **${skill.name}** (Confidence: ${conf}%, Probability: ${prob}%)`,
+    );
     if (skill.path) {
       lines.push(`  - Path: \`${skill.path}\``);
     }
@@ -210,7 +219,9 @@ export function formatSkillSummary(skills: SelectedSkill[]): string {
   }
 
   lines.push("");
-  lines.push("*Load instructions:* To inspect and follow a selected skill, view its `SKILL.md` from the path above.");
+  lines.push(
+    "*Load instructions:* To inspect and follow a selected skill, view its `SKILL.md` from the path above.",
+  );
 
   return lines.join("\n");
 }
@@ -222,7 +233,7 @@ export function formatSkillSummary(skills: SelectedSkill[]): string {
  */
 export function formatSkillContent(
   skills: SelectedSkill[],
-  options?: { userPrompt?: string }
+  options?: { userPrompt?: string },
 ): string {
   if (skills.length === 0) {
     return "No specialized skills required for this request.";
@@ -238,7 +249,9 @@ export function formatSkillContent(
   for (const skill of skills) {
     const prob = (skill.probability * 100).toFixed(1);
     const conf = (skill.confidence * 100).toFixed(0);
-    lines.push(`• **${skill.name}** (Probability: ${prob}% | Confidence: ${conf}%)`);
+    lines.push(
+      `• **${skill.name}** (Probability: ${prob}% | Confidence: ${conf}%)`,
+    );
     if (skill.path) {
       lines.push(`  - Path: \`${skill.path}\``);
     }
@@ -280,7 +293,9 @@ export function formatSkillContent(
     lines.push("", "---", "");
   }
 
-  lines.push("*Instruction:* Apply the above skill instructions directly to fulfill the user task.");
+  lines.push(
+    "*Instruction:* Apply the above skill instructions directly to fulfill the user task.",
+  );
 
   return lines.join("\n");
 }

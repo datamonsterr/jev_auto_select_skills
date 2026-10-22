@@ -1,17 +1,3 @@
 {
-  "description": "Jev skill routing",
-  "hooks": {
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bun run ../../hooks/codex.ts",
-            "timeout": 30,
-            "additionalContextLimit": 50000
-          }
-        ]
-      }
-    ]
-  }
+  "hooks": {}
 }

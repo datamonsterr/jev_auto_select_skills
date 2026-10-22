@@ -296,6 +296,7 @@ async function main() {
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
+    if (arg === undefined) continue;
     if (arg === "--help" || arg === "-h") {
       printHelp();
       return;
@@ -310,9 +311,9 @@ async function main() {
     } else if (arg === "--skills-dir" || arg === "-d") {
       customSkillsDir = args[++i];
     } else if (arg === "--threshold" || arg === "-t") {
-      threshold = parseFloat(args[++i]) || 0.05;
+      threshold = parseFloat(args[++i] ?? "") || 0.05;
     } else if (arg === "--max-skills" || arg === "-m") {
-      maxSkills = parseInt(args[++i], 10) || 3;
+      maxSkills = parseInt(args[++i] ?? "", 10) || 3;
     } else if (arg === "--json") {
       jsonOutput = true;
     } else if (!arg.startsWith("-") && !prompt) {

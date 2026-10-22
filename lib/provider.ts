@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import {
   type Skill,
+  type SelectedSkill,
   type SkillSelectorOptions,
   type SkillSelectionResult,
   type UsageMetrics,
@@ -11,7 +12,8 @@ import {
 import { buildSkillState, buildSkillCriteria } from "./parse_skill";
 import { DEFAULT_SYSTEM_PROMPT, buildJevInstructions } from "./system_prompt";
 
-export const DEFAULT_OPENROUTER_DECISIONS_URL = "https://openrouter.ai/api/alpha/decisions";
+export const DEFAULT_OPENROUTER_DECISIONS_URL =
+  "https://openrouter.ai/api/alpha/decisions";
 export const DEFAULT_FREE_MODEL = "inception/mercury-decide:free";
 export const DEFAULT_JEV_MODEL = DEFAULT_FREE_MODEL;
 
@@ -22,7 +24,7 @@ export const DEFAULT_JEV_MODEL = DEFAULT_FREE_MODEL;
 export function isFreeModel(model?: string): boolean {
   if (!model || typeof model !== "string") return false;
   const trimmed = model.trim().toLowerCase();
-  return trimmed.endsWith(":free");
+  return /^[a-z0-9_.-]+\/[a-z0-9_.-]+:free$/.test(trimmed);
 }
 
 /**
@@ -37,7 +39,7 @@ export function resolveActiveModel(optionsModel?: string): string {
   if (optionsModel) {
     if (!isFreeModel(optionsModel)) {
       throw new Error(
-        `Paid model "${optionsModel}" rejected: only free decision models (such as ${DEFAULT_FREE_MODEL}) are authorized.`
+        `Paid model "${optionsModel}" rejected: only free decision models (such as ${DEFAULT_FREE_MODEL}) are authorized.`,
       );
     }
     return optionsModel;
@@ -47,7 +49,7 @@ export function resolveActiveModel(optionsModel?: string): string {
   if (envSelectorModel) {
     if (!isFreeModel(envSelectorModel)) {
       throw new Error(
-        `Paid model "${envSelectorModel}" rejected: only free decision models (such as ${DEFAULT_FREE_MODEL}) are authorized.`
+        `Paid model "${envSelectorModel}" rejected: only free decision models (such as ${DEFAULT_FREE_MODEL}) are authorized.`,
       );
     }
     return envSelectorModel;
@@ -71,7 +73,10 @@ export interface JevProviderConfig {
   retries?: number;
   retryDelayMs?: number;
   timeoutMs?: number;
-  fetchFn?: typeof fetch;
+  fetchFn?: (
+    input: string | URL | Request,
+    init?: RequestInit,
+  ) => Promise<Response>;
 }
 
 /**
@@ -84,7 +89,10 @@ export class JevProvider {
   private retries: number;
   private retryDelayMs: number;
   private timeoutMs: number;
-  private fetchFn: typeof fetch;
+  private fetchFn: (
+    input: string | URL | Request,
+    init?: RequestInit,
+  ) => Promise<Response>;
 
   constructor(config: JevProviderConfig = {}) {
     this.apiKey =
@@ -95,7 +103,8 @@ export class JevProvider {
     this.model = resolveActiveModel(config.model);
     this.endpoint = config.endpoint || DEFAULT_OPENROUTER_DECISIONS_URL;
     this.retries = Math.max(1, Math.min(3, Math.floor(config.retries ?? 3)));
-    this.retryDelayMs = config.retryDelayMs !== undefined ? config.retryDelayMs : 500;
+    this.retryDelayMs =
+      config.retryDelayMs !== undefined ? config.retryDelayMs : 500;
     this.timeoutMs = Math.max(1, Math.min(8000, config.timeoutMs ?? 8000));
     this.fetchFn = config.fetchFn || fetch;
   }
@@ -103,17 +112,19 @@ export class JevProvider {
   /**
    * Send a decision request to Jev with automatic retries and backoff
    */
-  async sendDecisionRequest(request: JevDecisionRequest): Promise<JevDecisionResponse> {
+  async sendDecisionRequest(
+    request: JevDecisionRequest,
+  ): Promise<JevDecisionResponse> {
     const modelToUse = request.model || this.model;
     if (!isFreeModel(modelToUse)) {
       throw new Error(
-        `Paid model "${modelToUse}" rejected: only free decision models (such as ${DEFAULT_FREE_MODEL}) are authorized.`
+        `Paid model "${modelToUse}" rejected: only free decision models (such as ${DEFAULT_FREE_MODEL}) are authorized.`,
       );
     }
 
     if (!this.apiKey) {
       throw new Error(
-        "OPENROUTER_API_KEY is not set. Please set the environment variable or pass apiKey in constructor."
+        "OPENROUTER_API_KEY is not set. Please set the environment variable or pass apiKey in constructor.",
       );
     }
 
@@ -127,7 +138,9 @@ export class JevProvider {
         const deadline = new Promise<never>((_, reject) => {
           timer = setTimeout(() => {
             controller.abort();
-            reject(new Error(`Decision request timed out after ${this.timeoutMs}ms`));
+            reject(
+              new Error(`Decision request timed out after ${this.timeoutMs}ms`),
+            );
           }, this.timeoutMs);
         });
         let response: Response;
@@ -137,9 +150,10 @@ export class JevProvider {
             const reply = await this.fetchFn(this.endpoint, {
               method: "POST",
               headers: {
-                "Authorization": `Bearer ${this.apiKey}`,
+                Authorization: `Bearer ${this.apiKey}`,
                 "Content-Type": "application/json",
-                "HTTP-Referer": "https://github.com/datamonsterr/jev_auto_select_skills",
+                "HTTP-Referer":
+                  "https://github.com/datamonsterr/jev_auto_select_skills",
                 "X-Title": "Skill Selector",
               },
               body: JSON.stringify({ ...request, model: modelToUse }),
@@ -148,8 +162,12 @@ export class JevProvider {
             // The deadline covers both headers and body, even for injected clients.
             const body = await reply.text();
             let parsed: any;
-            try { parsed = JSON.parse(body); } catch { parsed = { error: {message: body} }; }
-            return {reply, parsed};
+            try {
+              parsed = JSON.parse(body);
+            } catch {
+              parsed = { error: { message: body } };
+            }
+            return { reply, parsed };
           })();
           const completed = await Promise.race([operation, deadline]);
           response = completed.reply;
@@ -162,10 +180,10 @@ export class JevProvider {
         const isRateLimit = response.status === 429;
         const isServerError = response.status >= 500 && response.status <= 599;
 
-        const errorText = data?.error?.message || JSON.stringify(data);
+        const errorText = "provider unavailable";
 
         const error = new Error(
-          `Jev decision API failed with HTTP ${response.status}: ${errorText}`
+          `Jev decision API failed with HTTP ${response.status}: ${errorText}`,
         );
         lastError = error;
 
@@ -188,7 +206,9 @@ export class JevProvider {
       }
     }
 
-    throw lastError || new Error("Failed to send decision request after retries");
+    throw (
+      lastError || new Error("Failed to send decision request after retries")
+    );
   }
 
   /**
@@ -214,7 +234,7 @@ export class JevProvider {
       userPrompt,
       systemPrompt || DEFAULT_SYSTEM_PROMPT,
       context,
-      { compact: true }
+      { compact: true },
     );
     const criteria = buildSkillCriteria(skills, includeNone, 140);
 
@@ -223,7 +243,7 @@ export class JevProvider {
       options.multiStep === true ||
       (options.multiStep !== false &&
         /(?:step\s*\d|phase\s*\d|continuing|continue|first.*(?:next|then)|after that|subsequent)/i.test(
-          userPrompt
+          userPrompt,
         ));
 
     const questions: Record<string, any> = isMultiStep
@@ -264,46 +284,18 @@ export class JevProvider {
     } catch (err: any) {
       // Treat provider failure/timeout as local fallback or no selected skills, explicit source metadata
       const activeSystemPrompt = systemPrompt || DEFAULT_SYSTEM_PROMPT;
-      const estimateTokens = (text: string) => Math.max(1, Math.ceil(text.trim().length / 3.8));
-
-      // Local heuristic fallback: match skill names present in the user prompt
-      const lowerPrompt = userPrompt.toLowerCase();
-      const localMatches: SelectedSkill[] = [];
-      for (const s of skills) {
-        const sName = s.name.toLowerCase();
-        const wordRegex = new RegExp(`\\b${sName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/[-_]/g, "[-_ ]?")}\\b`, "i");
-        if (wordRegex.test(lowerPrompt) || lowerPrompt.includes(sName)) {
-          localMatches.push({
-            name: s.name,
-            probability: 0.85,
-            confidence: 0.85,
-            description: s.description,
-            whenToUse: s.whenToUse,
-            path: s.path,
-          });
-          if (localMatches.length >= maxSkills) break;
-        }
-      }
-
-      if (options?.includeContent) {
-        for (const skill of localMatches) {
-          if (skill.path && fs.existsSync(skill.path)) {
-            try {
-              skill.content = fs.readFileSync(skill.path, "utf-8");
-            } catch {}
-          }
-        }
-      }
+      const estimateTokens = (text: string) =>
+        Math.max(1, Math.ceil(text.trim().length / 3.8));
 
       return {
-        selectedSkills: localMatches,
-        primarySkill: localMatches[0]?.name || null,
+        selectedSkills: [],
+        primarySkill: null,
         answers: {},
-        source: "local_fallback",
+        source: "unavailable",
         metadata: {
-          source: "local_fallback",
+          source: "unavailable",
           model: activeModel,
-          error: err?.message || String(err),
+          error: "decision_unavailable",
         },
         usage: {
           total_tokens: 0,
@@ -366,14 +358,16 @@ export class JevProvider {
       selectedSkills[0]?.name ||
       null;
 
-    const primarySkill = primaryChoice && primaryChoice !== "none" ? primaryChoice : null;
+    const primarySkill =
+      primaryChoice && primaryChoice !== "none" ? primaryChoice : null;
 
     const inputTokens = response.usage?.input_tokens ?? 0;
     const outputTokens = response.usage?.output_tokens ?? 0;
     const totalTokens = inputTokens + outputTokens;
     const activeSystemPrompt = systemPrompt || DEFAULT_SYSTEM_PROMPT;
 
-    const estimateTokens = (text: string) => Math.max(1, Math.ceil(text.trim().length / 3.8));
+    const estimateTokens = (text: string) =>
+      Math.max(1, Math.ceil(text.trim().length / 3.8));
     const userPromptTokens = estimateTokens(userPrompt);
     const systemPromptTokens = estimateTokens(activeSystemPrompt);
 

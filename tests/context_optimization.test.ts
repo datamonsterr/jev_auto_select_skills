@@ -1,5 +1,10 @@
 import { describe, it, expect } from "bun:test";
-import { formatSkillSummary, formatSkillContent, type SelectedSkill } from "../lib/model";
+import {
+  formatSkillSummary,
+  formatSkillContent,
+  type SelectedSkill,
+} from "../lib/model";
+import type { Message } from "../plugins/otherskill-opencode";
 import opencodePlugin from "../plugins/opencode";
 
 describe("Context optimization and injection formatting", () => {
@@ -11,7 +16,8 @@ describe("Context optimization and injection formatting", () => {
       description: "Test-driven development",
       whenToUse: "Use when user wants to build features test-first",
       path: "/path/to/.agents/other_skills/tdd/SKILL.md",
-      content: "---\nname: tdd\n---\n# Mandatory TDD Workflow Instructions\n1. Write failing test\n2. Make it pass\n3. Refactor",
+      content:
+        "---\nname: tdd\n---\n# Mandatory TDD Workflow Instructions\n1. Write failing test\n2. Make it pass\n3. Refactor",
     },
   ];
 
@@ -40,7 +46,8 @@ describe("Context optimization and injection formatting", () => {
   });
 
   it("does not silently truncate mandatory skill instructions when content is rendered", () => {
-    const longInstructions = "Step A\n" + "x".repeat(3000) + "\nStep Z: Mandatory final verification";
+    const longInstructions =
+      "Step A\n" + "x".repeat(3000) + "\nStep Z: Mandatory final verification";
     const skillWithLongInstructions: SelectedSkill[] = [
       {
         name: "verification",
@@ -55,24 +62,31 @@ describe("Context optimization and injection formatting", () => {
   });
 
   it("OpenCode plugin dedupes per user turn and replaces own prior injection instead of unbounded messages", async () => {
-    const plugin = opencodePlugin({ autoInject: true, selectSkillsFn: async () => ({selectedSkills: dummySkills}) });
+    const plugin = opencodePlugin({
+      autoInject: true,
+      selectSkillsFn: async () => ({ selectedSkills: dummySkills }),
+    });
     const transformHook = plugin.hooks["experimental.chat.messages.transform"];
 
-    const mockOutput = {
+    const mockOutput: { messages: Message[] } = {
       messages: [
-        { role: "user", parts: [{ type: "text", text: "Run TDD tests" }] },
+        {
+          info: { role: "user", id: "turn1", sessionID: "session1" },
+          parts: [{ type: "text", text: "Run TDD tests" }],
+        },
       ],
     };
 
     // First transform run
     await transformHook({}, mockOutput);
-    expect(mockOutput.messages.length).toBe(2);
-    const firstSystemMsg = mockOutput.messages[1];
-    expect(firstSystemMsg.info?.role).toBe("system");
+    expect(mockOutput.messages.length).toBe(1);
+    expect(mockOutput.messages[0]?.parts).toHaveLength(2);
+    expect(mockOutput.messages[0]?.parts[1]?.synthetic).toBe(true);
 
     // Second transform run on the same turn / state
     await transformHook({}, mockOutput);
     // Must NOT append a 3rd message; must replace prior injection in-place
-    expect(mockOutput.messages.length).toBe(2);
+    expect(mockOutput.messages.length).toBe(1);
+    expect(mockOutput.messages[0]?.parts).toHaveLength(2);
   });
 });

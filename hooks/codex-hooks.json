@@ -1,14 +1,13 @@
 {
-  "description": "Jev skill routing",
   "hooks": {
     "UserPromptSubmit": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "bun run ./hooks/codex.ts",
-            "timeout": 30,
-            "additionalContextLimit": 50000
+            "command": "bun \"${PLUGIN_ROOT}/otherskill.ts\" find --agent codex",
+            "timeout": 120,
+            "additionalContextLimit": 100000
           }
         ]
       }

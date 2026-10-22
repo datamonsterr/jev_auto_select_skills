@@ -37,6 +37,7 @@ describe("metatool online benchmark integration", () => {
     const candidateSkills: Skill[] = Object.entries(toolsJson).map(([name, desc]) => ({
       name,
       description: desc,
+      whenToUse: desc,
     }));
 
     const mockFetch = (async () => {

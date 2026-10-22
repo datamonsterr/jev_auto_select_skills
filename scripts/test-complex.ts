@@ -37,7 +37,7 @@ async function runComplexEvaluation() {
   console.log(`\n======================================================`);
   console.log(`🚀 Starting Jev Complex & Multi-Step Evaluation`);
   console.log(`Total Cases: ${testcases.length}`);
-  console.log(`Model: ${process.env.MODEL || "~typesafe/jev-latest"}`);
+  console.log(`Model: ${process.env.MODEL || "inception/mercury-decide:free"}`);
   console.log(`======================================================\n`);
 
   const results: ComplexEvalResult[] = [];
@@ -45,6 +45,7 @@ async function runComplexEvaluation() {
 
   for (let i = 0; i < testcases.length; i++) {
     const tc = testcases[i];
+    if (!tc) continue;
     process.stdout.write(`[${i + 1}/${testcases.length}] Evaluating ${tc.id} [${tc.type}]... `);
 
     const startTime = Date.now();

@@ -1,5 +1,10 @@
 import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test";
-import { JevProvider, isFreeModel, resolveActiveModel, DEFAULT_FREE_MODEL } from "../lib/provider";
+import {
+  JevProvider,
+  isFreeModel,
+  resolveActiveModel,
+  DEFAULT_FREE_MODEL,
+} from "../lib/provider";
 import { selectSkills } from "../index";
 import type { Skill } from "../lib/model";
 
@@ -21,7 +26,7 @@ describe("Free Decision Model enforcement", () => {
     expect(isFreeModel("inception/mercury-decide:free")).toBe(true);
     expect(isFreeModel("meta-llama/llama-3-8b-instruct:free")).toBe(true);
     expect(isFreeModel("any-provider/any-model:FREE")).toBe(true);
-    
+
     // Paid models must return false
     expect(isFreeModel("~typesafe/jev-latest")).toBe(false);
     expect(isFreeModel("typesafe/jev-1.13-20260917")).toBe(false);
@@ -36,7 +41,7 @@ describe("Free Decision Model enforcement", () => {
 
   it("rejects paid model overrides before network call", async () => {
     const mockFetch = mock(async () => new Response("{}", { status: 200 }));
-    
+
     // Explicit paid model option
     expect(() => {
       new JevProvider({
@@ -61,14 +66,18 @@ describe("Free Decision Model enforcement", () => {
   it("does not silently use legacy MODEL or JEV_MODEL if configured to paid model", () => {
     process.env.MODEL = "~typesafe/jev-latest";
     process.env.JEV_MODEL = "openai/gpt-4o";
-    
+
     // Should NOT use the paid legacy model; must fallback safely to default free model
     expect(resolveActiveModel()).toBe(DEFAULT_FREE_MODEL);
   });
 
   it("treats provider failure/timeout as local fallback or no selected skills with explicit source metadata", async () => {
     const dummySkills: Skill[] = [
-      { name: "tdd", description: "TDD", whenToUse: "Use for test-first development" },
+      {
+        name: "tdd",
+        description: "TDD",
+        whenToUse: "Use for test-first development",
+      },
     ];
 
     const mockFailingFetch = mock(async () => {
@@ -87,9 +96,9 @@ describe("Free Decision Model enforcement", () => {
       skills: dummySkills,
     });
 
-    expect(result.source).toBe("local_fallback");
-    expect(result.metadata?.source).toBe("local_fallback");
-    expect(result.metadata?.error).toContain("Connection timeout");
-    expect(result.selectedSkills).toBeDefined();
+    expect(result.source).toBe("unavailable");
+    expect(result.metadata?.source).toBe("unavailable");
+    expect(result.metadata?.error).toBe("decision_unavailable");
+    expect(result.selectedSkills).toEqual([]);
   });
 });

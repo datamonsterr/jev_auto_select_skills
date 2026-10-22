@@ -58,7 +58,7 @@ export function parseSkillContent(
   const frontmatterMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
   if (frontmatterMatch) {
     try {
-      const parsed = yaml.parse(frontmatterMatch[1]);
+      const parsed = yaml.parse(frontmatterMatch[1] ?? "");
       if (parsed && typeof parsed === "object") {
         if (parsed.name && typeof parsed.name === "string") {
           name = parsed.name.trim();

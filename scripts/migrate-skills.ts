@@ -1,9 +1,16 @@
 #!/usr/bin/env bun
 import path from "node:path";
 import os from "node:os";
-import { rollbackMigration, migrateSkills, DEFAULT_KEEP_SKILLS, type MigrationOptions } from "../lib/migrate";
+import {
+  rollbackMigration,
+  migrateSkills,
+  DEFAULT_KEEP_SKILLS,
+  type MigrationOptions,
+} from "../lib/migrate";
 
-export async function runMigrateCli(args: string[] = process.argv.slice(2)): Promise<void> {
+export async function runMigrateCli(
+  args: string[] = process.argv.slice(2),
+): Promise<void> {
   const homeDir = os.homedir();
 
   if (args.includes("--help") || args.includes("-h")) {
@@ -36,31 +43,58 @@ Default Kept Skills (always preserved in native dirs):
     return;
   }
 
-  const valueFlags = new Set(["--keep", "-k", "--source", "-s", "--target", "-t", "--backup", "-b", "--rollback", "--legacy-bank"]);
-  const boolFlags = new Set(["--apply", "--dry-run", "-d", "--json", "--no-repair-symlinks", "--prefer-native"]);
+  const valueFlags = new Set([
+    "--keep",
+    "-k",
+    "--source",
+    "-s",
+    "--target",
+    "-t",
+    "--backup",
+    "-b",
+    "--rollback",
+    "--legacy-bank",
+  ]);
+  const boolFlags = new Set([
+    "--apply",
+    "--dry-run",
+    "-d",
+    "--json",
+    "--no-repair-symlinks",
+    "--prefer-native",
+  ]);
   const values = new Map<string, string[]>();
   const flags = new Set<string>();
   for (let i = 0; i < args.length; i++) {
     const flag = args[i];
+    if (flag === undefined) continue;
     if (boolFlags.has(flag)) flags.add(flag);
     else if (valueFlags.has(flag)) {
       const value = args[++i];
-      if (!value || value.startsWith("-")) throw new Error(`${flag} requires a value`);
+      if (!value || value.startsWith("-"))
+        throw new Error(`${flag} requires a value`);
       values.set(flag, [...(values.get(flag) ?? []), value]);
     } else throw new Error(`Unknown migration argument: ${flag}`);
   }
-  if (flags.has("--apply") && (flags.has("--dry-run") || flags.has("-d"))) throw new Error("--apply and --dry-run are mutually exclusive");
+  if (flags.has("--apply") && (flags.has("--dry-run") || flags.has("-d")))
+    throw new Error("--apply and --dry-run are mutually exclusive");
   const dryRun = !flags.has("--apply");
   const jsonOutput = flags.has("--json");
   const repairSymlinks = !flags.has("--no-repair-symlinks");
-  const all = (...names: string[]) => names.flatMap(name => values.get(name) ?? []);
-  const customKeep = all("--keep", "-k").flatMap(v => v.split(",").map(s => s.trim()).filter(Boolean));
+  const all = (...names: string[]) =>
+    names.flatMap((name) => values.get(name) ?? []);
+  const customKeep = all("--keep", "-k").flatMap((v) =>
+    v
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+  );
   const customSources = all("--source", "-s");
   const customTarget = all("--target", "-t").at(-1);
   const customBackup = all("--backup", "-b").at(-1);
   const rollback = all("--rollback").at(-1);
   if (rollback) {
-    console.log(JSON.stringify(await rollbackMigration(rollback, {dryRun})));
+    console.log(JSON.stringify(await rollbackMigration(rollback, { dryRun })));
     return;
   }
 
@@ -74,7 +108,8 @@ Default Kept Skills (always preserved in native dirs):
   ];
 
   const sourceDirs = customSources.length > 0 ? customSources : defaultSources;
-  const targetDir = customTarget || path.join(homeDir, ".agents", "other_skills");
+  const targetDir =
+    customTarget || path.join(homeDir, ".agents", "other_skills");
 
   const options: MigrationOptions = {
     sourceDirs,
@@ -84,7 +119,12 @@ Default Kept Skills (always preserved in native dirs):
     dryRun,
     repairSymlinks,
     conflictPolicy: flags.has("--prefer-native") ? "prefer-native" : "error",
-    legacyBankPaths: [...(customSources.length ? [] : [path.join(homeDir, ".agents", "jev_skills")]), ...all("--legacy-bank")],
+    legacyBankPaths: [
+      ...(customSources.length
+        ? []
+        : [path.join(homeDir, ".agents", "jev_skills")]),
+      ...all("--legacy-bank"),
+    ],
   };
 
   if (!jsonOutput) {
@@ -121,7 +161,11 @@ Default Kept Skills (always preserved in native dirs):
   if (result.manifestPath) {
     console.log(`\nManifest saved to: ${result.manifestPath}`);
   }
-  console.log(result.collisions.length ? "Migration blocked: collisions; no changes applied." : "Migration complete.");
+  console.log(
+    result.collisions.length
+      ? "Migration blocked: collisions; no changes applied."
+      : "Migration complete.",
+  );
 }
 
 if (import.meta.main) {

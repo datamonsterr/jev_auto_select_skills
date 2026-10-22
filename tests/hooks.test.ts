@@ -57,7 +57,7 @@ describe("hooks and plugin", () => {
     expect(plugin.name).toBe("skill_selector");
     expect(typeof plugin.hooks?.["chat:before"]).toBe("function");
     expect(Array.isArray(plugin.tools)).toBe(true);
-    expect(plugin.tools[0].name).toBe("select_skill");
+    expect(plugin.tools[0]?.name).toBe("select_skill");
   });
 
   it("handles Antigravity hook input and injects ephemeral message", async () => {
@@ -83,8 +83,8 @@ describe("hooks and plugin", () => {
     );
 
     expect(result.injectSteps).toHaveLength(1);
-    expect(result.injectSteps[0].ephemeralMessage).toContain("Skill Selector");
-    expect(result.injectSteps[0].ephemeralMessage).toContain("writing-srs");
+    expect(result.injectSteps[0]?.ephemeralMessage).toContain("Skill Selector");
+    expect(result.injectSteps[0]?.ephemeralMessage).toContain("writing-srs");
   });
 
   it("skips invocation when invocationNum > 1 in Antigravity hook", async () => {
@@ -184,7 +184,7 @@ describe("hooks and plugin", () => {
     expect(output).toContain("tdd");
   });
 
-  it("injects full skill instructions without repeating prompt when includeContent is requested in Codex hook", async () => {
+  it("injects selected descriptions without full instructions or user prompt in Codex hook output", async () => {
     const mockSelectSkills = mock(async () => ({
       primarySkill: "tdd",
       selectedSkills: [
@@ -202,15 +202,15 @@ describe("hooks and plugin", () => {
 
     const result = await handleCodexHook(
       JSON.stringify({ prompt: "Refactor payment module test-first" }),
-      { selectSkillsFn: mockSelectSkills as any, includeContent: true }
+      { selectSkillsFn: mockSelectSkills as any }
     );
 
-    expect(result.injectedContext).not.toContain("Task: \"Refactor payment module test-first\"");
-    expect(result.injectedContext).toContain("## Skill: tdd");
-    expect(result.injectedContext).toContain("Red green refactor loop");
+    expect(result.injectedContext).not.toContain("Refactor payment module test-first");
+    expect(result.injectedContext).toContain("Test driven development");
+    expect(result.injectedContext).not.toContain("Red green refactor loop");
   });
 
-  it("injects full skill instructions without repeating prompt when includeContent is requested in Claude hook", async () => {
+  it("injects selected descriptions without full instructions or user prompt in Claude hook output", async () => {
     const mockSelectSkills = mock(async () => ({
       primarySkill: "git-commit",
       selectedSkills: [
@@ -228,11 +228,10 @@ describe("hooks and plugin", () => {
 
     const output = await handleClaudeHook("Commit the auth feature branch", {
       selectSkillsFn: mockSelectSkills as any,
-      includeContent: true,
     });
 
-    expect(output).not.toContain("Task: \"Commit the auth feature branch\"");
-    expect(output).toContain("## Skill: git-commit");
-    expect(output).toContain("Follow conventional commits");
+    expect(output).not.toContain("Commit the auth feature branch");
+    expect(output).toContain("Conventional git commits");
+    expect(output).not.toContain("Follow conventional commits");
   });
 });

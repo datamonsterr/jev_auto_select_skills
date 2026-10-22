@@ -34,7 +34,7 @@ describe("JevProvider", () => {
             },
           },
         }),
-        { status: 200, headers: { "Content-Type": "application/json" } }
+        { status: 200, headers: { "Content-Type": "application/json" } },
       );
     });
 
@@ -51,9 +51,9 @@ describe("JevProvider", () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
     expect(result.primarySkill).toBe("tdd");
     expect(result.selectedSkills).toHaveLength(1);
-    expect(result.selectedSkills[0].name).toBe("tdd");
-    expect(result.selectedSkills[0].probability).toBe(0.95);
-    expect(result.selectedSkills[0].confidence).toBe(0.95);
+    expect(result.selectedSkills[0]?.name).toBe("tdd");
+    expect(result.selectedSkills[0]?.probability).toBe(0.95);
+    expect(result.selectedSkills[0]?.confidence).toBe(0.95);
   });
 
   it("retries 3 times with delay on 429 rate limit before succeeding", async () => {
@@ -62,8 +62,10 @@ describe("JevProvider", () => {
       callCount++;
       if (callCount < 3) {
         return new Response(
-          JSON.stringify({ error: { message: "Rate limit exceeded", code: 429 } }),
-          { status: 429, headers: { "Content-Type": "application/json" } }
+          JSON.stringify({
+            error: { message: "Rate limit exceeded", code: 429 },
+          }),
+          { status: 429, headers: { "Content-Type": "application/json" } },
         );
       }
       return new Response(
@@ -82,7 +84,7 @@ describe("JevProvider", () => {
             },
           },
         }),
-        { status: 200, headers: { "Content-Type": "application/json" } }
+        { status: 200, headers: { "Content-Type": "application/json" } },
       );
     });
 
@@ -104,8 +106,10 @@ describe("JevProvider", () => {
   it("throws error in sendDecisionRequest after exhausting all retries and safely falls back in selectSkills", async () => {
     const mockFetch = mock(async () => {
       return new Response(
-        JSON.stringify({ error: { message: "Service Unavailable", code: 503 } }),
-        { status: 503, headers: { "Content-Type": "application/json" } }
+        JSON.stringify({
+          error: { message: "Service Unavailable", code: 503 },
+        }),
+        { status: 503, headers: { "Content-Type": "application/json" } },
       );
     });
 
@@ -119,15 +123,16 @@ describe("JevProvider", () => {
     await expect(
       provider.sendDecisionRequest({
         model: "inception/mercury-decide:free",
+        state: {},
         questions: {},
-      })
-    ).rejects.toThrow("Service Unavailable");
+      }),
+    ).rejects.toThrow("HTTP 503");
 
     const fallbackRes = await provider.selectSkills({
       userPrompt: "Any prompt",
       skills: dummySkills,
     });
-    expect(fallbackRes.source).toBe("local_fallback");
+    expect(fallbackRes.source).toBe("unavailable");
   });
 
   it("supports multi-step and continuation prompts by evaluating multiple questions and aggregating skills", async () => {
@@ -161,7 +166,7 @@ describe("JevProvider", () => {
             },
           },
         }),
-        { status: 200, headers: { "Content-Type": "application/json" } }
+        { status: 200, headers: { "Content-Type": "application/json" } },
       );
     });
 
@@ -171,7 +176,8 @@ describe("JevProvider", () => {
     });
 
     const result = await provider.selectSkills({
-      userPrompt: "Step 1: Write unit tests with TDD. Step 2: Commit changes using conventional commits.",
+      userPrompt:
+        "Step 1: Write unit tests with TDD. Step 2: Commit changes using conventional commits.",
       skills: dummySkills,
       options: { multiStep: true },
     });
@@ -182,4 +188,3 @@ describe("JevProvider", () => {
     expect(names).toContain("git-commit");
   });
 });
-

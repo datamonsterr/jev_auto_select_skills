@@ -2,7 +2,11 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { resolveSkillsSearchPaths, resolveSkillsBankPath, loadSkillsFromDir } from "../index";
+import {
+  resolveSkillsSearchPaths,
+  resolveSkillsBankPath,
+  loadSkillsFromDir,
+} from "../index";
 
 describe("Skills Bank discovery and search precedence", () => {
   const origEnv = { ...process.env };
@@ -40,7 +44,7 @@ describe("Skills Bank discovery and search precedence", () => {
     // Project skills must come before global bank in search paths
     expect(paths.length).toBeGreaterThan(0);
     const realProject = fs.realpathSync(projectOtherSkills);
-    const resolvedFirst = fs.realpathSync(paths[0]);
+    const resolvedFirst = fs.realpathSync(paths[0] ?? "");
     expect(resolvedFirst).toBe(realProject);
   });
 
@@ -56,7 +60,7 @@ describe("Skills Bank discovery and search precedence", () => {
 
     expect(paths.length).toBeGreaterThan(0);
     const realProject = fs.realpathSync(projectOtherSkills);
-    const resolvedFirst = fs.realpathSync(paths[0]);
+    const resolvedFirst = fs.realpathSync(paths[0] ?? "");
     expect(resolvedFirst).toBe(realProject);
   });
 
@@ -74,7 +78,11 @@ describe("Skills Bank discovery and search precedence", () => {
     });
 
     const realpaths = paths.map((p) => {
-      try { return fs.realpathSync(p); } catch { return p; }
+      try {
+        return fs.realpathSync(p);
+      } catch {
+        return p;
+      }
     });
     const uniqueRealpaths = new Set(realpaths);
     expect(uniqueRealpaths.size).toBe(paths.length);
@@ -88,14 +96,18 @@ describe("Skills Bank discovery and search precedence", () => {
 
     fs.writeFileSync(
       path.join(realSkillDir, "SKILL.md"),
-      "---\nname: tdd\ndescription: Test-driven development\n---\n# TDD"
+      "---\nname: tdd\ndescription: Test-driven development\n---\n# TDD",
     );
 
     // Valid symlink to a skill directory
     fs.symlinkSync(realSkillDir, path.join(bankDir, "tdd-symlink"), "dir");
 
     // Broken symlink pointing to non-existent location
-    fs.symlinkSync(path.join(tempDir, "non_existent"), path.join(bankDir, "broken-symlink"), "dir");
+    fs.symlinkSync(
+      path.join(tempDir, "non_existent"),
+      path.join(bankDir, "broken-symlink"),
+      "dir",
+    );
 
     // Should load the symlinked skill and NOT crash on the broken symlink
     const skills = loadSkillsFromDir(bankDir);
