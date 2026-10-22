@@ -5,7 +5,6 @@ import {
   resolveActiveModel,
   DEFAULT_FREE_MODEL,
 } from "../lib/provider";
-import { selectSkills } from "../index";
 import type { Skill } from "../lib/model";
 
 describe("Free Decision Model enforcement", () => {

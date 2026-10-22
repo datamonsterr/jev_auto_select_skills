@@ -33,7 +33,7 @@ export const repoRoot = path.resolve(
 );
 export function quote(value: string): string {
   if (/[\r\n\0]/.test(value)) throw new Error("invalid command path");
-  return "'" + value.replaceAll("'", "'\\''") + "'";
+  return `'${value.replaceAll("'", "'\\''")}'`;
 }
 export function launcherPath(home: string): string {
   return path.join(home, ".local/share/otherskill/bin/otherskill");
@@ -238,7 +238,7 @@ export function planSetup(
               !h ||
               typeof h !== "object" ||
               !String((h as Record<string, unknown>).command).startsWith(
-                quote(launcher) + " 'find' '--agent' 'antigravity'",
+                `${quote(launcher)} 'find' '--agent' 'antigravity'`,
               ),
           )
         )
@@ -268,7 +268,7 @@ export function planSetup(
                 return false;
               }
               return !hook.command.startsWith(
-                quote(launcher) + " 'find' '--agent' " + quote(agent),
+                `${quote(launcher)} 'find' '--agent' ${quote(agent)}`,
               );
             }),
           };
@@ -277,7 +277,7 @@ export function planSetup(
       hooks.UserPromptSubmit = [...kept, { hooks: [handler] }];
       data.hooks = hooks;
     }
-    files.push({ path: hook, content: JSON.stringify(data, null, 2) + "\n" });
+    files.push({ path: hook, content: `${JSON.stringify(data, null, 2)}\n` });
   }
   const companion = options.companion ?? true;
   if (companion) {

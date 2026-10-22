@@ -189,7 +189,7 @@ export class JevProvider {
 
         // Retry on 429 rate limit or 5xx server error if attempts remain
         if ((isRateLimit || isServerError) && attempt < maxAttempts - 1) {
-          const backoff = this.retryDelayMs * Math.pow(2, attempt);
+          const backoff = this.retryDelayMs * 2 ** attempt;
           await new Promise((res) => setTimeout(res, backoff));
           continue;
         }
@@ -198,7 +198,7 @@ export class JevProvider {
       } catch (err: any) {
         lastError = err;
         if (attempt < maxAttempts - 1) {
-          const backoff = this.retryDelayMs * Math.pow(2, attempt);
+          const backoff = this.retryDelayMs * 2 ** attempt;
           await new Promise((res) => setTimeout(res, backoff));
           continue;
         }
@@ -281,7 +281,7 @@ export class JevProvider {
     let response: JevDecisionResponse;
     try {
       response = await this.sendDecisionRequest(request);
-    } catch (err: any) {
+    } catch (_err: any) {
       // Treat provider failure/timeout as local fallback or no selected skills, explicit source metadata
       const activeSystemPrompt = systemPrompt || DEFAULT_SYSTEM_PROMPT;
       const estimateTokens = (text: string) =>

@@ -1,7 +1,6 @@
 # Skill selector migration checks
 
 Use a fresh isolated home for staging. Do not run tests against live config or credentials.
-
 1. Run `bun test tests/`. All provider tests inject mocked HTTP clients and dummy API keys; no paid model or real HTTP call is needed.
 2. Stage with `bun run scripts/setup-agent.ts all --home /tmp/selector-stage --repo /home/dat/dev/jev_skill_selector`. Create the four `.omnigent/accounts/accountN/.gemini/config` directories in the staging home first if inspecting all account entrypoints. Verify each of the five Gemini roots contains `config/plugins/skill_selector/{plugin.json,hooks.json}` pointing to the canonical runtime, and `migrate-skill` is discoverable in native directories and `other_skills`. Staging never calls `bun link`.
 3. Preview migration with `bun run scripts/migrate-skills.ts --source /tmp/selector-fixture/native --source /tmp/selector-fixture/jev_skills --target /tmp/selector-fixture/other_skills --backup /tmp/selector-fixture/backup --dry-run --json`. Check no filesystem writes occurred.

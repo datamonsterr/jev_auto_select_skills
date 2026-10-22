@@ -11,7 +11,6 @@ import {
   withRoutingOverrides,
   type RoutingOverrides,
   auditNativeExposure,
-  type Config,
 } from "./lib/otherskill/config";
 import { readKey, saveKey, credentialPath } from "./lib/otherskill/credentials";
 import {
@@ -33,9 +32,6 @@ import {
   planSetup,
   inspectInstallation,
   applySetup,
-  hookFile,
-  nativeCompanion,
-  launcherPath,
   agents,
   type Agent,
 } from "./lib/otherskill/setup";
@@ -353,7 +349,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
             agent,
             scope,
             credential: key
-              ? "saved privately" + (dryRun ? " (dry-run)" : "")
+              ? `saved privately${dryRun ? " (dry-run)" : ""}`
               : readKey(config.home)
                 ? "configured"
                 : "unavailable",
@@ -406,7 +402,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
           }
         : await route(config, input.prompt, provider());
       for (const detail of result.diagnostics)
-        console.error("[otherskill] " + detail);
+        console.error(`[otherskill] ${detail}`);
       console.log(
         JSON.stringify(
           values.json || command === "select"
@@ -457,7 +453,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
           /^[\w.-]+\/[\w.-]+$/.test(source))
       )
         await withOnlineSkill(
-          /^(https:\/\/|github:)/.test(source) ? source : "github:" + source,
+          /^(https:\/\/|github:)/.test(source) ? source : `github:${source}`,
           { ref: values.ref, subpath: values.path },
           install,
         );
@@ -482,7 +478,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
       auditNativeExposure(config);
       const skills = discoverBank(config);
       const scope = config.scope,
-        root = scope === "global" ? config.home : config.cwd;
+        _root = scope === "global" ? config.home : config.cwd;
       const findings = agents.map((agent) =>
         inspectInstallation(config, agent),
       );

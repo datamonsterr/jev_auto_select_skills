@@ -4,15 +4,18 @@ import {
   formatSkillSummary,
   formatSkillContent,
 } from "../lib/model";
-import { DEFAULT_SYSTEM_PROMPT, buildJevInstructions } from "../lib/system_prompt";
+import {
+  DEFAULT_SYSTEM_PROMPT,
+  buildJevInstructions,
+} from "../lib/system_prompt";
 
 describe("model and system_prompt", () => {
   it("filters selected skills based on confidence and probability thresholds", () => {
     const probabilities = {
-      "tdd": 0.85,
+      tdd: 0.85,
       "test-driven-development": 0.12,
       "git-commit": 0.02,
-      "none": 0.01,
+      none: 0.01,
     };
 
     const skills = filterSelectedSkills({
@@ -32,8 +35,8 @@ describe("model and system_prompt", () => {
 
   it("handles when choice is 'none'", () => {
     const probabilities = {
-      "none": 0.95,
-      "tdd": 0.05,
+      none: 0.95,
+      tdd: 0.05,
     };
 
     const skills = filterSelectedSkills({
@@ -48,7 +51,12 @@ describe("model and system_prompt", () => {
 
   it("formats skill summaries for hook output injection", () => {
     const summary = formatSkillSummary([
-      { name: "tdd", probability: 0.9, confidence: 0.9, description: "Test driven dev" },
+      {
+        name: "tdd",
+        probability: 0.9,
+        confidence: 0.9,
+        description: "Test driven dev",
+      },
     ]);
     expect(summary).toContain("tdd");
     expect(summary).toContain("Test driven dev");
@@ -66,9 +74,9 @@ describe("model and system_prompt", () => {
           path: "/tmp/tdd/SKILL.md",
         },
       ],
-      { userPrompt: "Build user signup test-first" }
+      { userPrompt: "Build user signup test-first" },
     );
-    expect(output).not.toContain("Task: \"Build user signup test-first\"");
+    expect(output).not.toContain('Task: "Build user signup test-first"');
     expect(output).toContain("## Skill: tdd");
     expect(output).toContain("Always write red before green.");
   });

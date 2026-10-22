@@ -108,7 +108,7 @@ test("every adapter supports global/project scopes and dry runs without bank exp
             hookFile(agent, scope === "global" ? home : cwd, scope),
           ),
         ).toBe(false);
-        expect(plan.command).toContain("'find' '--agent' '" + agent + "'");
+        expect(plan.command).toContain(`'find' '--agent' '${agent}'`);
         setup(config, agent, { scope });
         setup(config, agent, { scope });
         const hook = fs.readFileSync(

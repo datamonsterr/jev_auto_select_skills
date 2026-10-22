@@ -1,4 +1,5 @@
 ---
+
 name: migrate-skill
 description: Safely migrate optional skills into .agents/other_skills while preserving always-on skills in native agent directories. Features dry-run, exact backup manifest, idempotency, collision protection, and symlink repair.
 ---

@@ -3,7 +3,7 @@ import { handleCodexHook } from "../hooks/codex";
 import { handleClaudeHook } from "../hooks/claude";
 import { handleAntigravityHook } from "../hooks/antigravity";
 import jevSkillSelectorPlugin from "../plugins/opencode";
-import { detectEnvironment, runHookDispatcher } from "../scripts/run-hook";
+import { detectEnvironment } from "../scripts/run-hook";
 
 describe("hooks and plugin", () => {
   it("handles Codex hook input and formats skill instructions", async () => {
@@ -22,7 +22,7 @@ describe("hooks and plugin", () => {
 
     const result = await handleCodexHook(
       JSON.stringify({ prompt: "Please commit the changes" }),
-      { selectSkillsFn: mockSelectSkills as any }
+      { selectSkillsFn: mockSelectSkills as any },
     );
 
     expect(result).toHaveProperty("prompt");
@@ -79,7 +79,7 @@ describe("hooks and plugin", () => {
         invocationNum: 1,
         prompt: "viết tài liệu SRS cho hệ thống",
       }),
-      { selectSkillsFn: mockSelectSkills as any }
+      { selectSkillsFn: mockSelectSkills as any },
     );
 
     expect(result.injectSteps).toHaveLength(1);
@@ -99,7 +99,7 @@ describe("hooks and plugin", () => {
         invocationNum: 2,
         prompt: "some tool output",
       }),
-      { selectSkillsFn: mockSelectSkills as any }
+      { selectSkillsFn: mockSelectSkills as any },
     );
 
     expect(result.injectSteps).toHaveLength(0);
@@ -115,22 +115,32 @@ describe("hooks and plugin", () => {
     expect(detectEnvironment([], { OPENCODE: "1" })).toBe("opencode");
     expect(detectEnvironment([], { CLAUDE_CODE: "1" })).toBe("claude");
     expect(detectEnvironment([], { CODEX_RUNNER: "1" })).toBe("codex");
-    expect(detectEnvironment([], {}, '{"invocationNum": 1}')).toBe("antigravity");
+    expect(detectEnvironment([], {}, '{"invocationNum": 1}')).toBe(
+      "antigravity",
+    );
     expect(detectEnvironment([], {})).toBe("cli");
   });
 
   it("resolves skills paths using agent and global defaults with env overrides", async () => {
     const { resolveSkillsSearchPaths } = await import("../index");
-    
+
     // Default search paths should contain skills or jev_skills
     const defaultPaths = resolveSkillsSearchPaths();
     expect(defaultPaths.length).toBeGreaterThan(0);
-    expect(defaultPaths.some((p) => p.includes("skills") || p.includes("jev_skills"))).toBe(true);
+    expect(
+      defaultPaths.some(
+        (p) => p.includes("skills") || p.includes("jev_skills"),
+      ),
+    ).toBe(true);
 
     // Explicit path override
-    const explicitPaths = resolveSkillsSearchPaths({ customPath: "/tmp/custom_skills" });
+    const _explicitPaths = resolveSkillsSearchPaths({
+      customPath: "/tmp/custom_skills",
+    });
     // If doesn't exist, it won't add non-existent, but if we point to an existing dir:
-    const existingExplicit = resolveSkillsSearchPaths({ customPath: "./skills" });
+    const existingExplicit = resolveSkillsSearchPaths({
+      customPath: "./skills",
+    });
     expect(existingExplicit[0]).toContain("skills");
   });
 
@@ -150,7 +160,7 @@ describe("hooks and plugin", () => {
 
     const result = await handleCodexHook(
       JSON.stringify({ prompt: "Please commit the changes" }),
-      { selectSkillsFn: mockSelectSkills as any }
+      { selectSkillsFn: mockSelectSkills as any },
     );
 
     expect(result.hookSpecificOutput).toBeDefined();
@@ -178,7 +188,7 @@ describe("hooks and plugin", () => {
         hook_event_name: "UserPromptSubmit",
         session_id: "test-session-123",
       }),
-      { selectSkillsFn: mockSelectSkills as any }
+      { selectSkillsFn: mockSelectSkills as any },
     );
 
     expect(output).toContain("tdd");
@@ -202,10 +212,12 @@ describe("hooks and plugin", () => {
 
     const result = await handleCodexHook(
       JSON.stringify({ prompt: "Refactor payment module test-first" }),
-      { selectSkillsFn: mockSelectSkills as any }
+      { selectSkillsFn: mockSelectSkills as any },
     );
 
-    expect(result.injectedContext).not.toContain("Refactor payment module test-first");
+    expect(result.injectedContext).not.toContain(
+      "Refactor payment module test-first",
+    );
     expect(result.injectedContext).toContain("Test driven development");
     expect(result.injectedContext).not.toContain("Red green refactor loop");
   });

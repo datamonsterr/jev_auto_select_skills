@@ -174,7 +174,7 @@ export async function classify(
 ): Promise<string[]> {
   const skill = readSkill(sourceDir);
   const criteria = Object.fromEntries(
-    config.categories.map((c, i) => ["c" + i, c.description]),
+    config.categories.map((c, i) => [`c${i}`, c.description]),
   );
   criteria.none = "No category matches this skill.";
   const response = await provider.decide(
@@ -243,7 +243,7 @@ export async function route(
     );
     if (!categories.length) return result;
     const criteria = Object.fromEntries(
-      categories.map((category, index) => ["c" + index, category.description]),
+      categories.map((category, index) => [`c${index}`, category.description]),
     );
     criteria.none = "No specialized category needed.";
     result.logicalCalls++;
@@ -276,7 +276,7 @@ export async function route(
     // Preflight all category contexts before issuing any stage-two calls.
     const requests = nonempty.map(({ category, skills }) => {
       const criteria = Object.fromEntries(
-        skills.map((skill, index) => ["s" + index, skill.description]),
+        skills.map((skill, index) => [`s${index}`, skill.description]),
       );
       criteria.none = "No skill is useful for this request.";
       const request: DecisionRequest = {

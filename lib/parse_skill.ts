@@ -10,18 +10,18 @@ export function sanitizeSkillText(text: string, maxLen = 120): string {
   if (!text) return "";
   // Strip code blocks and markdown artifacts
   let cleaned = text.replace(/```[\s\S]*?```/g, " ");
-  cleaned = cleaned.replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1");
+  cleaned = cleaned.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
   cleaned = cleaned.replace(/[*_`#]/g, "");
 
   // Strip redundant repetitive boilerplate prefixes to optimize input tokens
   cleaned = cleaned.replace(
     /^(?:Use (?:this skill )?when (?:the user )?(?:wants to |asks to |needs to |is )?|Trigger (?:with|on) |Activate this skill when(?:ever)? |This skill (?:should be used when|provides|helps(?: users)?(?: to)?) )/i,
-    ""
+    "",
   );
 
   cleaned = cleaned.replace(/\s+/g, " ").trim();
   if (cleaned.length > maxLen) {
-    cleaned = cleaned.slice(0, maxLen).replace(/\s+\S*$/, "") + "...";
+    cleaned = `${cleaned.slice(0, maxLen).replace(/\s+\S*$/, "")}...`;
   }
   return cleaned;
 }
@@ -30,7 +30,8 @@ export function sanitizeSkillText(text: string, maxLen = 120): string {
  * Extract "When to Use" or trigger section from markdown body
  */
 export function extractWhenToUseFromBody(markdown: string): string | null {
-  const whenToUseRegex = /##\s*(?:When\s+to\s+Use|Triggers|When\s+to\s+use\s+this\s+skill)[\s\S]*?(?=\n##|\n#|$)/i;
+  const whenToUseRegex =
+    /##\s*(?:When\s+to\s+Use|Triggers|When\s+to\s+use\s+this\s+skill)[\s\S]*?(?=\n##|\n#|$)/i;
   const match = markdown.match(whenToUseRegex);
   if (match) {
     const lines = match[0].split("\n").slice(1).join("\n").trim();
@@ -48,14 +49,16 @@ export function extractWhenToUseFromBody(markdown: string): string | null {
 export function parseSkillContent(
   content: string,
   fallbackName?: string,
-  filePath?: string
+  filePath?: string,
 ): Skill {
   let name = fallbackName || "unknown-skill";
   let description = "";
   let body = content;
 
   // Extract YAML frontmatter
-  const frontmatterMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
+  const frontmatterMatch = content.match(
+    /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/,
+  );
   if (frontmatterMatch) {
     try {
       const parsed = yaml.parse(frontmatterMatch[1] ?? "");
@@ -77,7 +80,9 @@ export function parseSkillContent(
   let whenToUse = extractWhenToUseFromBody(body);
   if (!whenToUse && description) {
     // Check if description has "Use when..." or "Trigger with..."
-    const useWhenMatch = description.match(/(?:Use when|Trigger with|Activate this skill)[^.]*\.?/i);
+    const useWhenMatch = description.match(
+      /(?:Use when|Trigger with|Activate this skill)[^.]*\.?/i,
+    );
     if (useWhenMatch) {
       whenToUse = useWhenMatch[0].trim();
     } else {
@@ -156,14 +161,19 @@ export function loadSkillsFromDir(skillsDir: string | string[]): Skill[] {
     }
   }
 
-  return Array.from(skillMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  return Array.from(skillMap.values()).sort((a, b) =>
+    a.name.localeCompare(b.name),
+  );
 }
 
 /**
  * Compact user prompt for Jev routing by collapsing massive code blocks or logs
  * while preserving the essential user request instructions at top and bottom.
  */
-export function compactUserPromptForJev(prompt: string, maxChars: number = 1800): string {
+export function compactUserPromptForJev(
+  prompt: string,
+  maxChars: number = 1800,
+): string {
   if (!prompt || prompt.length <= maxChars) return prompt;
 
   let cleaned = prompt.replace(/```[\s\S]*?```/g, (block) => {
@@ -193,7 +203,7 @@ export function buildSkillState(
   userPrompt: string,
   systemPrompt?: string,
   context?: Record<string, any>,
-  options: { compact?: boolean } = {}
+  options: { compact?: boolean } = {},
 ): JevState {
   const compactedPrompt = compactUserPromptForJev(userPrompt);
 
@@ -225,7 +235,7 @@ export function buildSkillState(
 export function buildSkillCriteria(
   skills: Skill[],
   includeNone: boolean = true,
-  maxLen: number = 110
+  maxLen: number = 110,
 ): Record<string, string> {
   const criteria: Record<string, string> = {};
 
@@ -233,12 +243,12 @@ export function buildSkillCriteria(
     // Keep description concise and sanitized for Jev criteria
     criteria[skill.name] = sanitizeSkillText(
       skill.whenToUse || skill.description || skill.name,
-      maxLen
+      maxLen,
     );
   }
 
   if (includeNone) {
-    criteria["none"] = "No specialized skill applies";
+    criteria.none = "No specialized skill applies";
   }
 
   return criteria;

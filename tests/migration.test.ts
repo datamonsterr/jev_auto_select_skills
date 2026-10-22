@@ -19,7 +19,7 @@ describe("Safe skill migration primitive (migrate-skills)", () => {
     fs.mkdirSync(cavemanDir, { recursive: true });
     fs.writeFileSync(
       path.join(cavemanDir, "SKILL.md"),
-      "---\nname: caveman\ndescription: Ultra-compressed communication mode\n---\n# Caveman"
+      "---\nname: caveman\ndescription: Ultra-compressed communication mode\n---\n# Caveman",
     );
 
     // Create an optional skill with complete tree (scripts, assets, docs)
@@ -27,11 +27,11 @@ describe("Safe skill migration primitive (migrate-skills)", () => {
     fs.mkdirSync(path.join(tddDir, "scripts"), { recursive: true });
     fs.writeFileSync(
       path.join(tddDir, "SKILL.md"),
-      "---\nname: tdd\ndescription: Test-driven development\n---\n# TDD"
+      "---\nname: tdd\ndescription: Test-driven development\n---\n# TDD",
     );
     fs.writeFileSync(
       path.join(tddDir, "scripts", "runner.sh"),
-      "#!/bin/bash\necho tdd runner"
+      "#!/bin/bash\necho tdd runner",
     );
   });
 
@@ -51,12 +51,20 @@ describe("Safe skill migration primitive (migrate-skills)", () => {
     });
 
     // Kept skill must remain in native directory!
-    expect(fs.existsSync(path.join(nativeSkillsDir, "caveman", "SKILL.md"))).toBe(true);
+    expect(
+      fs.existsSync(path.join(nativeSkillsDir, "caveman", "SKILL.md")),
+    ).toBe(true);
     expect(result.kept).toContain("caveman");
 
     // Optional skill must be moved to other_skills
-    expect(fs.existsSync(path.join(targetOtherSkillsDir, "tdd", "SKILL.md"))).toBe(true);
-    expect(fs.existsSync(path.join(targetOtherSkillsDir, "tdd", "scripts", "runner.sh"))).toBe(true);
+    expect(
+      fs.existsSync(path.join(targetOtherSkillsDir, "tdd", "SKILL.md")),
+    ).toBe(true);
+    expect(
+      fs.existsSync(
+        path.join(targetOtherSkillsDir, "tdd", "scripts", "runner.sh"),
+      ),
+    ).toBe(true);
     expect(fs.existsSync(path.join(nativeSkillsDir, "tdd"))).toBe(false);
     expect(result.moved).toContain("tdd");
   });
@@ -75,7 +83,9 @@ describe("Safe skill migration primitive (migrate-skills)", () => {
     expect(result.kept).toContain("caveman");
 
     // Files on disk must remain unchanged in dryRun
-    expect(fs.existsSync(path.join(nativeSkillsDir, "tdd", "SKILL.md"))).toBe(true);
+    expect(fs.existsSync(path.join(nativeSkillsDir, "tdd", "SKILL.md"))).toBe(
+      true,
+    );
     expect(fs.existsSync(path.join(targetOtherSkillsDir, "tdd"))).toBe(false);
   });
 
@@ -94,7 +104,9 @@ describe("Safe skill migration primitive (migrate-skills)", () => {
     // Second run
     const secondRun = await migrateSkills(options);
     expect(secondRun.moved.length).toBe(0);
-    expect(fs.existsSync(path.join(targetOtherSkillsDir, "tdd", "SKILL.md"))).toBe(true);
+    expect(
+      fs.existsSync(path.join(targetOtherSkillsDir, "tdd", "SKILL.md")),
+    ).toBe(true);
   });
 
   it("failed collisions change nothing and do not overwrite existing skills", async () => {
@@ -103,7 +115,7 @@ describe("Safe skill migration primitive (migrate-skills)", () => {
     fs.mkdirSync(existingTargetTdd, { recursive: true });
     fs.writeFileSync(
       path.join(existingTargetTdd, "SKILL.md"),
-      "# Existing Different TDD Content"
+      "# Existing Different TDD Content",
     );
 
     const result = await migrateSkills({
@@ -118,11 +130,16 @@ describe("Safe skill migration primitive (migrate-skills)", () => {
     expect(result.collisions).toContain("tdd");
 
     // The target file must NOT have been overwritten
-    const targetContent = fs.readFileSync(path.join(existingTargetTdd, "SKILL.md"), "utf-8");
+    const targetContent = fs.readFileSync(
+      path.join(existingTargetTdd, "SKILL.md"),
+      "utf-8",
+    );
     expect(targetContent).toBe("# Existing Different TDD Content");
 
     // The source file must NOT have been deleted
-    expect(fs.existsSync(path.join(nativeSkillsDir, "tdd", "SKILL.md"))).toBe(true);
+    expect(fs.existsSync(path.join(nativeSkillsDir, "tdd", "SKILL.md"))).toBe(
+      true,
+    );
   });
 
   it("repairs symlinks pointing into renamed legacy jev_skills bank", async () => {

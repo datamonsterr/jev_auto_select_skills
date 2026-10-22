@@ -48,7 +48,7 @@ export async function legacyContext(
       new Decisions(config, { apiKey: readKey(config.home) }),
     );
     for (const code of result.diagnostics)
-      console.error("[otherskill] " + code);
+      console.error(`[otherskill] ${code}`);
     return {
       prompt: input.prompt,
       context: summary(result),

@@ -7,7 +7,9 @@ import { dirnameCompat } from "./compat";
  * Automatically discover and load environment variables from candidate .env files
  * across the active workspace, the jev-skill-selector repo, and user home directories.
  */
-export function loadEnvironment(options: { cwd?: string; workspacePaths?: string[] } = {}): void {
+export function loadEnvironment(
+  options: { cwd?: string; workspacePaths?: string[] } = {},
+): void {
   const home = os.homedir();
   const cwd = options.cwd || process.cwd();
   const scriptDir = path.resolve(dirnameCompat(import.meta), "..");
