@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bun \"${PLUGIN_ROOT}/otherskill.ts\" find --agent codex",
+            "command": "bun --no-env-file \"${PLUGIN_ROOT}/otherskill.ts\" find --agent codex",
             "timeout": 120,
             "additionalContextLimit": 100000
           }

@@ -9,6 +9,9 @@
       "!**/.otherskill",
       "!**/golden_set",
       "!**/tests/fixtures",
+      "!**/examples",
+      "!**/skills/**/*.md",
+      "!**/SKILL.md",
       "!**/bun.lock"
     ]
   },

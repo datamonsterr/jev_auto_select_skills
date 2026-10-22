@@ -12,7 +12,12 @@ import {
   type RoutingOverrides,
   auditNativeExposure,
 } from "./lib/otherskill/config";
-import { readKey, saveKey, credentialPath } from "./lib/otherskill/credentials";
+import {
+  readKey,
+  saveKey,
+  credentialPath,
+  keySource,
+} from "./lib/otherskill/credentials";
 import {
   createSkill,
   installLocal,
@@ -575,6 +580,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
             instances: skills.length,
             model: config.model,
             credential: readKey(config.home) ? "configured" : "unavailable",
+            credentialSource: keySource(config.home),
             credentialFile: credentialPath(config.home),
             nativeBankExposure: "checked_by_config",
             harnesses: findings,
