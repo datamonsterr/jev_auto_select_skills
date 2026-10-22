@@ -75,16 +75,23 @@ export async function update(
     updateAvailable: installedCommit !== remote.data.sha,
   };
   if (options.check) return { status: "checked", ...info };
-  if (!config.agent)
+  const agents = [
+    ...new Set([
+      ...(config.agent ? [config.agent] : []),
+      ...(config.agents ?? []),
+    ]),
+  ];
+  if (!agents.length)
     throw new Error(
       "update requires a configured agent; run otherskill setup first",
     );
+  const root = config.scope === "global" ? config.home : config.cwd;
   const archiveUrl = `https://codeload.github.com/datamonsterr/jev_auto_select_skills/tar.gz/${remote.data.sha}`;
   const setupArgs = [
     "setup",
     "--non-interactive",
-    "--agent",
-    config.agent,
+    agents.length === 1 ? "--agent" : "--agents",
+    agents.join(","),
     "--scope",
     config.scope,
     "--home",
@@ -92,12 +99,7 @@ export async function update(
     "--cwd",
     config.cwd,
     ...(config.configPath ? ["--config", config.configPath] : []),
-    ...(fs.existsSync(
-      nativeCompanion(
-        config.agent,
-        config.scope === "global" ? config.home : config.cwd,
-      ),
-    )
+    ...(agents.some((agent) => fs.existsSync(nativeCompanion(agent, root)))
       ? []
       : ["--no-companion"]),
   ];

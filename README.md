@@ -43,6 +43,18 @@ otherskill find --agent claude --prompt 'Design an accessible form' --json
 
 Preview without writing: `otherskill setup --non-interactive --agent claude --dry-run --home "$(mktemp -d)"`.
 
+### Setup targets
+
+Plain `otherskill setup` opens a checkbox list of targets: `.agents` (the shared `use-otherskill` companion, selected by default) plus Claude, Codex, Antigravity and OpenCode hooks. Arrow keys or `j`/`k` move, SPACE toggles, ENTER confirms. Reruns precheck the saved harnesses.
+
+Non-interactively, pass one harness with `--agent` or several with `--agents` (not both):
+
+```sh
+otherskill setup --non-interactive --agents claude,codex --scope global
+```
+
+Setup saves the primary `agent` and the full `agents` list; `config --apply` and `update` reapply hooks for every saved harness. `config set agent X` narrows the list to `[X]`. The companion lives once under `.agents/skills/use-otherskill`; Claude's `.claude/skills/use-otherskill` is a symlink to it.
+
 ## How it works
 
 ```text

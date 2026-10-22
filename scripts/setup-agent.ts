@@ -9,7 +9,9 @@ import {
   agentName,
   setup,
   hookFile,
-  nativeCompanion,
+  canonicalCompanionDir,
+  companionDir,
+  hasValidCompanion,
   launcherPath,
   repoRoot,
   type Agent,
@@ -46,10 +48,13 @@ function configure(agent: Agent, options: SetupOptions = {}): SetupResult {
     companion: !options.hooksOnly,
     dryRun: true,
   });
-  if (options.skillOnly)
-    plan.files = plan.files.filter(
-      (f) => f.path === nativeCompanion(agent, plan.root),
-    );
+  if (options.skillOnly) {
+    const wanted = new Set([
+      path.join(canonicalCompanionDir(plan.root), "SKILL.md"),
+      companionDir(agent, plan.root),
+    ]);
+    plan.files = plan.files.filter((file) => wanted.has(file.path));
+  }
   const { applySetup } =
     require("../lib/otherskill/setup") as typeof import("../lib/otherskill/setup");
   applySetup(plan, options.dryRun);
@@ -89,7 +94,7 @@ export function checkAgentStatus(options: SetupOptions = {}) {
       hook:
         fs.existsSync(file) &&
         fs.readFileSync(file, "utf8").includes(launcherPath(home)),
-      skill: fs.existsSync(nativeCompanion(agent, root)),
+      skill: hasValidCompanion(agent, root),
     };
   };
   return {

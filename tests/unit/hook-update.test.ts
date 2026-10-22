@@ -361,3 +361,43 @@ test("Claude legacy migration preserves unrelated commands that only mention leg
     JSON.parse(fs.readFileSync(file, "utf8")).hooks.UserPromptSubmit[0],
   ).toEqual(unrelated);
 });
+
+test("multi-target setup embeds hook params in every harness hook and saves all agents", async () => {
+  const f = fixture();
+  const result = await cli(f, [
+    "setup",
+    "--agents",
+    "claude,codex",
+    "--scope",
+    "global",
+    "--non-interactive",
+    "--max-skills",
+    "4",
+    "--timeout-ms",
+    "15000",
+  ]);
+  expect(result.code).toBe(0);
+  expect(result.json()).toMatchObject({
+    agents: ["claude", "codex"],
+    removedLegacyHooks: [],
+  });
+  for (const [agent, file] of [
+    ["claude", ".claude/settings.json"],
+    ["codex", ".codex/hooks.json"],
+  ] as const) {
+    const settings = JSON.parse(
+      fs.readFileSync(path.join(f.home, file), "utf8"),
+    );
+    const commands = settings.hooks.UserPromptSubmit.flatMap(
+      (group: { hooks: { command: string }[] }) =>
+        group.hooks.map((hook) => hook.command),
+    );
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toContain(`'--agent' '${agent}'`);
+    expect(commands[0]).toContain("'--max-skills' '4'");
+    expect(commands[0]).toContain("'--timeout-ms' '15000'");
+  }
+  const config = loadConfig({ home: f.home, cwd: f.cwd, scope: "global" });
+  expect(config.agents).toEqual(["claude", "codex"]);
+  expect(config.hookParams).toEqual({ maxSkills: 4, timeoutMs: 15000 });
+});

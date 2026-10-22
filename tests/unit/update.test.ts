@@ -312,3 +312,18 @@ test("update --check reports missing legacy version metadata explicitly without 
   expect(fs.readdirSync(f.repo)).toEqual([]);
   expect(fs.existsSync(f.home)).toBe(false);
 });
+
+test("update --dry-run reapplies every saved harness with --agents", async () => {
+  const f = fixture();
+  const result = await update(
+    { ...f.config, agent: "codex", agents: ["claude", "codex"] },
+    {
+      repoDir: f.repo,
+      dryRun: true,
+      fetchFn: async () => Response.json({ sha: newCommit }),
+    },
+  );
+  if (result.status !== "dry-run") throw new Error("expected dry-run result");
+  expect(result.steps?.[2]).toContain("'--agents' 'codex,claude'");
+  expect(result.steps?.[2]).not.toContain("'--agent' ");
+});
