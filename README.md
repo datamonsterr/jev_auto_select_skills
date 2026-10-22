@@ -6,6 +6,36 @@ Requires Bun, Git for online imports and a POSIX shell for the managed launcher.
 
 ## Setup
 
+Install Jev Skill Selector (the canonical CLI is now **OtherSkill**) with Bash on Linux or macOS:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/datamonsterr/jev_auto_select_skills/master/install.sh | bash
+
+# Forward setup options for a scripted install:
+curl -fsSL https://raw.githubusercontent.com/datamonsterr/jev_auto_select_skills/master/install.sh | bash -s -- \
+  --non-interactive --agent codex --scope global
+
+# Choose a persistent source location and a project harness:
+curl -fsSL https://raw.githubusercontent.com/datamonsterr/jev_auto_select_skills/master/install.sh | bash -s -- \
+  --install-dir "$HOME/.local/share/otherskill/installs" -- \
+  --non-interactive --agent claude --scope project --cwd "$PWD" --no-companion
+
+# Installer help (no writes/downloads by the installer):
+curl -fsSL https://raw.githubusercontent.com/datamonsterr/jev_auto_select_skills/master/install.sh | bash -s -- --help
+```
+
+The installer requires **Bun >= 1.3**, Bash (including macOS Bash 3.2), HTTPS-capable `curl`, `tar` with gzip support, and standard POSIX utilities. Install Bun separately from [bun.sh](https://bun.sh) first; this script does **not** bootstrap a runtime or use `sudo`. It checks PATH, `$BUN_INSTALL/bin/bun`, then `$HOME/.bun/bin/bun`. Git is unnecessary for installation; online skill imports require it later. Network access to GitHub's raw/codeload hosts and Bun's package registry is required. The commands track the current `master` branch; they are not a pinned or signed release. To inspect the script or check the initial download's exit status separately, download it with `curl -fsSL -o install.sh <raw URL above>`, inspect it, then run `bash install.sh`.
+
+Each run downloads the repository with HTTP failures treated as errors, creates a fresh private snapshot under `~/.local/share/otherskill/installs/release.*`, runs `bun install --frozen-lockfile`, and invokes the existing `otherskill.ts setup`. The original working directory is preserved for project configuration. `--install-dir DIR` changes the snapshot parent (relative paths resolve from your working directory); keep it outside native skill discovery directories. All remaining arguments go to setup unchanged. Use `--` to end installer option parsing, or `-- --help` for setup help after downloading dependencies. Supported targets are `--agent claude|codex|antigravity|opencode` (`agy` also aliases Antigravity).
+
+The default menu reads from the controlling terminal even through `curl | bash`. Without a terminal, pass `--non-interactive --agent <harness>`; use `--scope global|project`, `--home DIR`, `--cwd DIR`, `--no-companion`, `--model` and `--categories` as needed. `--dry-run` previews **setup writes only**; source and dependencies are still installed. Existing native hooks/settings/skills and the private bank follow the same preservation rules described below. Setup installs the optional native `use-otherskill` companion by default (disable it with `--no-companion`); the installer itself writes only the source snapshot and never changes your shell profile.
+
+Downloads and failed dependency snapshots are cleaned up. Successful snapshots and snapshots where setup was attempted are retained because launchers and OpenCode adapters can reference them by absolute path, including after a partial setup failure. Repeated installs create new snapshots and rerun safe setup without overwriting or deleting older source or user data. Keep any snapshot still referenced by an integration; there is no automatic pruning. On setup failure, fix the reported issue and rerun `bun /path/to/retained/release.XXXXXXXX/otherskill.ts setup` with your setup options.
+
+For API access, inherit `OPENROUTER_API_KEY` from your shell/secret manager or forward `--key-env OPENROUTER_API_KEY` to save it privately. Export the variable before the pipeline so Bash inherits it; never place its value in command arguments. `--key-stdin` requires downloading the installer to a file first, then piping a secret-manager command into `bash install.sh --non-interactive --agent codex --key-stdin`. The streamed installer refuses `--key-stdin` to avoid reading script text as a credential. The setup menu also offers hidden key entry. Details of key storage and precedence are below.
+
+For an existing checkout, use the same setup directly:
+
 ```sh
 bun install --frozen-lockfile
 bun otherskill.ts --help
@@ -141,9 +171,14 @@ TMPDIR="$PWD/.tmp" bun test tests/
 bunx tsc --noEmit
 bun run build
 TMPDIR="$PWD/.tmp" python3 scripts/smoke-interactive.py
+# Optional network installer smoke: real GitHub/dependencies, disposable HOME,
+# scripted project setup and the curl-style interactive pipe on a real PTY.
+TMPDIR="$PWD/.tmp" python3 scripts/smoke-installer.py
 TMPDIR="$PWD/.tmp" bun scripts/smoke-live.ts
 ```
 
 Use a writable scratch directory if system `/tmp` quota is exhausted. Offline tests exercise full copies, identities, actual concurrency at the HTTP boundary, response validation, CLI subprocesses and adapters. Menu smoke uses a real PTY and synthetic key. The inherited evaluation tests use controlled HTTP fixtures; their results are offline evidence. Real online evaluation scripts remain separate and were not run without credentials. Live smoke checks the public decision-model catalog and, only with an existing credential, tiny Mercury and two-stage requests. See [measured evidence and limitations](docs/otherskill-evidence.md).
+
+`bun test tests/installer.test.ts` exercises installer failures, argument forwarding, runtime discovery and repeated real setup against controlled download/dependency fixtures in disposable homes. The opt-in installer smoke additionally requires Python 3 on a POSIX host and network access; it makes no provider calls and never uses real API credentials.
 
 Primary protocol references: [OpenRouter Decisions example](https://openrouter.ai/blog/tutorials/jev-vs-llm-when-to-use-each/), [decision model catalog](https://openrouter.ai/api/v1/models?output_modalities=decisions), [Claude hooks](https://code.claude.com/docs/en/hooks), [Codex hooks](https://learn.chatgpt.com/docs/hooks), [Antigravity hooks](https://antigravity.google/docs/hooks), [OpenCode plugins](https://opencode.ai/docs/plugins/).
