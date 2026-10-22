@@ -8,6 +8,8 @@ import {
   configData,
   configTarget,
   writeConfig,
+  withRoutingOverrides,
+  type RoutingOverrides,
   auditNativeExposure,
   type Config,
 } from "./lib/otherskill/config";
@@ -39,6 +41,7 @@ import {
 } from "./lib/otherskill/setup";
 import { hookInput, hookOutput } from "./lib/otherskill/hook";
 import { menu } from "./lib/otherskill/menu";
+import { update } from "./lib/otherskill/update";
 
 export const HELP = `OtherSkill — hidden skill sets and free OpenRouter routing
 Usage: otherskill <command> [arguments] [options]
@@ -50,6 +53,8 @@ Canonical commands:
                                      Two-stage selection; emit native hook context (stdin JSON supported)
   config [show|get <field>|set <field> <value>]
                                      Interactive edits or scripted settings, with --apply for hooks
+  update [--check|--dry-run] [--ref branch-or-tag]
+                                     Update installed snapshot (default master), then reapply hooks
 Secondary commands:
   search <query>                     Online GitHub SKILL.md search (GH_TOKEN required by GitHub)
   create <dir> --name <slug> --description <text> --instructions-file <file>
@@ -64,7 +69,9 @@ Options:
   --home <dir> --cwd <dir>            Isolated home/project roots
   --config <file>                    Explicit config override (otherwise nearest ancestor, then global)
   --model <provider/model:free>       Configure one free model; paid models/fallback chains rejected
-  --categories <id,id>               Enabled category IDs (setup/config)
+  --categories <id,id>               Enabled category IDs (setup/config/find)
+  --max-skills N --max-categories N  Per-call routing limits; setup embeds them in hooks
+  --timeout-ms N                    Per-request deadline; setup embeds it in hooks
   --category <id>                    Explicit classification, repeat for complete copies in every match
   --key-env <ENV_NAME> | --key-stdin  Save key privately (0600); never printed or put in config
   --non-interactive                  Use flags/defaults for setup/config instead of menus
@@ -74,6 +81,7 @@ Options:
   --prompt <literal text> --json     Native find output, or JSON routing result for inspection
   --apply                           Apply config settings to harness hooks
   --live                            Doctor: tiny free-model probe (no paid fallback)
+  --check                           Update: compare installed commit with remote HEAD, no writes
   --help                            Show this help for any command
 Keys: environment OPENROUTER_API_KEY overrides private ~/.config/otherskill/credentials.json.
 Project configs never contain credentials. Explicit config > nearest project config > global > defaults.
@@ -86,6 +94,9 @@ const options = {
   config: { type: "string" },
   model: { type: "string" },
   categories: { type: "string" },
+  "max-skills": { type: "string" },
+  "max-categories": { type: "string" },
+  "timeout-ms": { type: "string" },
   category: { type: "string", multiple: true },
   "key-env": { type: "string" },
   "key-stdin": { type: "boolean" },
@@ -98,6 +109,7 @@ const options = {
   json: { type: "boolean" },
   apply: { type: "boolean" },
   live: { type: "boolean" },
+  check: { type: "boolean" },
   help: { type: "boolean", short: "h" },
   name: { type: "string" },
   description: { type: "string" },
@@ -162,6 +174,28 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     });
     if (values.model) config = { ...config, model: freeModel(values.model) };
     const dryRun = values["dry-run"] ?? false;
+    const overrides: RoutingOverrides = {
+      ...(values.model !== undefined ? { model: values.model } : {}),
+      ...(values.categories !== undefined
+        ? {
+            categories: values.categories.trim()
+              ? values.categories.split(",").map((s) => s.trim())
+              : [],
+          }
+        : {}),
+    };
+    for (const [flag, field] of [
+      ["max-skills", "maxSkills"],
+      ["max-categories", "maxCategories"],
+      ["timeout-ms", "timeoutMs"],
+    ] as const) {
+      const value = values[flag];
+      if (value !== undefined) {
+        if (!/^\d+$/.test(value))
+          throw new Error(`${flag} must be a positive integer`);
+        overrides[field] = Number(value);
+      }
+    }
     if (command === "setup" || command === "config") {
       const action = positionals[1];
       const scripted =
@@ -218,6 +252,8 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
           ? values.categories.split(",").map((s) => s.trim())
           : [];
       data.scope = scope;
+      if (Object.keys(overrides).length)
+        data.hookParams = { ...config.hookParams, ...overrides };
       if (agent) data.agent = agent;
       const file =
         values.config || process.env.OTHERSKILL_CONFIG
@@ -322,7 +358,22 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
                 ? "configured"
                 : "unavailable",
             files: plan?.files.map((f) => f.path) ?? [],
+            removedLegacyHooks: plan?.removedLegacyHooks ?? [],
           },
+          null,
+          2,
+        ),
+      );
+      return 0;
+    }
+    if (command === "update") {
+      console.log(
+        JSON.stringify(
+          await update(config, {
+            check: values.check,
+            dryRun,
+            ref: values.ref,
+          }),
           null,
           2,
         ),
@@ -344,6 +395,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
       );
       if (input.cwd && !values.cwd)
         config = loadConfig({ ...roots, cwd: input.cwd });
+      config = withRoutingOverrides(config, overrides);
       const result = input.skip
         ? {
             status: "ok" as const,
