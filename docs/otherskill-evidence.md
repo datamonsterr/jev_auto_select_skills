@@ -26,6 +26,21 @@ There was no baseline lint script. OtherSkill source formatting is checked with 
 
 The test totals above count collected/executed test cases rather than commands/CLI invocations. CLI test functions each execute multiple subprocess cases. Origin/master advanced after the original baseline; its migration/discovery/safety tests and controlled HTTP evaluation fixtures were integrated. All final evaluation fixture tests run offline; they are not live benchmarks. The four baseline credential-dependent failures are retained as historical baseline evidence.
 
+### Setup-target follow-up (2026-10-22)
+
+Measured in this follow-up worktree with disposable `HOME`/`TMPDIR` roots and no inherited operator skills bank. These counts are specific to that environment; they do not assert external bank or fixture availability.
+
+| Command | Measured result |
+| --- | --- |
+| Focused setup/CLI tests | 60 passed, 0 failed, 503 expect calls across 5 files; `tests/setup-checkboxes.test.ts` has 19 tests |
+| Full `bun test tests/` with disposable `HOME`/`TMPDIR` | 154 passed, 2 failed, 971 expect calls; 156 tests across 27 files |
+| Same full suite on `origin/master` at `d3ce0dc` | 135 passed, 2 failed, 858 expect calls; 137 tests across 26 files |
+| `scripts/smoke-interactive.py` | Passed, including seeded Codex+OpenCode survival through an untouched PTY setup rerun and later `config set model --apply` under `CLAUDE_CODE=1` |
+| `SMOKE_LOCAL_ARCHIVE=1 scripts/smoke-installer.py` | Passed; canonical `.agents` companion, Claude symlink, 0 provider calls |
+| Changed OtherSkill TS source/tests, `bunx prettier@3.6.2 --check` | Passed |
+
+The two full-suite failures are the known missing-bank `golden_eval`/`complex_eval` fixtures and reproduce unchanged on `origin/master`. No eval test was edited.
+
 ## Requirement evidence map
 
 | Requirement | Implementation and behavioral evidence |

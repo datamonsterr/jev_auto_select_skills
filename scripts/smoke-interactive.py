@@ -19,11 +19,33 @@ SPACE = b" "
 ENTER = b"\r"
 
 
-def drive(root, command, responses, extra=()):
+def environment_for(root, extra=None):
+    home = root / "home"
+    env = dict(os.environ, OPENROUTER_API_KEY="", OTHERSKILL_CONFIG="", OTHERSKILL_HOME=str(home))
+    if extra:
+        env.update(extra)
+    return env
+
+
+def cli(root, command, args=(), extra_env=None):
+    home, project = root / "home", root / "project"
+    project.mkdir(parents=True, exist_ok=True)
+    completed = subprocess.run(
+        ["bun", str(REPO / "otherskill.ts"), command, "--home", str(home), "--cwd", str(project), *args],
+        cwd=project,
+        env=environment_for(root, extra_env),
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, "cli failed: " + completed.stdout + completed.stderr
+    return completed.stdout
+
+
+def drive(root, command, responses, extra=(), extra_env=None):
     home, project = root / "home", root / "project"
     project.mkdir(exist_ok=True)
     master, slave = pty.openpty()
-    env = dict(os.environ, OPENROUTER_API_KEY="", OTHERSKILL_CONFIG="", OTHERSKILL_HOME=str(home))
+    env = environment_for(root, extra_env)
     process = subprocess.Popen(["bun", str(REPO / "otherskill.ts"), command, "--home", str(home), "--cwd", str(project), *extra], stdin=slave, stdout=slave, stderr=slave, cwd=project, env=env)
     os.close(slave)
     transcript = b""
@@ -77,7 +99,7 @@ def prompts(scope, key, model, categories, apply_marker):
 with tempfile.TemporaryDirectory(prefix="otherskill-menu-") as temp:
     root = Path(temp)
     # Default .agents plus Codex: DOWN DOWN SPACE ENTER.
-    setup_bytes = drive(root, "setup", [("Install targets", DOWN + DOWN + SPACE + ENTER), *prompts(b"2", FAKE_KEY.encode(), b"", b"1,4", "Apply setup?")])
+    setup_bytes = drive(root, "setup", [("Install targets", DOWN + DOWN + SPACE + ENTER), *prompts(b"2", FAKE_KEY.encode(), b"", b"1,4", "Apply setup?")], extra_env={"CLAUDE_CODE": "1"})
     project_config = root / "project/otherskill.config.json"
     configured = json.loads(project_config.read_text())
     assert configured["agent"] == "codex" and configured["scope"] == "project"
@@ -89,6 +111,7 @@ with tempfile.TemporaryDirectory(prefix="otherskill-menu-") as temp:
     assert shared.exists()
     assert (root / "project/.codex/hooks.json").exists()
     assert not (root / "project/.claude/skills").exists()
+    assert not (root / "project/.claude/settings.json").exists()
     # Global config menu: keep .agents, add Claude, remove the previous Codex.
     config_bytes = drive(root, "config", [("Install targets", DOWN + SPACE + DOWN + SPACE + ENTER), *prompts(b"1", b"", b"example/decision:free", b"4", "Save and apply settings/hooks?")])
     global_config = root / "home/.config/otherskill/otherskill.config.json"
@@ -97,9 +120,29 @@ with tempfile.TemporaryDirectory(prefix="otherskill-menu-") as temp:
     assert changed["enabledCategories"] == ["testing"]
     assert (root / "home/.claude/settings.json").exists()
     assert json.loads(project_config.read_text())["model"] == "inception/mercury-decide:free"
+    # B3: a seeded multi-harness selection survives an untouched interactive rerun.
+    persist_root = root / "persist"
+    persisted = json.loads(cli(persist_root, "setup", ["--non-interactive", "--agents", "codex,opencode", "--scope", "global"], {"CLAUDE_CODE": "1"}))
+    assert persisted["agent"] == "codex" and persisted["agents"] == ["codex", "opencode"]
+    persisted_home = persist_root / "home"
+    persisted_config = persisted_home / ".config/otherskill/otherskill.config.json"
+    assert (persisted_home / ".codex/hooks.json").exists()
+    assert (persisted_home / ".config/opencode/plugins/otherskill.ts").exists()
+    assert not (persisted_home / ".claude/settings.json").exists()
+    persist_bytes = drive(persist_root, "setup", [("Install targets", ENTER), *prompts(b"\n", b"", b"", b"", "Apply setup?")], extra_env={"CLAUDE_CODE": "1"})
+    survived = json.loads(persisted_config.read_text())
+    assert survived["agent"] == "codex" and survived["agents"] == ["codex", "opencode"]
+    assert (persisted_home / ".codex/hooks.json").exists()
+    assert (persisted_home / ".config/opencode/plugins/otherskill.ts").exists()
+    assert not (persisted_home / ".claude/settings.json").exists()
+    reapplied = json.loads(cli(persist_root, "config", ["set", "model", "example/persist:free", "--apply", "--scope", "global"], {"CLAUDE_CODE": "1"}))
+    assert reapplied["agent"] == "codex" and reapplied["agents"] == ["codex", "opencode"]
+    assert (persisted_home / ".codex/hooks.json").exists()
+    assert (persisted_home / ".config/opencode/plugins/otherskill.ts").exists()
+    assert not (persisted_home / ".claude/settings.json").exists()
     # Explicit flags still take precedence; --no-companion leaves no skill paths.
     flags_output = drive(root, "setup", [("Install targets", ENTER), *prompts(b"\n", b"", b"", b"", "Apply setup?")], ["--agent", "codex", "--scope", "project", "--no-companion", "--dry-run"])
     flags_result = json.loads(flags_output[flags_output.rfind("{"):])
     assert flags_result["agent"] == "codex" and flags_result["scope"] == "project"
     assert not any("skills/use-otherskill" in item for item in flags_result["files"])
-    print(json.dumps({"setup_menu": "passed", "checkbox_keys": "arrows/space/enter", "default_on_disk": ".agents", "explicit_menu_flags": "passed", "config_menu": "passed", "hidden_key": "not echoed", "credential_mode": "0600", "project_and_global_scopes": "passed", "captured_bytes": len(setup_bytes) + len(config_bytes)}))
+    print(json.dumps({"setup_menu": "passed", "checkbox_keys": "arrows/space/enter", "default_on_disk": ".agents", "explicit_menu_flags": "passed", "config_menu": "passed", "saved_targets_survive_pty": "passed", "saved_set_reapplied": "passed", "claude_detection_ignored": "passed", "hidden_key": "not echoed", "credential_mode": "0600", "project_and_global_scopes": "passed", "captured_bytes": len(setup_bytes) + len(config_bytes) + len(persist_bytes)}))

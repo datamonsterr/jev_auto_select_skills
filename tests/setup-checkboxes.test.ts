@@ -80,9 +80,7 @@ function configFor(home: string, cwd: string) {
 describe("interactive target checkbox", () => {
   it("defaults to .agents and responds to real arrow, space and enter key bytes", async () => {
     // Down to Claude, toggle it; down to Codex, toggle it; confirm.
-    const { selected, transcript } = await driveCheckbox(
-      "\x1b[B \x1b[B \r",
-    );
+    const { selected, transcript } = await driveCheckbox("\x1b[B \x1b[B \r");
     expect(selected).toEqual(["agents", "claude", "codex"]);
     expect(transcript).toContain("[x] .agents");
     expect(transcript).toContain("[x] Claude");
@@ -155,6 +153,24 @@ describe("interactive setup menu", () => {
     expect(transcript).toContain("[x] .agents");
   });
 
+  it("prechecks saved harnesses on rerun and preserves the saved primary", async () => {
+    const home = path.join(root, "home");
+    const cwd = path.join(root, "project");
+    const config: ReturnType<typeof loadConfig> = {
+      ...configFor(home, cwd),
+      agent: "opencode",
+      agents: ["opencode", "codex"],
+    };
+    // Accept all defaults; saved targets must remain selected.
+    const { result, transcript } = await driveMenu("\r\r\r\r\r\r", config);
+    expect(result.targets).toEqual(["agents", "codex", "opencode"]);
+    expect(result.agents).toEqual(["opencode", "codex"]);
+    expect(result.agent).toBe("opencode");
+    expect(result.companion).toBe(true);
+    expect(transcript).toContain("[x] Codex");
+    expect(transcript).toContain("[x] OpenCode");
+  });
+
   it("selects multiple harnesses and the shared canonical companion", async () => {
     const home = path.join(root, "home");
     const cwd = path.join(root, "project");
@@ -203,23 +219,15 @@ describe("multi-target setup and shared companion links", () => {
     const plan = planMultiSetup(config, ["claude", "codex", "opencode"], {
       scope: "global",
     });
-    expect(plan.targets).toEqual([
-      "agents",
-      "claude",
-      "codex",
-      "opencode",
-    ]);
+    expect(plan.targets).toEqual(["agents", "claude", "codex", "opencode"]);
     applySetup(plan);
-    const canonical = path.join(
-      canonicalCompanionDir(home),
-      "SKILL.md",
-    );
+    const canonical = path.join(canonicalCompanionDir(home), "SKILL.md");
     expect(fs.readFileSync(canonical, "utf8")).toBe(companionContent);
     const link = companionDir("claude", home);
     expect(fs.lstatSync(link).isSymbolicLink()).toBe(true);
-    expect(
-      fs.realpathSync(link),
-      ).toBe(fs.realpathSync(canonicalCompanionDir(home)));
+    expect(fs.realpathSync(link)).toBe(
+      fs.realpathSync(canonicalCompanionDir(home)),
+    );
     for (const hook of [
       path.join(home, ".claude/settings.json"),
       path.join(home, ".codex/hooks.json"),
@@ -264,9 +272,9 @@ describe("multi-target setup and shared companion links", () => {
     const legacy = companionDir("claude", home);
     fs.mkdirSync(legacy, { recursive: true });
     fs.writeFileSync(path.join(legacy, "SKILL.md"), "user modified companion");
-    expect(() =>
-      planSetup(config, "claude", { scope: "global" }),
-    ).toThrow(/modified or extended native companion/);
+    expect(() => planSetup(config, "claude", { scope: "global" })).toThrow(
+      /modified or extended native companion/,
+    );
     expect(fs.readFileSync(path.join(legacy, "SKILL.md"), "utf8")).toBe(
       "user modified companion",
     );
@@ -275,18 +283,18 @@ describe("multi-target setup and shared companion links", () => {
     fs.mkdirSync(other);
     fs.rmSync(legacy, { recursive: true, force: true });
     fs.symlinkSync(other, legacy);
-    expect(() =>
-      planSetup(config, "claude", { scope: "global" }),
-    ).toThrow("existing native companion symlink");
+    expect(() => planSetup(config, "claude", { scope: "global" })).toThrow(
+      "existing native companion symlink",
+    );
     expect(fs.readlinkSync(legacy)).toBe(other);
 
     const canonical = canonicalCompanionDir(home);
     fs.rmSync(legacy, { force: true });
     fs.mkdirSync(path.dirname(canonical), { recursive: true });
     fs.symlinkSync(other, canonical);
-    expect(() =>
-      planSetup(config, "codex", { scope: "global" }),
-    ).toThrow("canonical companion symlink collision");
+    expect(() => planSetup(config, "codex", { scope: "global" })).toThrow(
+      "canonical companion symlink collision",
+    );
     fs.rmSync(canonical, { force: true });
   });
 
@@ -296,9 +304,9 @@ describe("multi-target setup and shared companion links", () => {
     fs.mkdirSync(legacy, { recursive: true });
     fs.writeFileSync(path.join(legacy, "SKILL.md"), companionContent);
     fs.writeFileSync(path.join(legacy, "notes.txt"), "keep my notes");
-    expect(() =>
-      planSetup(config, "claude", { scope: "global" }),
-    ).toThrow(/move it aside to preserve it/);
+    expect(() => planSetup(config, "claude", { scope: "global" })).toThrow(
+      /move it aside to preserve it/,
+    );
     expect(fs.readFileSync(path.join(legacy, "notes.txt"), "utf8")).toBe(
       "keep my notes",
     );
@@ -347,7 +355,15 @@ describe("headless CLI compatibility", () => {
     fs.mkdirSync(cwd, { recursive: true });
     const run = async (args: string[]) => {
       const child = Bun.spawn(
-        [process.execPath, path.join(repo, "otherskill.ts"), ...args, "--home", home, "--cwd", cwd],
+        [
+          process.execPath,
+          path.join(repo, "otherskill.ts"),
+          ...args,
+          "--home",
+          home,
+          "--cwd",
+          cwd,
+        ],
         {
           cwd,
           env: {
@@ -384,9 +400,9 @@ describe("headless CLI compatibility", () => {
         true,
       );
       expect(fs.existsSync(path.join(home, ".codex/hooks.json"))).toBe(true);
-      expect(
-        fs.lstatSync(companionDir("claude", home)).isSymbolicLink(),
-      ).toBe(true);
+      expect(fs.lstatSync(companionDir("claude", home)).isSymbolicLink()).toBe(
+        true,
+      );
       const single = await run([
         "setup",
         "--non-interactive",
@@ -410,6 +426,7 @@ describe("headless CLI compatibility", () => {
       ]);
       expect(configured.code).toBe(0);
       expect(configured.json().agent).toBe("opencode");
+      expect(configured.json().agents).toEqual(["opencode"]);
       expect(
         fs.existsSync(
           path.join(home, ".config/opencode/plugins/otherskill.ts"),
@@ -504,11 +521,7 @@ describe("headless target precedence and persistence", () => {
     expect(setup.code).toBe(0);
     expect(setup.json().agent).toBe("codex");
     expect(setup.json().agents).toEqual(["codex", "opencode"]);
-    expect(setup.json().targets).toEqual([
-      "agents",
-      "codex",
-      "opencode",
-    ]);
+    expect(setup.json().targets).toEqual(["agents", "codex", "opencode"]);
     expect(savedConfig().agent).toBe("codex");
     expect(savedConfig().agents).toEqual(["codex", "opencode"]);
 
@@ -538,20 +551,12 @@ describe("headless target precedence and persistence", () => {
     expect(reapplied.code).toBe(0);
     expect(reapplied.json().agent).toBe("codex");
     expect(reapplied.json().agents).toEqual(["codex", "opencode"]);
-    expect(reapplied.json().targets).toEqual([
-      "agents",
-      "codex",
-      "opencode",
-    ]);
+    expect(reapplied.json().targets).toEqual(["agents", "codex", "opencode"]);
     expect(fs.existsSync(path.join(home, ".codex/hooks.json"))).toBe(true);
     expect(
-      fs.existsSync(
-        path.join(home, ".config/opencode/plugins/otherskill.ts"),
-      ),
+      fs.existsSync(path.join(home, ".config/opencode/plugins/otherskill.ts")),
     ).toBe(true);
-    expect(fs.existsSync(path.join(home, ".claude/settings.json"))).toBe(
-      false,
-    );
+    expect(fs.existsSync(path.join(home, ".claude/settings.json"))).toBe(false);
   }, 30000);
 
   it("explicit --agents outrank CLAUDE_CODE detection and later apply", async () => {
@@ -571,9 +576,7 @@ describe("headless target precedence and persistence", () => {
     expect(setup.json().agents).toEqual(["codex", "opencode"]);
     expect(savedConfig().agent).toBe("codex");
     expect(savedConfig().agents).toEqual(["codex", "opencode"]);
-    expect(fs.existsSync(path.join(home, ".claude/settings.json"))).toBe(
-      false,
-    );
+    expect(fs.existsSync(path.join(home, ".claude/settings.json"))).toBe(false);
     expect(fs.existsSync(path.join(home, ".codex/hooks.json"))).toBe(true);
 
     const doctor = await run(["doctor"], { CLAUDE_CODE: "1" });
@@ -585,9 +588,9 @@ describe("headless target precedence and persistence", () => {
     expect(
       harnesses.find((entry) => entry.agent === "claude")?.configured,
     ).toBe(false);
-    expect(
-      harnesses.find((entry) => entry.agent === "codex")?.configured,
-    ).toBe(true);
+    expect(harnesses.find((entry) => entry.agent === "codex")?.configured).toBe(
+      true,
+    );
 
     // Detection must not turn a later reapply into an unrequested Claude install.
     const reapplied = await run(
@@ -604,9 +607,7 @@ describe("headless target precedence and persistence", () => {
     );
     expect(reapplied.code).toBe(0);
     expect(reapplied.json().agents).toEqual(["codex", "opencode"]);
-    expect(fs.existsSync(path.join(home, ".claude/settings.json"))).toBe(
-      false,
-    );
+    expect(fs.existsSync(path.join(home, ".claude/settings.json"))).toBe(false);
   }, 30000);
 
   it("rejects combining --agent and --agents before any writes", async () => {
@@ -628,9 +629,7 @@ describe("headless target precedence and persistence", () => {
       ),
     ).toBe(false);
     expect(fs.existsSync(path.join(home, ".codex/hooks.json"))).toBe(false);
-    expect(fs.existsSync(path.join(home, ".claude/settings.json"))).toBe(
-      false,
-    );
+    expect(fs.existsSync(path.join(home, ".claude/settings.json"))).toBe(false);
   }, 30000);
 
   it("dedupes --agents and excludes .agents targets under --no-companion", async () => {
@@ -649,9 +648,7 @@ describe("headless target precedence and persistence", () => {
     expect(savedConfig().agents).toEqual(["codex", "opencode"]);
     expect(fs.existsSync(canonicalCompanionDir(home))).toBe(false);
     expect(
-      fs.existsSync(
-        path.join(home, ".claude/skills/use-otherskill"),
-      ),
+      fs.existsSync(path.join(home, ".claude/skills/use-otherskill")),
     ).toBe(false);
   }, 30000);
 });

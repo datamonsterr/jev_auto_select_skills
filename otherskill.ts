@@ -204,23 +204,14 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
       let apply = command === "setup" || !!values.apply;
       let data = configData(config);
       if (!scripted) {
-        const answers = await menu(
-          {
-            ...config,
-            agent: explicitAgent ?? config.agent ?? agent,
-            agents: config.agents,
-            scope,
-          },
-          command,
-          {
-            fixedAgent: explicitAgent,
-            fixedAgents: explicitAgents,
-            fixedScope: values.scope ? scope : undefined,
-            noCompanion: values["no-companion"],
-            configForScope: (targetScope) =>
-              loadConfig({ ...roots, scope: targetScope }),
-          },
-        );
+        const answers = await menu({ ...config, scope }, command, {
+          fixedAgent: explicitAgent,
+          fixedAgents: explicitAgents,
+          fixedScope: values.scope ? scope : undefined,
+          noCompanion: values["no-companion"],
+          configForScope: (targetScope) =>
+            loadConfig({ ...roots, scope: targetScope }),
+        });
         if (!answers.apply) {
           console.log("Cancelled; no changes.");
           return 0;
@@ -348,9 +339,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
       if (agentWasSelected) {
         if (selectedAgents.length > 0) {
           agent =
-            agent && selectedAgents.includes(agent)
-              ? agent
-              : selectedAgents[0];
+            agent && selectedAgents.includes(agent) ? agent : selectedAgents[0];
           data.agent = agent;
           data.agents = selectedAgents;
         } else {
@@ -387,12 +376,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
             configPath: target,
             agent,
             agents: selectedAgents,
-            targets:
-              plan?.targets ??
-              [
-                ...(companion && shared ? (["agents"] as const) : []),
-                ...selectedAgents,
-              ],
+            targets: plan?.targets ?? [
+              ...(companion && shared ? (["agents"] as const) : []),
+              ...selectedAgents,
+            ],
             scope,
             credential: key
               ? "saved privately" + (dryRun ? " (dry-run)" : "")

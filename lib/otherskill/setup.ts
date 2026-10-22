@@ -164,7 +164,9 @@ function validateCanonicalCompanion(dir: string, content: string): void {
         " first",
     );
   if (!stat.isDirectory())
-    throw new Error("refusing unrelated canonical companion collision at " + dir);
+    throw new Error(
+      "refusing unrelated canonical companion collision at " + dir,
+    );
   const skill = path.join(dir, "SKILL.md");
   const skillStat = lstat(skill);
   if (skillStat) {
@@ -186,10 +188,7 @@ function validateCompanionLink(
   const stat = lstat(link);
   if (!stat) return;
   if (stat.isSymbolicLink()) {
-    const target = path.resolve(
-      path.dirname(link),
-      fs.readlinkSync(link),
-    );
+    const target = path.resolve(path.dirname(link), fs.readlinkSync(link));
     if (realPath(target) !== realPath(canonicalDir))
       throw new Error(
         "refusing to replace existing native companion symlink at " + link,
@@ -383,7 +382,16 @@ export function planMultiSetup(
     const command = commandArgs.map(quote).join(" ");
     commands.push(command);
     files.push(
-      planHook(config, agent, scope, root, repo, launcher, command, commandArgs),
+      planHook(
+        config,
+        agent,
+        scope,
+        root,
+        repo,
+        launcher,
+        command,
+        commandArgs,
+      ),
     );
   }
   const installCompanion = companion && (shared || agentList.length > 0);

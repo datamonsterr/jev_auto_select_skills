@@ -43,7 +43,8 @@ export const targetChoices: CheckboxChoice[] = [
   {
     value: "agents",
     label: ".agents",
-    description: "shared canonical use-otherskill companion (required with a harness)",
+    description:
+      "shared canonical use-otherskill companion (required with a harness)",
   },
   { value: "claude", label: "Claude", description: "hook + linked companion" },
   { value: "codex", label: "Codex", description: "hook" },
@@ -298,7 +299,8 @@ export async function menu(
   const input = options.input ?? process.stdin;
   const output = options.output ?? process.stderr;
   const terminal =
-    options.terminal ?? (input === process.stdin && Boolean(process.stdin.isTTY));
+    options.terminal ??
+    (input === process.stdin && Boolean(process.stdin.isTTY));
   if (!terminal)
     throw new Error(
       "interactive menu requires a terminal; use --non-interactive and flags",
@@ -306,19 +308,19 @@ export async function menu(
   const session = new TerminalSession(input, output, terminal);
   try {
     output.write(`OtherSkill ${kind} menu\n`);
-    const fixed = options.fixedAgents ?? (options.fixedAgent ? [options.fixedAgent] : []);
-    const initial: SetupTarget[] =
-      kind === "setup"
-        ? uniqueTargets(["agents", ...fixed])
-        : uniqueTargets([
-            "agents",
-            ...(config.agents?.length
-              ? config.agents
-              : config.agent
-                ? [config.agent]
-                : []),
-            ...fixed,
-          ]);
+    const fixed =
+      options.fixedAgents ?? (options.fixedAgent ? [options.fixedAgent] : []);
+    const saved = config.agents?.length
+      ? config.agents
+      : config.agent
+        ? [config.agent]
+        : [];
+    // Explicit flags start clean; untouched reruns retain the saved harness set.
+    const initial = uniqueTargets([
+      "agents",
+      ...(fixed.length ? [] : saved),
+      ...fixed,
+    ]);
     const chosen = await session.checkbox({
       title: "Install targets (shared .agents companion and harness hooks):",
       choices: targetChoices,
@@ -326,7 +328,10 @@ export async function menu(
       agentsRequired: !options.noCompanion,
     });
     let targets = uniqueTargets([...chosen, ...fixed]);
-    const agents = targets.filter(isAgentTarget);
+    let agents = targets.filter(isAgentTarget);
+    // Keep the saved primary when an untouched rerun retains it.
+    if (!fixed.length && config.agent && agents.includes(config.agent))
+      agents = [config.agent, ...agents.filter((a) => a !== config.agent)];
     // The canonical companion is required by every harness that links to it.
     if (agents.length > 0) targets = uniqueTargets(["agents", ...targets]);
     const scopeChoice = (
@@ -351,7 +356,9 @@ export async function menu(
     ).trim();
     const model =
       (
-        await session.ask(`Free decision model [${config.model || FREE_MODEL}]: `)
+        await session.ask(
+          `Free decision model [${config.model || FREE_MODEL}]: `,
+        )
       ).trim() || config.model;
     output.write(
       "Categories:\n" +
