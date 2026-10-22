@@ -1,0 +1,55 @@
+name: Release
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'master' &&
+      github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - run: bun install --frozen-lockfile
+      - name: Installer smoke test
+        run: |
+          bash install.sh --help > /dev/null
+          smoke_home=$(mktemp -d)
+          bun otherskill.ts setup --non-interactive --agent claude --scope global --home "$smoke_home" --no-companion --dry-run
+          bun otherskill.ts doctor --home "$smoke_home"
+      - name: Tag and release
+        run: |
+          version=$(bun -e 'console.log(require("./package.json").version)')
+          tag="v$version"
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null; then
+            echo "version already released: $tag"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$tag" -m "Release $tag" "$RELEASE_SHA"
+          git push origin "refs/tags/$tag"
+          gh release create "$tag" --verify-tag --title "$tag" --generate-notes
