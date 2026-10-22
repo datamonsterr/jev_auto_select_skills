@@ -30,7 +30,7 @@ bun install --frozen-lockfile
 bun otherskill.ts setup
 ```
 
-Setup creates the launcher `~/.local/share/otherskill/bin/otherskill`; add its directory to `PATH`. Details, snapshots and flags: [docs/installation.md](docs/installation.md).
+Setup creates the launcher `~/.local/share/otherskill/bin/otherskill` (used by hooks) and a copy at `~/.local/bin/otherskill`, so `otherskill` is on `PATH` when `~/.local/bin` is. Details, snapshots and flags: [docs/installation.md](docs/installation.md).
 
 ## Quick start
 

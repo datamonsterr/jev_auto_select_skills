@@ -177,6 +177,29 @@ test("doctor installation inspection detects stale launcher source paths", async
   }
 });
 
+test("setup puts a managed launcher on PATH without replacing an unrelated one", async () => {
+  const { launcherPath, pathLauncherPath } = await import(
+    "../lib/otherskill/setup"
+  );
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "otherskill-path-"));
+  try {
+    const config = loadConfig({ home: root, cwd: root });
+    setup(config, "codex");
+    const onPath = pathLauncherPath(root);
+    expect(onPath).toBe(path.join(root, ".local/bin/otherskill"));
+    expect(fs.readFileSync(onPath, "utf8")).toBe(
+      fs.readFileSync(launcherPath(root), "utf8"),
+    );
+    expect(fs.statSync(onPath).mode & 0o111).not.toBe(0);
+    fs.writeFileSync(onPath, "#!/bin/sh\necho mine\n");
+    const plan = setup(config, "codex");
+    expect(plan.files.map((f) => f.path)).not.toContain(onPath);
+    expect(fs.readFileSync(onPath, "utf8")).toBe("#!/bin/sh\necho mine\n");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("generated installed hook commands and the installed OpenCode module execute with safe native failures", async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "otherskill-installed-"));
   try {

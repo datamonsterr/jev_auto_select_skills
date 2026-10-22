@@ -8,7 +8,7 @@ Glossary of project terms.
 - **Harness**: the coding agent host: Claude Code, Codex, Antigravity, OpenCode 1.x.
 - **Adapter**: harness-specific integration that calls `find --agent <harness>`: a hook entry (Claude, Codex, Antigravity) or a plugin file (OpenCode).
 - **Companion**: optional native `use-otherskill` skill installed by setup that teaches the agent to use the CLI. Disable with `--no-companion`.
-- **Launcher**: managed script `~/.local/share/otherskill/bin/otherskill` that runs Bun on a snapshot by absolute path. Hooks call it.
+- **Launcher**: managed script `~/.local/share/otherskill/bin/otherskill` that runs Bun on a snapshot by absolute path. Hooks call it. Setup also writes a managed copy to `~/.local/bin/otherskill` for `PATH`.
 - **Snapshot**: immutable source copy under `~/.local/share/otherskill/installs/release.*` made by the installer or `update`. Launchers and adapters point at one.
 - **Scope**: `global` (user home config and hooks) or `project` (nearest `otherskill.config.json`, project hook files and bank).
 - **Hook params**: `find` flags (`--max-skills`, `--max-categories`, `--timeout-ms`, `--categories`, `--model`, `--config`, `--home`) that override config for one call and can be embedded in the hook command by setup.
