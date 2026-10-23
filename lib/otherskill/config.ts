@@ -3,6 +3,11 @@ import path from "node:path";
 import os from "node:os";
 import { z } from "zod";
 
+/** Default bank location as written in config (home-relative). */
+export const DEFAULT_BANK_PATH = "~/.local/share/otherskill/bank";
+/** Default bank location resolved against `home`. */
+export const defaultBankPath = (home: string) =>
+  path.join(home, DEFAULT_BANK_PATH.slice(2));
 export const FREE_MODEL = "inception/mercury-decide:free";
 export function freeModel(model: string): string {
   if (!/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+:free$/.test(model))
@@ -68,7 +73,7 @@ const schema = z
           !value.split(/[\\/]/).includes("..") && !value.includes("\0"),
         "bank path traversal is forbidden",
       )
-      .default("~/.local/share/otherskill/bank"),
+      .default(DEFAULT_BANK_PATH),
     model: z.string().default(FREE_MODEL),
     scope: z.enum(["global", "project"]).default("global"),
     agent: agentId.optional(),

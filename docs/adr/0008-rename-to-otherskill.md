@@ -14,6 +14,8 @@ The project began as "Jev Skill Selector" (`skill_selector`, `jev-skill-selector
 - Env vars: `OTHERSKILL_MODEL`, `OTHERSKILL_BANK_PATH`, `OTHERSKILL_GLOBAL_SKILLS_PATH`, `OTHERSKILL_AGENT_SKILLS_PATH` are primary. Each is read first; the legacy `SKILL_SELECTOR_*` name (and `JEV_MODEL`, after `MODEL`, for the model) is read only when the new one is unset. Free-model enforcement is unchanged.
 - Kept on purpose: legacy detection and migration lists (`lib/migrate.ts`, setup hook detection of `skill_selector` / `jev-skill-selector`), legacy bank paths `.agents/jev_skills`, `JEV_API_KEY`, the migrate backup dir `~/.local/state/skill-selector`, and external names (OpenRouter `~typesafe/jev-latest`, openrouter.ai Jev tutorial URL, the external Jev/Decisions skill in `docs/project-skills.md`).
 
+- `scripts/assess.ts` accepts `--jev-model` (and the `useJevModel` option) as deprecated aliases of `--decision-model`. Dev-script break: the `--json` classification value is `ROUTED` (previously `JEV_ROUTED`); consumers of that output must update.
+
 ## Consequences
 
 Old env vars, bins and library imports still work but are deprecated. Removal of the aliases and legacy names needs a later major version.

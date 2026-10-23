@@ -114,6 +114,8 @@ The API key is never in config. `OPENROUTER_API_KEY` in the environment wins ove
 | `--model id:free`                      | override model              |
 | `--config FILE`, `--home DIR`          | config and home roots       |
 
+Selections over `--max-skills` are now truncated to the top N by probability (previously an error).
+
 `setup` / `config --apply` embed these flags in the hook command, installing one idempotent `UserPromptSubmit` entry and keeping all other hooks:
 
 ```sh
