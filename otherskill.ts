@@ -555,7 +555,11 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
           { ref: values.ref, subpath: values.path },
           install,
         );
-      else await install(path.resolve(config.cwd, source));
+      else {
+        const dir = path.resolve(config.cwd, source);
+        if (!fs.existsSync(dir)) throw new Error(`source not found: ${dir}`);
+        await install(dir);
+      }
       return 0;
     }
     if (command === "list") {
@@ -629,7 +633,11 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
         (routingCommand
           ? diagnostic(error)
           : error instanceof Error && "code" in error
-            ? "filesystem_or_process_operation_failed"
+            ? String((error as { code: unknown }).code).startsWith(
+                "ERR_PARSE_ARGS_",
+              )
+              ? error.message
+              : "filesystem_or_process_operation_failed"
             : error instanceof Error && !(error instanceof SyntaxError)
               ? error.message
               : "invalid input/configuration"),
