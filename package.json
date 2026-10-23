@@ -1,6 +1,6 @@
 {
   "name": "other-skill",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "OtherSkill: hidden categorized skills, free OpenRouter decisions and native harness awareness",
   "main": "index.ts",
   "module": "index.ts",

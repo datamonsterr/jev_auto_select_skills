@@ -84,7 +84,7 @@ export interface DecisionProviderConfig {
 }
 
 /**
- * Provider client for OpenRouter decision model via OpenRouter
+ * Provider client for the decision model on OpenRouter
  */
 export class DecisionProvider {
   private apiKey: string;

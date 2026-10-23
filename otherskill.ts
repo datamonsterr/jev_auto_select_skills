@@ -4,6 +4,7 @@ import path from "node:path";
 import { parseArgs } from "node:util";
 import {
   loadConfig,
+  defaultBankPath,
   freeModel,
   configData,
   configTarget,
@@ -240,8 +241,11 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     });
     const command = positionals[0] ?? "help";
     if (values.help || command === "help") {
+      const topic = values.help ? positionals[0] : positionals[1];
       console.log(
-        (values.help && positionals[0] && COMMAND_HELP[positionals[0]]) || HELP,
+        (topic && Object.hasOwn(COMMAND_HELP, topic)
+          ? COMMAND_HELP[topic]
+          : undefined) || HELP,
       );
       return 0;
     }
@@ -485,11 +489,17 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
         data.bankPath =
           scope === "project" &&
           !fs.existsSync(target) &&
-          config.bankPath ===
-            path.join(config.home, ".local/share/otherskill/bank")
+          config.bankPath === defaultBankPath(config.home)
             ? defaultProjectBankPath(target)
             : writtenBankPath(target, config.bankPath, config.home);
+      const portableTouched =
+        values.portable ||
+        (command === "config" &&
+          action === "set" &&
+          (positionals[2] === "portableHooks" ||
+            positionals[2] === "bankPath"));
       if (
+        portableTouched &&
         data.portableHooks === true &&
         typeof data.bankPath === "string" &&
         (path.isAbsolute(data.bankPath) || data.bankPath.startsWith("~"))

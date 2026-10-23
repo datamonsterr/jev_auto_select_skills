@@ -58,6 +58,8 @@ const ROUTED_PATTERNS = [
 export async function assessSkill(params: {
   skillPathOrName: string;
   useDecisionModel?: boolean;
+  /** @deprecated Use `useDecisionModel`. */
+  useJevModel?: boolean;
   global?: boolean;
   cwd?: string;
 }): Promise<SkillAssessmentResult> {
@@ -145,7 +147,7 @@ export async function assessSkill(params: {
 
   // 3. Optional: Use decision model if requested and API key present
   if (
-    params.useDecisionModel &&
+    (params.useDecisionModel ?? params.useJevModel) &&
     (process.env.OPENROUTER_API_KEY || process.env.JEV_API_KEY)
   ) {
     try {
@@ -272,7 +274,8 @@ Options:
     if (arg === undefined) continue;
     if (arg === "--move" || arg === "-m") shouldMove = true;
     else if (arg === "--global" || arg === "-g") isGlobal = true;
-    else if (arg === "--decision-model") useDecisionModel = true;
+    else if (arg === "--decision-model" || arg === "--jev-model")
+      useDecisionModel = true; // --jev-model is a deprecated alias
     else if (arg === "--json") jsonOutput = true;
     else if (!arg.startsWith("-") && !skillArg) skillArg = arg;
   }
