@@ -9,6 +9,7 @@ Project hooks embedded the launcher path, `--home` and `--config` as absolute pa
 ## Decision
 
 - Config field `portableHooks` (set by `--portable` or `config set portableHooks true|false`) makes setup write path-free hooks. It requires project scope and a project config at `<root>/otherskill.config.json` or `<root>/.otherskill/config.json`; otherwise setup throws a fixed message.
+- Setup writes `bankPath` `.otherskill/bank` into a new project config (relative to the config file) and rejects `--portable` with an absolute or `~` bankPath ("portable hooks require a project-relative bankPath").
 - Shell hooks call `"$HOME/.local/share/otherskill/bin/otherskill" 'find' '--agent' <agent>` plus hook params, with no `--home`. Claude adds `--config "$CLAUDE_PROJECT_DIR/<config path relative to the root>"`; Codex and Antigravity let `find` resolve the nearest config from the payload cwd.
 - The OpenCode plugin inlines `plugins/otherskill-opencode.ts` (single source) and builds the launcher path from `os.homedir()`.
 - Config discovery also accepts `.otherskill/config.json` in each ancestor, so a project can keep its config and bank together under `.otherskill/`. The root `otherskill.config.json` wins when a directory has both.

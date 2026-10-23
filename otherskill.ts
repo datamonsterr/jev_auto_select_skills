@@ -8,6 +8,7 @@ import {
   configData,
   configTarget,
   writeConfig,
+  defaultProjectBankPath,
   writtenBankPath,
   withRoutingOverrides,
   type RoutingOverrides,
@@ -407,7 +408,19 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
           ? configTarget({ ...roots, scope })
           : file;
       if (data.bankPath === config.bankPath)
-        data.bankPath = writtenBankPath(target, config.bankPath, config.home);
+        data.bankPath =
+          scope === "project" &&
+          !fs.existsSync(target) &&
+          config.bankPath ===
+            path.join(config.home, ".local/share/otherskill/bank")
+            ? defaultProjectBankPath(target)
+            : writtenBankPath(target, config.bankPath, config.home);
+      if (
+        data.portableHooks === true &&
+        typeof data.bankPath === "string" &&
+        (path.isAbsolute(data.bankPath) || data.bankPath.startsWith("~"))
+      )
+        throw new Error("portable hooks require a project-relative bankPath");
       config = writeConfig(target, data, roots, true);
       const plan = apply
         ? planMultiSetup(config, selectedAgents, {

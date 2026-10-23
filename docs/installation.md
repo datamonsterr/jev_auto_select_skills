@@ -64,7 +64,7 @@ otherskill setup --scope project --agents claude,codex --portable   # persists "
 otherskill config set portableHooks false --apply                  # back to absolute hooks
 ```
 
-Requirements: project scope, the project config at `otherskill.config.json` or `.otherskill/config.json` in the project root, a bankPath relative to that file (for example `.otherskill/bank` or, from `.otherskill/config.json`, `bank`), and the launcher installed at `$HOME/.local/share/otherskill/bin/otherskill` on every machine. Otherwise setup fails with "portable hooks require project scope with otherskill.config.json or .otherskill/config.json at the project root".
+Requirements: project scope, the project config at `otherskill.config.json` or `.otherskill/config.json` in the project root, a bankPath relative to that file (for example `.otherskill/bank` or, from `.otherskill/config.json`, `bank`), and the launcher installed at `$HOME/.local/share/otherskill/bin/otherskill` on every machine. A new project config created by setup defaults to `bankPath` `.otherskill/bank`. An absolute or `~` bankPath fails with "portable hooks require a project-relative bankPath". Missing project scope or config fails with "portable hooks require project scope with otherskill.config.json or .otherskill/config.json at the project root".
 
 To keep everything OtherSkill owns in one folder, use `.otherskill/config.json` with `"bankPath": "bank"`, giving `.otherskill/config.json` plus `.otherskill/bank/`. `update` and `config --apply` keep honoring the saved flag.
 
