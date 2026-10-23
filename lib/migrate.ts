@@ -34,6 +34,7 @@ export interface MigrationResult {
 }
 export const DEFAULT_KEEP_SKILLS = [
   "caveman",
+  "otherskill",
   "skill_selector",
   "jev-skill-selector",
 ];
