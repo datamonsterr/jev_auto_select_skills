@@ -127,7 +127,7 @@ def main():
                 bun = str(candidate)
                 break
     assert bun, "Install Bun >= 1.3 before running this smoke"
-    with tempfile.TemporaryDirectory(prefix="jev installer's network smoke-") as temp:
+    with tempfile.TemporaryDirectory(prefix="otherskill installer's network smoke-") as temp:
         root = Path(temp).resolve()
         home, project, scratch = root / "home", root / "project", root / "scratch"
         for directory in [home, project, scratch]:

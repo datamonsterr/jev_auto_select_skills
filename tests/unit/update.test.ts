@@ -52,7 +52,7 @@ test("update --check compares remote SHA and --ref without filesystem or process
     ref: "feature/routing",
   });
   expect(calls).toEqual([
-    "https://api.github.com/repos/datamonsterr/jev_auto_select_skills/commits/feature%2Frouting",
+    "https://api.github.com/repos/datamonsterr/other-skill/commits/feature%2Frouting",
   ]);
   expect(fs.existsSync(f.home)).toBe(false);
   expect(fs.readdirSync(f.repo)).toEqual([".otherskill-version"]);
@@ -185,8 +185,8 @@ test("update installs a pinned tarball in a new snapshot, records commit and rea
   expect(result.status).toBe("updated");
   if (result.status !== "updated") throw new Error("expected updated result");
   expect(deps.calls).toEqual([
-    "https://api.github.com/repos/datamonsterr/jev_auto_select_skills/commits/v2.0",
-    `https://codeload.github.com/datamonsterr/jev_auto_select_skills/tar.gz/${newCommit}`,
+    "https://api.github.com/repos/datamonsterr/other-skill/commits/v2.0",
+    `https://codeload.github.com/datamonsterr/other-skill/tar.gz/${newCommit}`,
   ]);
   const snapshot = result.snapshot!;
   expect(snapshot).toStartWith(

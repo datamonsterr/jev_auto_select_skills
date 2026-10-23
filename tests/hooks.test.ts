@@ -2,7 +2,7 @@ import { describe, it, expect, mock } from "bun:test";
 import { handleCodexHook } from "../hooks/codex";
 import { handleClaudeHook } from "../hooks/claude";
 import { handleAntigravityHook } from "../hooks/antigravity";
-import jevSkillSelectorPlugin from "../plugins/opencode";
+import otherSkillPlugin from "../plugins/opencode";
 import { detectEnvironment } from "../scripts/run-hook";
 
 describe("hooks and plugin", () => {
@@ -48,13 +48,13 @@ describe("hooks and plugin", () => {
       selectSkillsFn: mockSelectSkills as any,
     });
 
-    expect(output).toContain("Skill Selector");
+    expect(output).toContain("OtherSkill");
     expect(output).toContain("tdd");
   });
 
   it("creates a valid OpenCode plugin object with chat hook and tool", () => {
-    const plugin = jevSkillSelectorPlugin();
-    expect(plugin.name).toBe("skill_selector");
+    const plugin = otherSkillPlugin();
+    expect(plugin.name).toBe("otherskill");
     expect(typeof plugin.hooks?.["chat:before"]).toBe("function");
     expect(Array.isArray(plugin.tools)).toBe(true);
     expect(plugin.tools[0]?.name).toBe("select_skill");
@@ -83,7 +83,7 @@ describe("hooks and plugin", () => {
     );
 
     expect(result.injectSteps).toHaveLength(1);
-    expect(result.injectSteps[0]?.ephemeralMessage).toContain("Skill Selector");
+    expect(result.injectSteps[0]?.ephemeralMessage).toContain("OtherSkill");
     expect(result.injectSteps[0]?.ephemeralMessage).toContain("writing-srs");
   });
 

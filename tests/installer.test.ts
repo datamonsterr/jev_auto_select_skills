@@ -22,7 +22,9 @@ function executable(file: string, content: string) {
 }
 
 beforeAll(() => {
-  fixture = fs.mkdtempSync(path.join(os.tmpdir(), "jev-installer-fixture-"));
+  fixture = fs.mkdtempSync(
+    path.join(os.tmpdir(), "otherskill-installer-fixture-"),
+  );
   const source = path.join(fixture, "source");
   fs.mkdirSync(source);
   for (const file of [
@@ -44,7 +46,9 @@ beforeAll(() => {
 });
 afterAll(() => fs.rmSync(fixture, { recursive: true, force: true }));
 beforeEach(() => {
-  root = fs.mkdtempSync(path.join(os.tmpdir(), "jev installer's space-"));
+  root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "otherskill installer's space-"),
+  );
   home = path.join(root, "home");
   project = path.join(root, "project");
   bin = path.join(root, "bin");
@@ -245,7 +249,7 @@ test("curl HTTP failure fails closed and cleans temporary files without touching
   expect(log("curl")).toContain("--location");
   expect(log("curl")).toContain("=https");
   expect(log("curl").at(-1)).toBe(
-    "https://codeload.github.com/datamonsterr/jev_auto_select_skills/tar.gz/refs/heads/master",
+    "https://codeload.github.com/datamonsterr/other-skill/tar.gz/refs/heads/master",
   );
   expect(fs.readFileSync(path.join(defaults(), "keep.txt"), "utf8")).toBe(
     "user data",

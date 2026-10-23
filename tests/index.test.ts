@@ -12,8 +12,8 @@ describe("index programmatic API", () => {
           answers: {
             primary_skill: {
               type: "choice",
-              choice: "skill_selector",
-              probabilities: { skill_selector: 0.95 },
+              choice: "otherskill",
+              probabilities: { otherskill: 0.95 },
               confidence: 0.95,
             },
           },
@@ -36,7 +36,7 @@ describe("index programmatic API", () => {
       },
     });
 
-    expect(result.primarySkill).toBe("skill_selector");
+    expect(result.primarySkill).toBe("otherskill");
     expect(result.usage).toBeDefined();
     expect(result.usage?.total_tokens).toBeGreaterThan(0);
     expect(result.usage?.input_tokens).toBeGreaterThan(0);

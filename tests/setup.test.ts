@@ -18,7 +18,7 @@ describe("agent setup scripts", () => {
   let repoDir: string;
 
   beforeEach(() => {
-    tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "jev-setup-test-"));
+    tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), "otherskill-setup-test-"));
     repoDir = path.resolve(dirnameCompat(import.meta), "..");
   });
 
@@ -81,7 +81,7 @@ describe("agent setup scripts", () => {
 
   it("setupClaude supports hooksOnly and skillOnly flags", () => {
     const hooksOnlyHome = fs.mkdtempSync(
-      path.join(os.tmpdir(), "jev-hooks-only-"),
+      path.join(os.tmpdir(), "otherskill-hooks-only-"),
     );
     try {
       const hRes = setupClaude({
@@ -99,7 +99,7 @@ describe("agent setup scripts", () => {
       );
 
       const skillOnlyHome = fs.mkdtempSync(
-        path.join(os.tmpdir(), "jev-skill-only-"),
+        path.join(os.tmpdir(), "otherskill-skill-only-"),
       );
       try {
         const sRes = setupClaude({

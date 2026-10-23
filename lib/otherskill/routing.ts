@@ -379,8 +379,10 @@ export async function route(
     result.selected = [...collected.values()].sort(
       (a, b) => b.probability - a.probability,
     );
-    if (result.selected.length > config.limits.maxSkills)
-      throw new RoutingError("skill_selection_limit_exceeded_raise_maxSkills");
+    if (result.selected.length > config.limits.maxSkills) {
+      result.selected = result.selected.slice(0, config.limits.maxSkills);
+      result.diagnostics.push("skill_selection_truncated_to_maxSkills");
+    }
     return result;
   } catch (error) {
     return {

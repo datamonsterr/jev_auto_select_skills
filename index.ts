@@ -5,12 +5,21 @@ import {
   type Skill,
   type SelectedSkill,
   type SkillSelectionResult,
-  type SkillSelectorOptions,
+  type OtherSkillOptions,
   type UsageMetrics,
   formatSkillSummary,
   formatSkillContent,
 } from "./lib/model";
-import { JevProvider } from "./lib/provider";
+import { DecisionProvider, DEFAULT_DECISION_MODEL } from "./lib/provider";
+import { buildDecisionInstructions } from "./lib/system_prompt";
+import { compactUserPromptForDecision } from "./lib/parse_skill";
+import type {
+  DecisionState,
+  DecisionChoiceQuestion,
+  DecisionRequest,
+  DecisionChoiceAnswer,
+  DecisionResponse,
+} from "./lib/model";
 import {
   loadSkillsFromDir,
   parseSkillFile,
@@ -60,7 +69,7 @@ export function findNearestWorkspaceSkillsDir(startDir: string): string | null {
  *  2. Project-level nearest ancestor discovery (.agents/other_skills, legacy .agents/jev_skills)
  *     (Project skills override global EVEN WITH global SKILLS_BANK_PATH)
  *  3. Workspace-specific paths
- *  4. Environment variable overrides (SKILL_SELECTOR_BANK_PATH, SKILLS_BANK_PATH)
+ *  4. Environment variable overrides (OTHERSKILL_BANK_PATH, legacy SKILL_SELECTOR_BANK_PATH, SKILLS_BANK_PATH)
  *  5. Global skills bank (~/.agents/other_skills/, legacy ~/.agents/jev_skills/)
  *  6. Realpath deduplication across all resolved paths
  */
@@ -121,8 +130,9 @@ export function resolveSkillsSearchPaths(options?: {
     }
   }
 
-  // 4. Agent-specific skills path (SKILL_SELECTOR_AGENT_SKILLS_PATH, AGENT_SKILLS_PATH)
+  // 4. Agent-specific skills path (OTHERSKILL_AGENT_SKILLS_PATH, legacy SKILL_SELECTOR_AGENT_SKILLS_PATH, AGENT_SKILLS_PATH)
   const agentEnv =
+    process.env.OTHERSKILL_AGENT_SKILLS_PATH ||
     process.env.SKILL_SELECTOR_AGENT_SKILLS_PATH ||
     process.env.AGENT_SKILLS_PATH ||
     process.env.SKILLS_AGENT_DIR;
@@ -137,8 +147,9 @@ export function resolveSkillsSearchPaths(options?: {
   addPath(path.resolve(dirnameCompat(import.meta), ".agents", "jev_skills"));
   addPath(path.resolve(dirnameCompat(import.meta), "skills"));
 
-  // 5. Environment variable overrides (SKILL_SELECTOR_BANK_PATH, SKILLS_BANK_PATH, SKILLS_DIR)
+  // 5. Environment variable overrides (OTHERSKILL_BANK_PATH, legacy SKILL_SELECTOR_BANK_PATH, SKILLS_BANK_PATH, SKILLS_DIR)
   const envPath =
+    process.env.OTHERSKILL_BANK_PATH ||
     process.env.SKILL_SELECTOR_BANK_PATH ||
     process.env.SKILLS_BANK_PATH ||
     process.env.SKILLS_DIR;
@@ -154,6 +165,7 @@ export function resolveSkillsSearchPaths(options?: {
 
   // 6. Global skills path (default: ~/.agents/other_skills/, legacy ~/.agents/jev_skills/)
   const globalEnv =
+    process.env.OTHERSKILL_GLOBAL_SKILLS_PATH ||
     process.env.SKILL_SELECTOR_GLOBAL_SKILLS_PATH ||
     process.env.GLOBAL_SKILLS_PATH ||
     process.env.SKILLS_GLOBAL_DIR;
@@ -185,7 +197,7 @@ export function resolveSkillsBankPath(customPath?: string): string {
 }
 
 export {
-  JevProvider,
+  DecisionProvider,
   loadSkillsFromDir,
   parseSkillFile,
   parseSkillContent,
@@ -208,18 +220,41 @@ export type {
   Skill,
   SelectedSkill,
   SkillSelectionResult,
-  SkillSelectorOptions,
+  OtherSkillOptions,
   UsageMetrics,
 };
 
+/** @deprecated Use `DecisionProvider`. */
+export const JevProvider = DecisionProvider;
+/** @deprecated Use `DecisionProvider`. */
+export type JevProvider = DecisionProvider;
+/** @deprecated Use `OtherSkillOptions`. */
+export type SkillSelectorOptions = OtherSkillOptions;
+/** @deprecated Use `DecisionState`. */
+export type JevState = DecisionState;
+/** @deprecated Use `DecisionChoiceQuestion`. */
+export type JevChoiceQuestion = DecisionChoiceQuestion;
+/** @deprecated Use `DecisionRequest`. */
+export type JevDecisionRequest = DecisionRequest;
+/** @deprecated Use `DecisionChoiceAnswer`. */
+export type JevChoiceAnswer = DecisionChoiceAnswer;
+/** @deprecated Use `DecisionResponse`. */
+export type JevDecisionResponse = DecisionResponse;
+/** @deprecated Use `DEFAULT_DECISION_MODEL`. */
+export const DEFAULT_JEV_MODEL = DEFAULT_DECISION_MODEL;
+/** @deprecated Use `buildDecisionInstructions`. */
+export const buildJevInstructions = buildDecisionInstructions;
+/** @deprecated Use `compactUserPromptForDecision`. */
+export const compactUserPromptForJev = compactUserPromptForDecision;
+
 /**
- * High-level programmatic API to select skills using Jev decision model
+ * High-level programmatic API to select skills using the decision model
  */
 export async function selectSkills(params: {
   userPrompt: string;
   systemPrompt?: string;
   skillsDir?: string | string[];
-  options?: SkillSelectorOptions;
+  options?: OtherSkillOptions;
 }): Promise<SkillSelectionResult> {
   const { userPrompt, systemPrompt, skillsDir, options = {} } = params;
   const targetDirs = resolveSkillsSearchPaths({
@@ -233,7 +268,7 @@ export async function selectSkills(params: {
 
   const provider =
     options.provider ||
-    new JevProvider({
+    new DecisionProvider({
       apiKey: options.apiKey,
       model: options.model,
       retries: options.retries,
@@ -251,14 +286,14 @@ export async function selectSkills(params: {
 
 function printHelp(): void {
   console.log(`
-Skill Selector (skill_selector)
+OtherSkill (otherskill)
 Usage:
-  skill_selector "<user prompt>" [options]
-  skill_selector setup [agent] [options]
-  skill_selector migrate [options]
-  skill_selector --prompt "<user prompt>" --content
-  skill_selector --skill "<skill-name>"
-  echo '{"userPrompt": "..."}' | skill_selector
+  otherskill "<user prompt>" [options]
+  otherskill setup [agent] [options]
+  otherskill migrate [options]
+  otherskill --prompt "<user prompt>" --content
+  otherskill --skill "<skill-name>"
+  echo '{"userPrompt": "..."}' | otherskill
 
 Commands:
   setup [agent]            Configure agent harness (claude, codex, agy, opencode, all)
@@ -411,7 +446,7 @@ async function main() {
           formatSkillContent(result.selectedSkills, { userPrompt: prompt }),
       );
     } else {
-      console.log("\n🎯 Jev Skill Selection Result");
+      console.log("\n🎯 OtherSkill Selection Result");
       console.log(`Prompt: "${prompt}"`);
       console.log(`Primary Choice: ${result.primarySkill || "none"}`);
       console.log(

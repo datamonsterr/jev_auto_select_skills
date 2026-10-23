@@ -69,7 +69,7 @@ Details here.
     const skills = loadSkillsFromDir(skillsDir);
     expect(skills.length).toBeGreaterThanOrEqual(1);
 
-    const routerSkill = skills.find((s) => s.name === "skill_selector");
+    const routerSkill = skills.find((s) => s.name === "otherskill");
     expect(routerSkill).toBeDefined();
     expect(routerSkill?.description).toContain("router");
   });
@@ -78,10 +78,10 @@ Details here.
     const primaryDir = path.resolve(__dirname, "../skills");
     const merged = loadSkillsFromDir([primaryDir, primaryDir]);
     expect(merged.length).toBeGreaterThanOrEqual(1);
-    expect(merged.some((s) => s.name === "skill_selector")).toBe(true);
+    expect(merged.some((s) => s.name === "otherskill")).toBe(true);
   });
 
-  it("builds Jev state containing skills description, name and when to use it", () => {
+  it("builds decision state containing skills description, name and when to use it", () => {
     const sampleSkills = [
       {
         name: "skill-a",

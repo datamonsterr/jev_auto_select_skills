@@ -387,6 +387,12 @@ export function writtenBankPath(
     return resolved;
   }
 }
+/** Project bank default written into a new project config: relative to the config file. */
+export function defaultProjectBankPath(file: string): string {
+  return path.basename(path.dirname(file)) === ".otherskill"
+    ? "bank"
+    : ".otherskill/bank";
+}
 export function configData(config: Config): Record<string, unknown> {
   const { home, cwd, configPath, inherited, categoriesFinal, ...data } = config;
   return data;

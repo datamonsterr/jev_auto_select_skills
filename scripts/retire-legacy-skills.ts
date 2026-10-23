@@ -17,11 +17,9 @@ export async function retireLegacySkills(options: {
   if (
     path.basename(options.replacement) !== "SKILL.md" ||
     !fs.statSync(options.replacement).isFile() ||
-    path.basename(path.dirname(options.replacement)) !== "skill_selector"
+    path.basename(path.dirname(options.replacement)) !== "otherskill"
   )
-    throw new Error(
-      "An installed skill_selector/SKILL.md replacement is required",
-    );
+    throw new Error("An installed otherskill/SKILL.md replacement is required");
   const backup = path.resolve(options.backupDir);
   for (const root of options.roots)
     if (
@@ -143,7 +141,7 @@ if (import.meta.main) {
     throw new Error("--apply and --dry-run are mutually exclusive");
   if (!roots.length || !replacement)
     throw new Error(
-      "Supply --root discovery directories and --replacement installed skill_selector/SKILL.md",
+      "Supply --root discovery directories and --replacement installed otherskill/SKILL.md",
     );
   backupDir ||= path.join(
     os.homedir(),

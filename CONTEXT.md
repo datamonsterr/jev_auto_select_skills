@@ -1,7 +1,7 @@
 # Context
 
 Glossary of project terms.
-- **OtherSkill**: this project and its canonical CLI (`otherskill.ts`). Routes prompts to skills held in a bank. `jev-skill-selector` and legacy `index.ts` are deprecated aliases or predecessors.
+- **OtherSkill**: this project, formerly "Jev Skill Selector" (`skill_selector`, `jev-skill-selector`), and its canonical CLI (`otherskill.ts`). Routes prompts to skills held in a bank. The old bin names `skill_selector` and `jev-skill-selector` stay as deprecated aliases; legacy `index.ts` is a predecessor entry. See ADR 0008.
 - **Bank**: private directory of categorized skill copies (`bankPath`), outside native skill discovery. Never linked into `.claude/skills` or `.agents/skills`.
 - **Category**: stable, possibly nested ID (`frontend/ui-ux`) with a description. Stage one of routing chooses categories. A skill can hold a complete copy in several categories.
 - **Skill set**: the skills in one category, or the enabled categories together; the candidates stage two chooses from.

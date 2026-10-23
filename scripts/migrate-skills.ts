@@ -20,7 +20,7 @@ Relocates optional task-specific skills into .agents/other_skills while preservi
 always-on skills in native agent directories.
 
 Usage:
-  skill_selector migrate [options]
+  otherskill migrate [options]
   bun run scripts/migrate-skills.ts [options]
 
 Options:

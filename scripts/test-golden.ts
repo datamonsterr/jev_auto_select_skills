@@ -32,7 +32,7 @@ async function runGoldenEvaluation() {
   const testcases: GoldenTestCase[] = JSON.parse(raw);
 
   console.log(`\n======================================================`);
-  console.log(`🚀 Starting Jev Skill Selector Golden Evaluation`);
+  console.log(`🚀 Starting OtherSkill Golden Evaluation`);
   console.log(`Total Cases: ${testcases.length}`);
   console.log(`Model: ${process.env.MODEL || "inception/mercury-decide:free"}`);
   console.log(`======================================================\n`);

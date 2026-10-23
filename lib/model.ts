@@ -9,9 +9,9 @@ export interface Skill {
 }
 
 /**
- * State object sent to the Jev decision model
+ * State object sent to the decision model
  */
-export interface JevState {
+export interface DecisionState {
   user_prompt: string;
   system_prompt?: string;
   skills: Array<{
@@ -23,9 +23,9 @@ export interface JevState {
 }
 
 /**
- * Jev Choice question schema
+ * Choice question schema
  */
-export interface JevChoiceQuestion {
+export interface DecisionChoiceQuestion {
   type: "choice";
   instructions: string;
   criteria: Record<string, string>;
@@ -34,16 +34,16 @@ export interface JevChoiceQuestion {
 /**
  * Decisions request payload for OpenRouter alpha decisions API
  */
-export interface JevDecisionRequest {
+export interface DecisionRequest {
   model: string;
-  state: JevState | Record<string, any> | string;
-  questions: Record<string, JevChoiceQuestion>;
+  state: DecisionState | Record<string, any> | string;
+  questions: Record<string, DecisionChoiceQuestion>;
 }
 
 /**
- * Answer for a Choice question from Jev
+ * Answer for a Choice question from the decision model
  */
-export interface JevChoiceAnswer {
+export interface DecisionChoiceAnswer {
   type: "choice";
   choice: string;
   probabilities: Record<string, number>;
@@ -51,11 +51,11 @@ export interface JevChoiceAnswer {
 }
 
 /**
- * Full response from Jev / OpenRouter decisions API
+ * Full response from the OpenRouter decisions API
  */
-export interface JevDecisionResponse {
+export interface DecisionResponse {
   model: string;
-  answers: Record<string, JevChoiceAnswer>;
+  answers: Record<string, DecisionChoiceAnswer>;
   usage?: {
     input_tokens?: number;
     output_tokens?: number;
@@ -96,9 +96,9 @@ export interface UsageMetrics {
 export interface SkillSelectionResult {
   selectedSkills: SelectedSkill[];
   primarySkill: string | null;
-  answers: Record<string, JevChoiceAnswer>;
+  answers: Record<string, DecisionChoiceAnswer>;
   usage?: UsageMetrics;
-  raw?: JevDecisionResponse;
+  raw?: DecisionResponse;
   source?: "model" | "local_fallback" | "unavailable" | string;
   metadata?: {
     source?: string;
@@ -111,7 +111,7 @@ export interface SkillSelectionResult {
 /**
  * Options for configuring skill selection
  */
-export interface SkillSelectorOptions {
+export interface OtherSkillOptions {
   model?: string;
   apiKey?: string;
   threshold?: number;
@@ -128,7 +128,7 @@ export interface SkillSelectorOptions {
 }
 
 /**
- * Filter and sort selected skills from a Jev choice answer based on probability threshold
+ * Filter and sort selected skills from a choice answer based on probability threshold
  */
 export function filterSelectedSkills(params: {
   choice: string;
@@ -195,7 +195,7 @@ export function formatSkillSummary(skills: SelectedSkill[]): string {
   }
 
   const lines = [
-    "🎯 **[Skill Selector]**",
+    "🎯 **[OtherSkill]**",
     "The following specialized skill(s) have been selected for this task:",
     "",
   ];
@@ -239,7 +239,7 @@ export function formatSkillContent(
 
   const lines: string[] = [
     "### Recommended Agent Skills",
-    "🎯 **[Skill Selector]**",
+    "🎯 **[OtherSkill]**",
     "The following specialized skills have been selected:",
     "",
   ];

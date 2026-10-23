@@ -9,19 +9,19 @@ Bash (including macOS Bash 3.2), HTTPS-capable `curl`, `tar` with gzip, standard
 ## Installer flow
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/datamonsterr/jev_auto_select_skills/master/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/datamonsterr/other-skill/master/install.sh | bash
 
 # Forward setup options:
-curl -fsSL https://raw.githubusercontent.com/datamonsterr/jev_auto_select_skills/master/install.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/datamonsterr/other-skill/master/install.sh | bash -s -- \
   --non-interactive --agent codex --scope global
 
 # Custom snapshot parent, project harness:
-curl -fsSL https://raw.githubusercontent.com/datamonsterr/jev_auto_select_skills/master/install.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/datamonsterr/other-skill/master/install.sh | bash -s -- \
   --install-dir "$HOME/.local/share/otherskill/installs" -- \
   --non-interactive --agent claude --scope project --cwd "$PWD" --no-companion
 
 # Installer help (no download, no writes):
-curl -fsSL https://raw.githubusercontent.com/datamonsterr/jev_auto_select_skills/master/install.sh | bash -s -- --help
+curl -fsSL https://raw.githubusercontent.com/datamonsterr/other-skill/master/install.sh | bash -s -- --help
 ```
 
 To inspect first: `curl -fsSL -o install.sh <raw URL>`, read it, then `bash install.sh`.
@@ -64,7 +64,7 @@ otherskill setup --scope project --agents claude,codex --portable   # persists "
 otherskill config set portableHooks false --apply                  # back to absolute hooks
 ```
 
-Requirements: project scope, the project config at `otherskill.config.json` or `.otherskill/config.json` in the project root, a bankPath relative to that file (for example `.otherskill/bank` or, from `.otherskill/config.json`, `bank`), and the launcher installed at `$HOME/.local/share/otherskill/bin/otherskill` on every machine. Otherwise setup fails with "portable hooks require project scope with otherskill.config.json or .otherskill/config.json at the project root".
+Requirements: project scope, the project config at `otherskill.config.json` or `.otherskill/config.json` in the project root, a bankPath relative to that file (for example `.otherskill/bank` or, from `.otherskill/config.json`, `bank`), and the launcher installed at `$HOME/.local/share/otherskill/bin/otherskill` on every machine. A new project config created by setup defaults to `bankPath` `.otherskill/bank`. An absolute or `~` bankPath fails with "portable hooks require a project-relative bankPath". Missing project scope or config fails with "portable hooks require project scope with otherskill.config.json or .otherskill/config.json at the project root".
 
 To keep everything OtherSkill owns in one folder, use `.otherskill/config.json` with `"bankPath": "bank"`, giving `.otherskill/config.json` plus `.otherskill/bank/`. `update` and `config --apply` keep honoring the saved flag.
 

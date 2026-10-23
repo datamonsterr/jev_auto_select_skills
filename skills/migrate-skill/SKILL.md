@@ -17,7 +17,7 @@ Safe, non-destructive migration utility to relocate optional task-specific skill
 
 ## Safe Migration Guarantees
 
-1. **Always-On Preservation**: Skills designated as universal/always-on (e.g. `caveman`, `skill_selector`) remain intact in their native directory. Their originals are never deleted or modified.
+1. **Always-On Preservation**: Skills designated as universal/always-on (e.g. `caveman`, `otherskill`) remain intact in their native directory. Their originals are never deleted or modified.
 2. **Complete Tree Preservation**: Complete skill directories (including `scripts/`, `references/`, `examples/`, and assets) are moved together with `SKILL.md`.
 3. **Dry-Run Preview**: Supports `--dry-run` to inspect all actions without modifying the filesystem.
 4. **Exact Backup Manifest**: Automatically writes an exact JSON manifest recording timestamp, source/target paths, and file hashes in `backup_manifest.json`.
@@ -28,20 +28,20 @@ Safe, non-destructive migration utility to relocate optional task-specific skill
 
 ## CLI Usage
 
-Run via `skill_selector`:
+Run via `otherskill`:
 
 ```bash
 # Preview actions without modifying disk
-skill_selector migrate --dry-run
+otherskill migrate --dry-run
 
 # Run full migration with default keep list (caveman, superpowers, etc.)
-skill_selector migrate --apply
+otherskill migrate --apply
 
 # Specify additional skills to keep in native directory
-skill_selector migrate --apply --keep my-persona-skill,another-always-on
+otherskill migrate --apply --keep my-persona-skill,another-always-on
 
 # Custom target and source directories
-skill_selector migrate --apply --source ~/.agents/skills --target ~/.agents/other_skills --backup ~/.agents/skills_backup
+otherskill migrate --apply --source ~/.agents/skills --target ~/.agents/other_skills --backup ~/.agents/skills_backup
 ```
 
 Direct script execution:
@@ -57,8 +57,8 @@ bun run scripts/migrate-skills.ts --apply
 Every apply returns `manifestPath`. Restore only after previewing the guarded rollback:
 
 ```bash
-skill_selector migrate --rollback /absolute/backup/backup_manifest.json --dry-run
-skill_selector migrate --rollback /absolute/backup/backup_manifest.json --apply
+otherskill migrate --rollback /absolute/backup/backup_manifest.json --dry-run
+otherskill migrate --rollback /absolute/backup/backup_manifest.json --apply
 ```
 
 Rollback preflights every complete tree and refuses to overwrite user edits. Default sources include the canonical global legacy bank; specify project `--source` directories explicitly for project migrations. Collisions block the entire migration before any writes.
@@ -73,26 +73,26 @@ A differing preexisting `other_skills` destination always blocks the whole migra
 
 ```bash
 # Preview project migration with deliberate native precedence
-skill_selector migrate --source /project/.agents/skills --source /project/.claude/skills --legacy-bank /project/.agents/jev_skills --target /project/.agents/other_skills --prefer-native --dry-run --json
+otherskill migrate --source /project/.agents/skills --source /project/.claude/skills --legacy-bank /project/.agents/jev_skills --target /project/.agents/other_skills --prefer-native --dry-run --json
 
 # Apply only after reviewing selectedSource, backupPath, and kept skills
-skill_selector migrate --source /project/.agents/skills --source /project/.claude/skills --legacy-bank /project/.agents/jev_skills --target /project/.agents/other_skills --prefer-native --apply --json
+otherskill migrate --source /project/.agents/skills --source /project/.claude/skills --legacy-bank /project/.agents/jev_skills --target /project/.agents/other_skills --prefer-native --apply --json
 ```
 
 Use a normal terminal for protected global paths. Preview and review first; never bypass harness read-only mounts. Exact backups default to `~/.local/state/skill-selector/backups`.
 
 ## Retire obsolete selector and dispatch skills
 
-After installing `skill_selector` and verifying it, archive the obsolete names from every native discovery root and both old/new banks. The retirement helper touches only `jev-dispatch` and `jev-skill-selector`. It requires an accessible installed replacement and backs up exact originals outside discovery catalogs using the same guarded rollback manifest format. Defaults to preview; `--apply` is explicit. Run this after physical bank migration and configuration cutover, so old instructions cannot route agents back to retired tools. Installation no longer recreates legacy skill names.
+After installing `otherskill` and verifying it, archive the obsolete names from every native discovery root and both old/new banks. The retirement helper touches only `jev-dispatch` and `jev-skill-selector`. It requires an accessible installed replacement and backs up exact originals outside discovery catalogs using the same guarded rollback manifest format. Defaults to preview; `--apply` is explicit. Run this after physical bank migration and configuration cutover, so old instructions cannot route agents back to retired tools. Installation no longer recreates legacy skill names.
 
 ```bash
 # Preview in a normal terminal; add --root for project or account-specific native directories.
-bun run /home/dat/dev/jev_skill_selector/scripts/retire-legacy-skills.ts --replacement /home/dat/.agents/skills/skill_selector/SKILL.md --root /home/dat/.agents/skills --root /home/dat/.claude/skills --root /home/dat/.codex/skills --root /home/dat/.gemini/config/skills --root /home/dat/.config/opencode/skills --root /home/dat/.agents/jev_skills --root /home/dat/.agents/other_skills --dry-run
+bun run <repo>/scripts/retire-legacy-skills.ts --replacement /home/dat/.agents/skills/otherskill/SKILL.md --root /home/dat/.agents/skills --root /home/dat/.claude/skills --root /home/dat/.codex/skills --root /home/dat/.gemini/config/skills --root /home/dat/.config/opencode/skills --root /home/dat/.agents/jev_skills --root /home/dat/.agents/other_skills --dry-run
 
 # Repeat the reviewed arguments with --apply instead of --dry-run.
 # Rollback uses the returned manifest:
-skill_selector migrate --rollback /private/retirement/backup_manifest.json --dry-run
-skill_selector migrate --rollback /private/retirement/backup_manifest.json --apply
+otherskill migrate --rollback /private/retirement/backup_manifest.json --dry-run
+otherskill migrate --rollback /private/retirement/backup_manifest.json --apply
 ```
 
 Safe sequence: install new selector and account entrypoints; review migration and backup plans; migrate optional skill banks; switch config/hooks to the new selector; retire legacy names; restart and verify harnesses. Keep all returned manifests for rollback. Protected global paths require a normal terminal; never bypass read-only mounts.

@@ -38,7 +38,7 @@ async function runComplexEvaluation() {
   const testcases: ComplexTestCase[] = JSON.parse(raw);
 
   console.log(`\n======================================================`);
-  console.log(`🚀 Starting Jev Complex & Multi-Step Evaluation`);
+  console.log(`🚀 Starting OtherSkill Complex & Multi-Step Evaluation`);
   console.log(`Total Cases: ${testcases.length}`);
   console.log(`Model: ${process.env.MODEL || "inception/mercury-decide:free"}`);
   console.log(`======================================================\n`);

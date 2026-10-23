@@ -9,11 +9,11 @@ main() (
   fail() { printf '[otherskill installer] %s\n' "$*" >&2; exit 1; }
   usage() {
     cat <<'HELP'
-Install Jev Skill Selector (OtherSkill) on Linux/macOS with Bash.
+Install OtherSkill on Linux/macOS with Bash.
 
 Usage: bash install.sh [--install-dir DIR] [--] [setup options...]
-       curl -fsSL https://raw.githubusercontent.com/datamonsterr/jev_auto_select_skills/master/install.sh | bash
-       curl -fsSL https://raw.githubusercontent.com/datamonsterr/jev_auto_select_skills/master/install.sh | bash -s -- --non-interactive --agent codex --scope global
+       curl -fsSL https://raw.githubusercontent.com/datamonsterr/other-skill/master/install.sh | bash
+       curl -fsSL https://raw.githubusercontent.com/datamonsterr/other-skill/master/install.sh | bash -s -- --non-interactive --agent codex --scope global
 
 Installer options (before --):
   --install-dir DIR  Persistent snapshot parent (default: $HOME/.local/share/otherskill/installs)
@@ -129,7 +129,7 @@ HELP
   curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
     --connect-timeout 15 --max-time 180 --retry 2 \
     --output "$work_dir/source.tar.gz" \
-    'https://codeload.github.com/datamonsterr/jev_auto_select_skills/tar.gz/refs/heads/master' \
+    'https://codeload.github.com/datamonsterr/other-skill/tar.gz/refs/heads/master' \
     || fail 'repository download failed; check HTTPS/network access and retry'
 
   mkdir -p -- "$install_dir" || fail 'could not create persistent install directory'

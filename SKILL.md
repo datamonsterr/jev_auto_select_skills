@@ -1,24 +1,24 @@
 ---
 
-name: skill_selector
+name: otherskill
 description: Fast, calibrated multi-skill router using free decision models on OpenRouter (inception/mercury-decide:free). Dynamically filters and injects only relevant skills from your skills bank per prompt to eliminate context bloat. Use on every prompt or before agent task execution.
 ---
 
-# Skill Selector
+# OtherSkill
 
 High-speed, calibrated multi-skill router powered by the free decision model on OpenRouter (`inception/mercury-decide:free`).
 
-Instead of polluting the agent's context window by loading 70+ skills on startup, `skill_selector` evaluates the user prompt against your centralized skill bank (`.agents/other_skills`) and injects only concise skill references and load instructions for that specific task.
+Instead of polluting the agent's context window by loading 70+ skills on startup, `otherskill` evaluates the user prompt against your centralized skill bank (`.agents/other_skills`) and injects only concise skill references and load instructions for that specific task.
 
 ## Quick Start
 
-### 1. Run Skill Selector and Get Full Skill Content (When Cannot Use Hooks)
+### 1. Run OtherSkill and Get Full Skill Content (When Cannot Use Hooks)
 
-If your agent harness cannot use lifecycle hooks, invoke `skill_selector` CLI (globally available via `bun link` or via `./run.sh`) to select skills:
+If your agent harness cannot use lifecycle hooks, invoke `otherskill` CLI (globally available via `bun link` or via `./run.sh`) to select skills:
 
 ```bash
 # If linked globally via 'bun link' (recommended):
-skill_selector "Refactor the payment gateway with TDD and make a git commit" --content
+otherskill "Refactor the payment gateway with TDD and make a git commit" --content
 
 # Or using the skill runner script:
 ./run.sh "Refactor the payment gateway with TDD and make a git commit" --content
@@ -29,7 +29,7 @@ bun run index.ts "Refactor the payment gateway with TDD and make a git commit" -
 
 Directly inspect a skill by name:
 ```bash
-skill_selector --skill tdd
+otherskill --skill tdd
 ```
 
 ### 2. Fast Skill Selection Overview
@@ -37,7 +37,7 @@ skill_selector --skill tdd
 To inspect routing probabilities without full file dumps:
 
 ```bash
-skill_selector "Refactor the payment gateway with TDD and make a git commit"
+otherskill "Refactor the payment gateway with TDD and make a git commit"
 ```
 
 Output:
@@ -91,11 +91,11 @@ The tool acts as a gatekeeper before your agent starts planning:
 ### 2. Standalone Skill Workflow (Priority 2: Fallback When Cannot Use Hooks)
 
 When the agent harness does not support lifecycle hooks:
-1. `skill_selector` is installed into the harness's skill folder (`~/.agents/skills/skill_selector`).
+1. `otherskill` is installed into the harness's skill folder (`~/.agents/skills/otherskill`).
 2. The agent calls:
 
    ```bash
-   skill_selector "<task description>" --content
+   otherskill "<task description>" --content
    ```
 3. Full instructions of only the necessary skills are returned directly for execution.
 
@@ -104,10 +104,10 @@ When the agent harness does not support lifecycle hooks:
 Relocate optional skills out of native auto-load directories into the isolated skills bank:
 ```bash
 # Preview actions without modifying disk
-skill_selector migrate --dry-run
+otherskill migrate --dry-run
 
 # Run migration
-skill_selector migrate
+otherskill migrate
 ```
 
 ---
@@ -115,8 +115,8 @@ skill_selector migrate
 ## Skills Directory Precedence
 
 Skills are automatically discovered and merged with strict project-first precedence:
-1. **Agent Skills (Project-Level)**: Nearest workspace ancestor `./.agents/other_skills` (or `SKILL_SELECTOR_AGENT_SKILLS_PATH`)
-2. **Global Skills (User-Level)**: `~/.agents/other_skills/` (or `SKILL_SELECTOR_GLOBAL_SKILLS_PATH`)
+1. **Agent Skills (Project-Level)**: Nearest workspace ancestor `./.agents/other_skills` (or `OTHERSKILL_AGENT_SKILLS_PATH`; legacy `SKILL_SELECTOR_AGENT_SKILLS_PATH` still read)
+2. **Global Skills (User-Level)**: `~/.agents/other_skills/` (or `OTHERSKILL_GLOBAL_SKILLS_PATH`; legacy `SKILL_SELECTOR_GLOBAL_SKILLS_PATH` still read)
 3. **Precedence**: Project-level skills override global skills with the same name even if `SKILLS_BANK_PATH` is configured.
 4. **Legacy Fallback**: Legacy `./.agents/jev_skills` and `~/.agents/jev_skills` are supported for migration compatibility with deprecation notice.
 
@@ -131,14 +131,16 @@ Configure via environment variables or a `.env` file:
 OPENROUTER_API_KEY=sk-or-v1-your-key-here
 
 # Free decision model (defaults to inception/mercury-decide:free, paid overrides rejected)
-SKILL_SELECTOR_MODEL=inception/mercury-decide:free
+OTHERSKILL_MODEL=inception/mercury-decide:free
 
 # Optional: Global skills bank directory (defaults to ~/.agents/other_skills/)
-SKILL_SELECTOR_GLOBAL_SKILLS_PATH=~/.agents/other_skills
+OTHERSKILL_GLOBAL_SKILLS_PATH=~/.agents/other_skills
 
 # Optional: Project/agent skills directory (defaults to ./.agents/other_skills)
-SKILL_SELECTOR_AGENT_SKILLS_PATH=./.agents/other_skills
+OTHERSKILL_AGENT_SKILLS_PATH=./.agents/other_skills
 ```
+
+The `OTHERSKILL_*` names win. Legacy `SKILL_SELECTOR_*` names (and `JEV_MODEL` for the model) are read only when the new name is unset.
 
 ---
 

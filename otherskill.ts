@@ -8,6 +8,7 @@ import {
   configData,
   configTarget,
   writeConfig,
+  defaultProjectBankPath,
   writtenBankPath,
   withRoutingOverrides,
   type RoutingOverrides,
@@ -94,6 +95,78 @@ Keys: environment OPENROUTER_API_KEY overrides private ~/.config/otherskill/cred
 Project configs never contain credentials. Explicit config > nearest project config > global > defaults.
 A project config is otherskill.config.json or .otherskill/config.json (the root file wins when both exist).
 `;
+const COMMAND_HELP: Record<string, string> = {
+  setup: `Usage: otherskill setup [--agent <harness> | --agents a,b] [--scope global|project] [options]
+Install harness hooks, the launcher and the companion skill, and write config.
+  --non-interactive            Use flags/defaults instead of the menu
+  --dry-run                    Preview writes without changing anything
+  --portable                   Path-free project hooks (needs project scope; bankPath must be project-relative)
+  --no-companion               Skip the shared .agents companion
+  --key-env <ENV> | --key-stdin  Save the OpenRouter key privately
+  --model, --categories, --max-skills, --max-categories, --timeout-ms
+                               Persist routing settings and embed them in the hook
+  --home <dir> --cwd <dir> --config <file>
+`,
+  find: `Usage: otherskill find --agent <harness> [--prompt <text>] [options]
+Select skills for a prompt and print native hook context (stdin hook JSON is read when no --prompt).
+Hook params override config for this call only and are never written to config:
+  --max-skills N        Keep at most N skills, highest probability first
+  --max-categories N    Consider at most N categories in stage one
+  --timeout-ms N        Per-request deadline in milliseconds
+  --categories a,b      Restrict enabled categories
+  --model <id:free>     Free model override
+  --config <file>       Explicit config file
+  --home <dir>          Home root (config and credentials)
+  --agent claude|codex|antigravity|opencode   Output format for the harness
+  --json                Print the routing result as JSON
+Errors never block the prompt: the hook exits 0 with empty context.
+`,
+  add: `Usage: otherskill add <local-dir|github:owner/repo|https://skills.sh/owner/repo/skill> [options]
+Classify a skill and copy its full tree into the bank of every matching category.
+  --category <id>       Skip classification; repeat for several categories
+  --ref <branch-or-tag> --path <dir>   GitHub source selection
+  --scope global|project, --home, --cwd, --config
+Alias: install.
+`,
+  list: `Usage: otherskill list [options]
+Print bank skill instances and their category membership as JSON.
+  --scope global|project, --home, --cwd, --config
+`,
+  config: `Usage: otherskill config [show|get <field>|set <field> <value>] [options]
+Without an action, edit settings interactively. With an action, run scripted.
+  --apply               Reapply harness hooks after the change
+  --scope global|project, --dry-run, --home, --cwd, --config
+  --model, --categories, --max-skills, --max-categories, --timeout-ms
+Settable fields: key, model, bankPath, portableHooks, scope, agent, categories, taxonomy, limits.
+`,
+  update: `Usage: otherskill update [--check|--dry-run] [--ref <branch-or-tag>]
+Install a new snapshot (default master), repoint the launcher and reapply hooks.
+  --check               Compare the installed commit with remote HEAD; no writes
+  --dry-run             Preview without writes
+`,
+  doctor: `Usage: otherskill doctor [--live]
+Check config, bank, native skill visibility, hook paths and credentials.
+  --live                Send one tiny free-model probe
+  --home, --cwd, --config
+`,
+  search: `Usage: otherskill search <query>
+Search GitHub for SKILL.md files (GH_TOKEN required by GitHub).
+`,
+  create: `Usage: otherskill create <dir> --name <slug> --description <text> --instructions-file <file>
+Generate a SKILL.md, then classify and copy it into the bank.
+  --category <id>       Skip classification; repeatable
+`,
+  classify: `Usage: otherskill classify <dir> [--category <id>]
+Reclassify a skill directory and copy it into the bank.
+  --category <id>       Explicit categories; repeatable
+`,
+};
+for (const [alias, name] of [
+  ["install", "add"],
+  ["hook", "find"],
+  ["select", "find"],
+] as const)
+  COMMAND_HELP[alias] = COMMAND_HELP[name]!;
 const options = {
   agent: { type: "string" },
   agents: { type: "string" },
@@ -167,7 +240,9 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     });
     const command = positionals[0] ?? "help";
     if (values.help || command === "help") {
-      console.log(HELP);
+      console.log(
+        (values.help && positionals[0] && COMMAND_HELP[positionals[0]]) || HELP,
+      );
       return 0;
     }
     const roots = {
@@ -407,7 +482,19 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
           ? configTarget({ ...roots, scope })
           : file;
       if (data.bankPath === config.bankPath)
-        data.bankPath = writtenBankPath(target, config.bankPath, config.home);
+        data.bankPath =
+          scope === "project" &&
+          !fs.existsSync(target) &&
+          config.bankPath ===
+            path.join(config.home, ".local/share/otherskill/bank")
+            ? defaultProjectBankPath(target)
+            : writtenBankPath(target, config.bankPath, config.home);
+      if (
+        data.portableHooks === true &&
+        typeof data.bankPath === "string" &&
+        (path.isAbsolute(data.bankPath) || data.bankPath.startsWith("~"))
+      )
+        throw new Error("portable hooks require a project-relative bankPath");
       config = writeConfig(target, data, roots, true);
       const plan = apply
         ? planMultiSetup(config, selectedAgents, {
@@ -542,7 +629,11 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
           { ref: values.ref, subpath: values.path },
           install,
         );
-      else await install(path.resolve(config.cwd, source));
+      else {
+        const dir = path.resolve(config.cwd, source);
+        if (!fs.existsSync(dir)) throw new Error(`source not found: ${dir}`);
+        await install(dir);
+      }
       return 0;
     }
     if (command === "list") {
@@ -616,7 +707,11 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
         (routingCommand
           ? diagnostic(error)
           : error instanceof Error && "code" in error
-            ? "filesystem_or_process_operation_failed"
+            ? String((error as { code: unknown }).code).startsWith(
+                "ERR_PARSE_ARGS_",
+              )
+              ? error.message
+              : "filesystem_or_process_operation_failed"
             : error instanceof Error && !(error instanceof SyntaxError)
               ? error.message
               : "invalid input/configuration"),

@@ -5,7 +5,7 @@ import { dirnameCompat } from "./compat";
 
 /**
  * Automatically discover and load environment variables from candidate .env files
- * across the active workspace, the jev-skill-selector repo, and user home directories.
+ * across the active workspace, the OtherSkill repo, and user home directories.
  */
 export function loadEnvironment(
   options: { cwd?: string; workspacePaths?: string[] } = {},
@@ -19,7 +19,7 @@ export function loadEnvironment(
     path.resolve(cwd, ".env"),
     // 2. Any explicit workspace paths (e.g. from Antigravity)
     ...(options.workspacePaths?.map((w) => path.resolve(w, ".env")) || []),
-    // 3. Jev Skill Selector installation repository .env
+    // 3. OtherSkill installation repository .env
     path.resolve(scriptDir, ".env"),
     // 4. Gemini / Antigravity config .env
     path.join(home, ".gemini", "config", ".env"),

@@ -259,8 +259,9 @@ function legacyClaudeHook(command: string): string | undefined {
     if (/(?:^|\/)hooks\/claude\.ts$/.test(words[0] ?? ""))
       return "hooks/claude.ts";
   }
-  if (path.basename(words[0] ?? "") === "skill_selector")
-    return "skill_selector";
+  const executable = path.basename(words[0] ?? "");
+  if (executable === "skill_selector" || executable === "jev-skill-selector")
+    return executable;
 }
 export interface SetupFile {
   path: string;

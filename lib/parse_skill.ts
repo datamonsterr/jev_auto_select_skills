@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import yaml from "yaml";
-import type { Skill, JevState } from "./model";
+import type { Skill, DecisionState } from "./model";
 
 /**
  * Sanitize and compact text by removing code blocks, links, boilerplate phrases, and redundant spaces
@@ -167,10 +167,10 @@ export function loadSkillsFromDir(skillsDir: string | string[]): Skill[] {
 }
 
 /**
- * Compact user prompt for Jev routing by collapsing massive code blocks or logs
+ * Compact user prompt for decision routing by collapsing massive code blocks or logs
  * while preserving the essential user request instructions at top and bottom.
  */
-export function compactUserPromptForJev(
+export function compactUserPromptForDecision(
   prompt: string,
   maxChars: number = 1800,
 ): string {
@@ -195,7 +195,7 @@ export function compactUserPromptForJev(
 }
 
 /**
- * Build state object for Jev containing skill metadata and user prompt.
+ * Build state object containing skill metadata and user prompt.
  * If compact is true, omits the redundant skills array to save ~11,000 input tokens.
  */
 export function buildSkillState(
@@ -204,8 +204,8 @@ export function buildSkillState(
   systemPrompt?: string,
   context?: Record<string, any>,
   options: { compact?: boolean } = {},
-): JevState {
-  const compactedPrompt = compactUserPromptForJev(userPrompt);
+): DecisionState {
+  const compactedPrompt = compactUserPromptForDecision(userPrompt);
 
   if (options.compact) {
     return {
@@ -229,7 +229,7 @@ export function buildSkillState(
 }
 
 /**
- * Build criteria record for Jev Choice question, limited to skill names (+ none)
+ * Build criteria record for Choice question, limited to skill names (+ none)
  * Compacts and sanitizes description strings to keep input tokens lean.
  */
 export function buildSkillCriteria(
@@ -240,7 +240,7 @@ export function buildSkillCriteria(
   const criteria: Record<string, string> = {};
 
   for (const skill of skills) {
-    // Keep description concise and sanitized for Jev criteria
+    // Keep description concise and sanitized for decision criteria
     criteria[skill.name] = sanitizeSkillText(
       skill.whenToUse || skill.description || skill.name,
       maxLen,

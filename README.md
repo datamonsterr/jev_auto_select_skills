@@ -12,25 +12,27 @@ Coding agents load every installed skill into context on every prompt. OtherSkil
 ## Install
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/datamonsterr/jev_auto_select_skills/master/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/datamonsterr/other-skill/master/install.sh | bash
 ```
 
 Scripted, no menu:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/datamonsterr/jev_auto_select_skills/master/install.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/datamonsterr/other-skill/master/install.sh | bash -s -- \
   --non-interactive --agent claude --scope global --key-env OPENROUTER_API_KEY
 ```
 
 From source:
 
 ```sh
-git clone https://github.com/datamonsterr/jev_auto_select_skills && cd jev_auto_select_skills
+git clone https://github.com/datamonsterr/other-skill && cd other-skill
 bun install --frozen-lockfile
 bun otherskill.ts setup
 ```
 
 Setup creates the launcher `~/.local/share/otherskill/bin/otherskill` (used by hooks) and a copy at `~/.local/bin/otherskill`, so `otherskill` is on `PATH` when `~/.local/bin` is. Details, snapshots and flags: [docs/installation.md](docs/installation.md).
+
+The bins `skill_selector` and `jev-skill-selector` are deprecated aliases kept for old installs; use `otherskill`. Env vars `OTHERSKILL_MODEL`, `OTHERSKILL_BANK_PATH`, `OTHERSKILL_GLOBAL_SKILLS_PATH` and `OTHERSKILL_AGENT_SKILLS_PATH` win over the legacy `SKILL_SELECTOR_*` names (and `JEV_MODEL`), which are still read as fallbacks. See [ADR 0008](docs/adr/0008-rename-to-otherskill.md).
 
 ## Quick start
 
@@ -136,7 +138,7 @@ otherskill setup --non-interactive --agent claude --scope global --max-skills 5 
 }
 ```
 
-(Real files contain absolute paths.) Setup also removes the legacy `hooks/claude.ts` / `skill_selector` entry and reports it as `removedLegacyHooks`.
+(Real files contain absolute paths.) Setup also removes the legacy `hooks/claude.ts`, `skill_selector` and `jev-skill-selector` entries and reports it as `removedLegacyHooks`.
 
 ## Update
 

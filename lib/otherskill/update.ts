@@ -53,7 +53,7 @@ export async function update(
   }
   const fetchFn = options.fetchFn ?? fetch;
   const response = await fetchFn(
-    `https://api.github.com/repos/datamonsterr/jev_auto_select_skills/commits/${encodeURIComponent(ref)}`,
+    `https://api.github.com/repos/datamonsterr/other-skill/commits/${encodeURIComponent(ref)}`,
     {
       headers: {
         Accept: "application/vnd.github+json",
@@ -86,7 +86,7 @@ export async function update(
       "update requires a configured agent; run otherskill setup first",
     );
   const root = config.scope === "global" ? config.home : projectRoot(config);
-  const archiveUrl = `https://codeload.github.com/datamonsterr/jev_auto_select_skills/tar.gz/${remote.data.sha}`;
+  const archiveUrl = `https://codeload.github.com/datamonsterr/other-skill/tar.gz/${remote.data.sha}`;
   const setupArgs = [
     "setup",
     "--non-interactive",
