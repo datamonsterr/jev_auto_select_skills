@@ -303,16 +303,17 @@ test("candidate and result limits produce explicit failures instead of silently 
           return answer(
             request,
             request.state.stage === "skills"
-              ? { s0: 0.5, s1: 0.5, none: 0 }
+              ? { s0: 0.6, s1: 0.4, none: 0 }
               : undefined,
           );
         },
       }),
     );
-    expect(overflow.status).toBe("failed");
-    expect(overflow.selected).toEqual([]);
+    expect(overflow.status).toBe("ok");
+    expect(overflow.selected).toHaveLength(1);
+    expect(overflow.selected[0]!.probability).toBe(0.6);
     expect(overflow.diagnostics).toContain(
-      "skill_selection_limit_exceeded_raise_maxSkills",
+      "skill_selection_truncated_to_maxSkills",
     );
   }));
 

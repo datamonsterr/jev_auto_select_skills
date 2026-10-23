@@ -118,8 +118,10 @@ test("find flags override categories, model and selection limits after stdin cwd
     f.preload,
     true,
   );
+  expect(limited.json().status).toBe("ok");
+  expect(limited.json().selected).toHaveLength(1);
   expect(limited.json().diagnostics).toContain(
-    "skill_selection_limit_exceeded_raise_maxSkills",
+    "skill_selection_truncated_to_maxSkills",
   );
   const categories = await cli(
     f,
