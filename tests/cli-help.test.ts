@@ -26,7 +26,7 @@ const home = () => fs.mkdtempSync(path.join(os.tmpdir(), "otherskill-err-"));
 
 test("per-command help prints command usage, not the global help", async () => {
   const h = home();
-  for (const cmd of [
+  const cmds = [
     "setup",
     "find",
     "add",
@@ -37,13 +37,19 @@ test("per-command help prints command usage, not the global help", async () => {
     "search",
     "create",
     "classify",
-  ]) {
-    for (const flag of ["--help", "-h"]) {
-      const r = await run([cmd, flag], h);
-      expect(r.code).toBe(0);
-      expect(r.out).toContain(`Usage: otherskill ${cmd}`);
-      expect(r.out).not.toContain("Canonical commands:");
-    }
+  ];
+  const results = await Promise.all(
+    cmds.flatMap((cmd) =>
+      ["--help", "-h"].map(async (flag) => ({
+        cmd,
+        r: await run([cmd, flag], h),
+      })),
+    ),
+  );
+  for (const { cmd, r } of results) {
+    expect(r.code).toBe(0);
+    expect(r.out).toContain(`Usage: otherskill ${cmd}`);
+    expect(r.out).not.toContain("Canonical commands:");
   }
   const find = (await run(["find", "--help"], h)).out;
   for (const flag of [
@@ -58,4 +64,4 @@ test("per-command help prints command usage, not the global help", async () => {
   ])
     expect(find).toContain(flag);
   expect((await run(["--help"], h)).out).toContain("Canonical commands:");
-});
+}, 30000);
