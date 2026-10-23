@@ -403,3 +403,43 @@ test("multi-target setup embeds hook params in every harness hook and saves all 
   expect(config.agents).toEqual(["claude", "codex"]);
   expect(config.hookParams).toEqual({ maxSkills: 4, timeoutMs: 15000 });
 });
+
+test("Claude setup removes the deprecated jev-skill-selector hook but not mentions of it", async () => {
+  const f = fixture(),
+    file = path.join(f.home, ".claude/settings.json");
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const unrelated = {
+    hooks: [{ type: "command", command: "echo jev-skill-selector" }],
+  };
+  fs.writeFileSync(
+    file,
+    JSON.stringify({
+      hooks: {
+        UserPromptSubmit: [
+          {
+            hooks: [
+              {
+                type: "command",
+                command:
+                  "/home/u/.local/bin/jev-skill-selector hook --agent claude",
+              },
+            ],
+          },
+          unrelated,
+        ],
+      },
+    }),
+  );
+  const result = await cli(f, [
+    "setup",
+    "--agent",
+    "claude",
+    "--non-interactive",
+  ]);
+  expect(result.code).toBe(0);
+  expect(result.json().removedLegacyHooks).toEqual(["jev-skill-selector"]);
+  const prompt = JSON.parse(fs.readFileSync(file, "utf8")).hooks
+    .UserPromptSubmit;
+  expect(prompt).toHaveLength(2);
+  expect(prompt[0]).toEqual(unrelated);
+});
