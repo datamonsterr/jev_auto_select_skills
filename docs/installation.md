@@ -9,19 +9,19 @@ Bash (including macOS Bash 3.2), HTTPS-capable `curl`, `tar` with gzip, standard
 ## Installer flow
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/datamonsterr/jev_auto_select_skills/master/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/datamonsterr/other-skill/master/install.sh | bash
 
 # Forward setup options:
-curl -fsSL https://raw.githubusercontent.com/datamonsterr/jev_auto_select_skills/master/install.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/datamonsterr/other-skill/master/install.sh | bash -s -- \
   --non-interactive --agent codex --scope global
 
 # Custom snapshot parent, project harness:
-curl -fsSL https://raw.githubusercontent.com/datamonsterr/jev_auto_select_skills/master/install.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/datamonsterr/other-skill/master/install.sh | bash -s -- \
   --install-dir "$HOME/.local/share/otherskill/installs" -- \
   --non-interactive --agent claude --scope project --cwd "$PWD" --no-companion
 
 # Installer help (no download, no writes):
-curl -fsSL https://raw.githubusercontent.com/datamonsterr/jev_auto_select_skills/master/install.sh | bash -s -- --help
+curl -fsSL https://raw.githubusercontent.com/datamonsterr/other-skill/master/install.sh | bash -s -- --help
 ```
 
 To inspect first: `curl -fsSL -o install.sh <raw URL>`, read it, then `bash install.sh`.

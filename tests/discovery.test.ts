@@ -12,6 +12,11 @@ describe("Skills Bank discovery and search precedence", () => {
     process.env = { ...origEnv };
     delete process.env.SKILLS_BANK_PATH;
     delete process.env.SKILL_SELECTOR_BANK_PATH;
+    delete process.env.OTHERSKILL_BANK_PATH;
+    delete process.env.SKILL_SELECTOR_GLOBAL_SKILLS_PATH;
+    delete process.env.OTHERSKILL_GLOBAL_SKILLS_PATH;
+    delete process.env.SKILL_SELECTOR_AGENT_SKILLS_PATH;
+    delete process.env.OTHERSKILL_AGENT_SKILLS_PATH;
     delete process.env.GLOBAL_SKILLS_PATH;
     delete process.env.AGENT_SKILLS_PATH;
     fs.mkdirSync(tempDir, { recursive: true });
@@ -42,6 +47,32 @@ describe("Skills Bank discovery and search precedence", () => {
     const realProject = fs.realpathSync(projectOtherSkills);
     const resolvedFirst = fs.realpathSync(paths[0] ?? "");
     expect(resolvedFirst).toBe(realProject);
+  });
+
+  it("OTHERSKILL_* env names win over legacy SKILL_SELECTOR_* and legacy still works", () => {
+    const cwd = path.join(tempDir, "envcwd");
+    fs.mkdirSync(cwd, { recursive: true });
+    const names = ["BANK_PATH", "GLOBAL_SKILLS_PATH", "AGENT_SKILLS_PATH"];
+    for (const n of names) {
+      const newDir = path.join(tempDir, `new_${n}`);
+      const oldDir = path.join(tempDir, `old_${n}`);
+      fs.mkdirSync(newDir, { recursive: true });
+      fs.mkdirSync(oldDir, { recursive: true });
+      process.env[`OTHERSKILL_${n}`] = newDir;
+      process.env[`SKILL_SELECTOR_${n}`] = oldDir;
+      const both = resolveSkillsSearchPaths({ cwd }).map((p) =>
+        path.resolve(p),
+      );
+      expect(both).toContain(path.resolve(newDir));
+      expect(both).not.toContain(path.resolve(oldDir));
+
+      delete process.env[`OTHERSKILL_${n}`];
+      const legacy = resolveSkillsSearchPaths({ cwd }).map((p) =>
+        path.resolve(p),
+      );
+      expect(legacy).toContain(path.resolve(oldDir));
+      delete process.env[`SKILL_SELECTOR_${n}`];
+    }
   });
 
   it("finds nearest workspace ancestor discovery for nested cwd", () => {

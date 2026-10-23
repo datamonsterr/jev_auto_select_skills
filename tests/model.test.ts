@@ -6,7 +6,7 @@ import {
 } from "../lib/model";
 import {
   DEFAULT_SYSTEM_PROMPT,
-  buildJevInstructions,
+  buildDecisionInstructions,
 } from "../lib/system_prompt";
 
 describe("model and system_prompt", () => {
@@ -85,7 +85,7 @@ describe("model and system_prompt", () => {
     expect(DEFAULT_SYSTEM_PROMPT.toLowerCase()).toContain("decision model");
     expect(DEFAULT_SYSTEM_PROMPT).toContain("skill");
 
-    const instructions = buildJevInstructions("primary");
+    const instructions = buildDecisionInstructions("primary");
     expect(instructions).toContain("skill");
   });
 });

@@ -12,9 +12,7 @@ export interface OpenCodePluginOptions {
     skillsDir?: string | string[];
   }) => Promise<{ selectedSkills: SelectedSkill[] }>;
 }
-export default function jevSkillSelectorPlugin(
-  options: OpenCodePluginOptions = {},
-) {
+export default function otherSkillPlugin(options: OpenCodePluginOptions = {}) {
   const command = [
     process.execPath,
     path.join(repoRoot, "otherskill.ts"),
@@ -38,7 +36,7 @@ export default function jevSkillSelectorPlugin(
     : undefined;
   const hooks = createOpenCodePlugin({ command, cwd: process.cwd(), run });
   return {
-    name: "skill_selector",
+    name: "otherskill",
     version: "1.1.0",
     hooks: {
       ...hooks,

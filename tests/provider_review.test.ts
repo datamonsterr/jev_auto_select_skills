@@ -1,10 +1,10 @@
 import { describe, it, expect, mock } from "bun:test";
-import { JevProvider, isFreeModel } from "../lib/provider";
+import { DecisionProvider, isFreeModel } from "../lib/provider";
 describe("reviewed free provider", () => {
   it("rejects deceptive suffixes including direct requests without HTTP", async () => {
     const fetchFn = mock(async () => new Response("{}"));
     expect(isFreeModel("paid/model:free-but-paid")).toBe(false);
-    const provider = new JevProvider({ apiKey: "test", fetchFn });
+    const provider = new DecisionProvider({ apiKey: "test", fetchFn });
     await expect(
       provider.sendDecisionRequest({
         model: "paid/model:free-but-paid",
@@ -18,7 +18,7 @@ describe("reviewed free provider", () => {
     const fetchFn = mock(
       async () => ({ ok: true, text: () => new Promise(() => {}) }) as Response,
     );
-    const provider = new JevProvider({
+    const provider = new DecisionProvider({
       apiKey: "test",
       fetchFn,
       timeoutMs: 15,

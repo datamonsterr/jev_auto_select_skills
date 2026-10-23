@@ -1,14 +1,14 @@
 /**
- * Concise system prompt and question instructions for Jev skill selection
+ * Concise system prompt and question instructions for OtherSkill selection
  */
 
 export const DEFAULT_SYSTEM_PROMPT =
   "Decision model: route the user task to the most appropriate specialized skill in the skill bank, or 'none' if no specialized skill applies.";
 
 /**
- * Build concise choice instructions for Jev
+ * Build concise choice instructions for the decision model
  */
-export function buildJevInstructions(
+export function buildDecisionInstructions(
   role: "primary" | "secondary" | "followup" | "single" = "single",
 ): string {
   switch (role) {

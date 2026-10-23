@@ -2,20 +2,23 @@ import fs from "node:fs";
 import {
   type Skill,
   type SelectedSkill,
-  type SkillSelectorOptions,
+  type OtherSkillOptions,
   type SkillSelectionResult,
   type UsageMetrics,
-  type JevDecisionRequest,
-  type JevDecisionResponse,
+  type DecisionRequest,
+  type DecisionResponse,
   filterSelectedSkills,
 } from "./model";
 import { buildSkillState, buildSkillCriteria } from "./parse_skill";
-import { DEFAULT_SYSTEM_PROMPT, buildJevInstructions } from "./system_prompt";
+import {
+  DEFAULT_SYSTEM_PROMPT,
+  buildDecisionInstructions,
+} from "./system_prompt";
 
 export const DEFAULT_OPENROUTER_DECISIONS_URL =
   "https://openrouter.ai/api/alpha/decisions";
 export const DEFAULT_FREE_MODEL = "inception/mercury-decide:free";
-export const DEFAULT_JEV_MODEL = DEFAULT_FREE_MODEL;
+export const DEFAULT_DECISION_MODEL = DEFAULT_FREE_MODEL;
 
 /**
  * Check if a model is an authorized free decision model.
@@ -31,7 +34,7 @@ export function isFreeModel(model?: string): boolean {
  * Resolve the active decision model.
  * Precedence:
  * 1. optionsModel (must be free, else error)
- * 2. SKILL_SELECTOR_MODEL env var (must be free, else error)
+ * 2. OTHERSKILL_MODEL env var, then legacy SKILL_SELECTOR_MODEL (must be free, else error)
  * 3. Compatible legacy free-only env vars (MODEL, JEV_MODEL) ONLY if free
  * 4. DEFAULT_FREE_MODEL ("inception/mercury-decide:free")
  */
@@ -45,7 +48,8 @@ export function resolveActiveModel(optionsModel?: string): string {
     return optionsModel;
   }
 
-  const envSelectorModel = process.env.SKILL_SELECTOR_MODEL;
+  const envSelectorModel =
+    process.env.OTHERSKILL_MODEL || process.env.SKILL_SELECTOR_MODEL;
   if (envSelectorModel) {
     if (!isFreeModel(envSelectorModel)) {
       throw new Error(
@@ -66,7 +70,7 @@ export function resolveActiveModel(optionsModel?: string): string {
   return DEFAULT_FREE_MODEL;
 }
 
-export interface JevProviderConfig {
+export interface DecisionProviderConfig {
   apiKey?: string;
   model?: string;
   endpoint?: string;
@@ -80,9 +84,9 @@ export interface JevProviderConfig {
 }
 
 /**
- * Provider client for TypeSafe Jev Decision Model via OpenRouter
+ * Provider client for OpenRouter decision model via OpenRouter
  */
-export class JevProvider {
+export class DecisionProvider {
   private apiKey: string;
   private model: string;
   private endpoint: string;
@@ -94,7 +98,7 @@ export class JevProvider {
     init?: RequestInit,
   ) => Promise<Response>;
 
-  constructor(config: JevProviderConfig = {}) {
+  constructor(config: DecisionProviderConfig = {}) {
     this.apiKey =
       config.apiKey ||
       process.env.OPENROUTER_API_KEY ||
@@ -110,11 +114,11 @@ export class JevProvider {
   }
 
   /**
-   * Send a decision request to Jev with automatic retries and backoff
+   * Send a decision request to the decision model with automatic retries and backoff
    */
   async sendDecisionRequest(
-    request: JevDecisionRequest,
-  ): Promise<JevDecisionResponse> {
+    request: DecisionRequest,
+  ): Promise<DecisionResponse> {
     const modelToUse = request.model || this.model;
     if (!isFreeModel(modelToUse)) {
       throw new Error(
@@ -152,9 +156,8 @@ export class JevProvider {
               headers: {
                 Authorization: `Bearer ${this.apiKey}`,
                 "Content-Type": "application/json",
-                "HTTP-Referer":
-                  "https://github.com/datamonsterr/jev_auto_select_skills",
-                "X-Title": "Skill Selector",
+                "HTTP-Referer": "https://github.com/datamonsterr/other-skill",
+                "X-Title": "OtherSkill",
               },
               body: JSON.stringify({ ...request, model: modelToUse }),
               signal: controller.signal,
@@ -175,7 +178,7 @@ export class JevProvider {
         } finally {
           clearTimeout(timer!);
         }
-        if (response.ok) return data as JevDecisionResponse;
+        if (response.ok) return data as DecisionResponse;
 
         const isRateLimit = response.status === 429;
         const isServerError = response.status >= 500 && response.status <= 599;
@@ -183,7 +186,7 @@ export class JevProvider {
         const errorText = "provider unavailable";
 
         const error = new Error(
-          `Jev decision API failed with HTTP ${response.status}: ${errorText}`,
+          `Decision API failed with HTTP ${response.status}: ${errorText}`,
         );
         lastError = error;
 
@@ -219,7 +222,7 @@ export class JevProvider {
     skills: Skill[];
     systemPrompt?: string;
     context?: Record<string, any>;
-    options?: SkillSelectorOptions;
+    options?: OtherSkillOptions;
   }): Promise<SkillSelectionResult> {
     const { userPrompt, skills, systemPrompt, context, options = {} } = params;
 
@@ -250,35 +253,35 @@ export class JevProvider {
       ? {
           primary_skill: {
             type: "choice",
-            instructions: buildJevInstructions("primary"),
+            instructions: buildDecisionInstructions("primary"),
             criteria,
           },
           secondary_skill: {
             type: "choice",
-            instructions: buildJevInstructions("secondary"),
+            instructions: buildDecisionInstructions("secondary"),
             criteria,
           },
           followup_skill: {
             type: "choice",
-            instructions: buildJevInstructions("followup"),
+            instructions: buildDecisionInstructions("followup"),
             criteria,
           },
         }
       : {
           selected_skill: {
             type: "choice",
-            instructions: buildJevInstructions("single"),
+            instructions: buildDecisionInstructions("single"),
             criteria,
           },
         };
 
-    const request: JevDecisionRequest = {
+    const request: DecisionRequest = {
       model: activeModel,
       state,
       questions,
     };
 
-    let response: JevDecisionResponse;
+    let response: DecisionResponse;
     try {
       response = await this.sendDecisionRequest(request);
     } catch (_err: any) {
@@ -310,7 +313,7 @@ export class JevProvider {
     const skillMap = new Map(skills.map((s) => [s.name, s]));
     const collectedMap = new Map<string, SelectedSkill>();
 
-    // Process all choice answers returned from Jev
+    // Process all choice answers returned from the decision model
     for (const [, choiceAnswer] of Object.entries(response.answers || {})) {
       if (choiceAnswer.type !== "choice") continue;
 

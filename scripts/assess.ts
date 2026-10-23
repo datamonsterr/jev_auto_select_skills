@@ -3,10 +3,10 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { parseSkillContent } from "../lib/parse_skill";
-import { JevProvider } from "../lib/provider";
+import { DecisionProvider } from "../lib/provider";
 import { resolveSkillsSearchPaths } from "../index";
 
-export type SkillClassification = "ALWAYS_ON" | "JEV_ROUTED";
+export type SkillClassification = "ALWAYS_ON" | "ROUTED";
 
 export interface SkillAssessmentResult {
   skillName: string;
@@ -40,9 +40,9 @@ const ALWAYS_ON_PATTERNS = [
 ];
 
 /**
- * Heuristics to identify task-specific / domain-specific skills suitable for Jev routing
+ * Heuristics to identify task-specific / domain-specific skills suitable for decision routing
  */
-const JEV_ROUTED_PATTERNS = [
+const ROUTED_PATTERNS = [
   /\bwhen\s+to\s+use\b/i,
   /\btrigger\s+with\b/i,
   /\buse\s+when\b/i,
@@ -53,11 +53,11 @@ const JEV_ROUTED_PATTERNS = [
 ];
 
 /**
- * Perform quick classification of a skill into ALWAYS_ON vs JEV_ROUTED
+ * Perform quick classification of a skill into ALWAYS_ON vs ROUTED
  */
 export async function assessSkill(params: {
   skillPathOrName: string;
-  useJevModel?: boolean;
+  useDecisionModel?: boolean;
   global?: boolean;
   cwd?: string;
 }): Promise<SkillAssessmentResult> {
@@ -115,41 +115,41 @@ export async function assessSkill(params: {
   const combinedText = `${skillName}\n${parsed.description}\n${parsed.whenToUse}\n${content.slice(0, 1000)}`;
 
   // 2. Run heuristics
-  let classification: SkillClassification = "JEV_ROUTED";
+  let classification: SkillClassification = "ROUTED";
   let confidence = 0.85;
   let reason = "";
 
   const alwaysMatch = ALWAYS_ON_PATTERNS.find((pat) => pat.test(combinedText));
-  const jevMatch = JEV_ROUTED_PATTERNS.find((pat) => pat.test(combinedText));
+  const routedMatch = ROUTED_PATTERNS.find((pat) => pat.test(combinedText));
 
-  if (alwaysMatch && !jevMatch) {
+  if (alwaysMatch && !routedMatch) {
     classification = "ALWAYS_ON";
     confidence = 0.95;
     reason = `Matches always-on behavioral pattern (${alwaysMatch.source}). Universal tone/guideline to load with LLM by default.`;
-  } else if (alwaysMatch && jevMatch) {
+  } else if (alwaysMatch && routedMatch) {
     // Ambiguous: check if name matches caveman or persona explicitly
     if (/caveman|persona|tone|terse/i.test(skillName)) {
       classification = "ALWAYS_ON";
       confidence = 0.9;
       reason = `Skill "${skillName}" modifies universal model demeanor/personality across all prompts.`;
     } else {
-      classification = "JEV_ROUTED";
+      classification = "ROUTED";
       confidence = 0.8;
-      reason = `Contains specific tool/domain workflows (${jevMatch.source}). Best routed on-demand by Jev to preserve context.`;
+      reason = `Contains specific tool/domain workflows (${routedMatch.source}). Best routed on-demand by OtherSkill to preserve context.`;
     }
   } else {
-    classification = "JEV_ROUTED";
+    classification = "ROUTED";
     confidence = 0.92;
-    reason = `Task-specific or tool-specific capability. Suitable for dynamic on-demand selection via Jev.`;
+    reason = `Task-specific or tool-specific capability. Suitable for dynamic on-demand selection via OtherSkill.`;
   }
 
-  // 3. Optional: Use Jev decision model if requested and API key present
+  // 3. Optional: Use decision model if requested and API key present
   if (
-    params.useJevModel &&
+    params.useDecisionModel &&
     (process.env.OPENROUTER_API_KEY || process.env.JEV_API_KEY)
   ) {
     try {
-      const provider = new JevProvider();
+      const provider = new DecisionProvider();
       const response = await provider.sendDecisionRequest({
         model: process.env.MODEL || "inception/mercury-decide:free",
         state: {
@@ -162,11 +162,11 @@ export async function assessSkill(params: {
           placement: {
             type: "choice",
             instructions:
-              "Determine if this skill should be ALWAYS loaded directly with LLM (universal persona/tone like caveman) or JEV_ROUTED (optional task-specific skill loaded dynamically).",
+              "Determine if this skill should be ALWAYS loaded directly with LLM (universal persona/tone like caveman) or ROUTED (optional task-specific skill loaded dynamically).",
             criteria: {
               ALWAYS_ON:
                 "Universal persona, terse style modifier like caveman, or core behavioral guideline loaded on every prompt",
-              JEV_ROUTED:
+              ROUTED:
                 "Task-specific, domain-specific, tool-specific, or language-specific skill loaded dynamically only when needed",
             },
           },
@@ -174,10 +174,10 @@ export async function assessSkill(params: {
       });
 
       const ans = response.answers?.placement;
-      if (ans && (ans.choice === "ALWAYS_ON" || ans.choice === "JEV_ROUTED")) {
+      if (ans && (ans.choice === "ALWAYS_ON" || ans.choice === "ROUTED")) {
         classification = ans.choice as SkillClassification;
         confidence = ans.confidence ?? confidence;
-        reason = `TypeSafe Jev decision model classified this skill as ${classification} (confidence: ${(confidence * 100).toFixed(0)}%).`;
+        reason = `Decision model classified this skill as ${classification} (confidence: ${(confidence * 100).toFixed(0)}%).`;
       }
     } catch {
       // Fallback to heuristic decision
@@ -243,10 +243,10 @@ if (import.meta.main) {
   const args = process.argv.slice(2);
   if (args.length === 0 || args.includes("--help") || args.includes("-h")) {
     console.log(`
-Jev Skill Placement Assessor (assess.ts)
+OtherSkill Placement Assessor (assess.ts)
 Classifies skills into:
   1. ALWAYS_ON: Universal persona/tone modifiers (e.g. caveman) loaded directly with LLM.
-  2. JEV_ROUTED: Task-specific skills routed dynamically on-demand via Jev.
+  2. ROUTED: Task-specific skills routed dynamically on-demand via OtherSkill.
 
 Usage:
   bun run scripts/assess.ts <skill-path-or-name> [options]
@@ -254,7 +254,7 @@ Usage:
 Options:
   --move, -m     Automatically move the skill to the recommended folder
   --global, -g   Target global (~/.agents/) instead of project-local (./.agents/)
-  --jev-model    Use TypeSafe Jev model on OpenRouter for classification
+  --decision-model    Use decision model on OpenRouter for classification
   --json         Output results as JSON
   --help, -h     Show this help message
 `);
@@ -264,7 +264,7 @@ Options:
   let skillArg = "";
   let shouldMove = false;
   let isGlobal = false;
-  let useJevModel = false;
+  let useDecisionModel = false;
   let jsonOutput = false;
 
   for (let i = 0; i < args.length; i++) {
@@ -272,7 +272,7 @@ Options:
     if (arg === undefined) continue;
     if (arg === "--move" || arg === "-m") shouldMove = true;
     else if (arg === "--global" || arg === "-g") isGlobal = true;
-    else if (arg === "--jev-model") useJevModel = true;
+    else if (arg === "--decision-model") useDecisionModel = true;
     else if (arg === "--json") jsonOutput = true;
     else if (!arg.startsWith("-") && !skillArg) skillArg = arg;
   }
@@ -284,7 +284,7 @@ Options:
 
   assessSkill({
     skillPathOrName: skillArg,
-    useJevModel,
+    useDecisionModel,
     global: isGlobal,
   })
     .then((res) => {
@@ -305,7 +305,7 @@ Options:
         console.log(`Skill:          ${res.skillName}`);
         console.log(`Source:         ${res.sourcePath || "N/A"}`);
         console.log(
-          `Classification: ${res.classification === "ALWAYS_ON" ? "🟢 ALWAYS_ON (Normal Skill)" : "🎯 JEV_ROUTED (Jev Bank)"}`,
+          `Classification: ${res.classification === "ALWAYS_ON" ? "🟢 ALWAYS_ON (Normal Skill)" : "🎯 ROUTED (OtherSkill Bank)"}`,
         );
         console.log(`Confidence:     ${(res.confidence * 100).toFixed(0)}%`);
         console.log(`Reason:         ${res.reason}`);

@@ -1,6 +1,6 @@
 import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test";
 import {
-  JevProvider,
+  DecisionProvider,
   isFreeModel,
   resolveActiveModel,
   DEFAULT_FREE_MODEL,
@@ -15,6 +15,7 @@ describe("Free Decision Model enforcement", () => {
     delete process.env.MODEL;
     delete process.env.JEV_MODEL;
     delete process.env.SKILL_SELECTOR_MODEL;
+    delete process.env.OTHERSKILL_MODEL;
   });
 
   afterEach(() => {
@@ -43,7 +44,7 @@ describe("Free Decision Model enforcement", () => {
 
     // Explicit paid model option
     expect(() => {
-      new JevProvider({
+      new DecisionProvider({
         apiKey: "test-key",
         model: "~typesafe/jev-latest",
         fetchFn: mockFetch as any,
@@ -51,6 +52,15 @@ describe("Free Decision Model enforcement", () => {
     }).toThrow(/paid.*rejected|only free/i);
 
     expect(mockFetch).toHaveBeenCalledTimes(0);
+  });
+
+  it("OTHERSKILL_MODEL wins over legacy SKILL_SELECTOR_MODEL, which still works alone", () => {
+    process.env.OTHERSKILL_MODEL = "new/free-model:free";
+    process.env.SKILL_SELECTOR_MODEL = "old/free-model:free";
+    expect(resolveActiveModel()).toBe("new/free-model:free");
+
+    delete process.env.OTHERSKILL_MODEL;
+    expect(resolveActiveModel()).toBe("old/free-model:free");
   });
 
   it("prefers SKILL_SELECTOR_MODEL then compatible legacy free-only values", () => {
@@ -83,7 +93,7 @@ describe("Free Decision Model enforcement", () => {
       throw new Error("Connection timeout");
     });
 
-    const provider = new JevProvider({
+    const provider = new DecisionProvider({
       apiKey: "test-key",
       model: "inception/mercury-decide:free",
       fetchFn: mockFailingFetch as any,

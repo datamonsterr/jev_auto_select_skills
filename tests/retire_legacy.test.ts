@@ -8,10 +8,10 @@ it("retires only legacy names after replacement, exact backup and reversible pri
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "selector-retire-"));
   try {
     const native = path.join(root, "native"),
-      replacement = path.join(native, "skill_selector/SKILL.md"),
+      replacement = path.join(native, "otherskill/SKILL.md"),
       backupDir = path.join(root, "private");
     for (const name of [
-      "skill_selector",
+      "otherskill",
       "jev-skill-selector",
       "jev-dispatch",
       "tdd",
@@ -25,7 +25,7 @@ it("retires only legacy names after replacement, exact backup and reversible pri
     expect((await retireLegacySkills(options)).dryRun).toBe(true);
     expect(fs.existsSync(backupDir)).toBe(false);
     const result = await retireLegacySkills({ ...options, apply: true });
-    expect(fs.readdirSync(native).sort()).toEqual(["skill_selector", "tdd"]);
+    expect(fs.readdirSync(native).sort()).toEqual(["otherskill", "tdd"]);
     expect(result.sources).toHaveLength(2);
     await rollbackMigration(result.manifestPath);
     expect(

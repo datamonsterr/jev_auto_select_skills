@@ -5,12 +5,12 @@ import fs from "node:fs";
 import { dirnameCompat } from "../lib/compat";
 
 describe("assess.ts skill placement", () => {
-  it("classifies task-specific skills as JEV_ROUTED", async () => {
+  it("classifies task-specific skills as ROUTED", async () => {
     const result = await assessSkill({
-      skillPathOrName: path.resolve(__dirname, "../skills/skill_selector"),
+      skillPathOrName: path.resolve(__dirname, "../skills/otherskill"),
     });
 
-    expect(result.classification).toBe("JEV_ROUTED");
+    expect(result.classification).toBe("ROUTED");
     expect(result.recommendedDir).toContain("other_skills");
   });
 
@@ -46,7 +46,7 @@ Me speak short.
     }
   });
 
-  it("classifies docker deployment skill as JEV_ROUTED", async () => {
+  it("classifies docker deployment skill as ROUTED", async () => {
     const tmpDir = path.join(
       dirnameCompat(import.meta),
       "fixtures",
@@ -69,7 +69,7 @@ Instructions...
         skillPathOrName: tmpDir,
       });
 
-      expect(result.classification).toBe("JEV_ROUTED");
+      expect(result.classification).toBe("ROUTED");
       expect(result.recommendedDir).toContain(
         path.join(".agents", "other_skills", "docker-deploy"),
       );

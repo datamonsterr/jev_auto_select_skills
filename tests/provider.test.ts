@@ -1,8 +1,8 @@
 import { describe, it, expect, mock } from "bun:test";
-import { JevProvider } from "../lib/provider";
+import { DecisionProvider } from "../lib/provider";
 import type { Skill } from "../lib/model";
 
-describe("JevProvider", () => {
+describe("DecisionProvider", () => {
   const dummySkills: Skill[] = [
     {
       name: "tdd",
@@ -38,7 +38,7 @@ describe("JevProvider", () => {
       );
     });
 
-    const provider = new JevProvider({
+    const provider = new DecisionProvider({
       apiKey: "test-key",
       fetchFn: mockFetch as any,
     });
@@ -88,7 +88,7 @@ describe("JevProvider", () => {
       );
     });
 
-    const provider = new JevProvider({
+    const provider = new DecisionProvider({
       apiKey: "test-key",
       fetchFn: mockFetch as any,
       retryDelayMs: 10, // Fast delay for tests
@@ -113,7 +113,7 @@ describe("JevProvider", () => {
       );
     });
 
-    const provider = new JevProvider({
+    const provider = new DecisionProvider({
       apiKey: "test-key",
       fetchFn: mockFetch as any,
       retries: 3,
@@ -170,7 +170,7 @@ describe("JevProvider", () => {
       );
     });
 
-    const provider = new JevProvider({
+    const provider = new DecisionProvider({
       apiKey: "test-key",
       fetchFn: mockFetch as any,
     });

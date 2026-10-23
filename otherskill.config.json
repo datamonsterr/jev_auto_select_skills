@@ -14,7 +14,7 @@
     },
     {
       "id": "management",
-      "description": "Agent skill authoring, routing, Jev decision models and Claude Code hook workflows"
+      "description": "Agent skill authoring, routing, decision models and Claude Code hook workflows"
     }
   ],
   "limits": {

@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import fs from "node:fs";
 import path from "node:path";
-import { JevProvider } from "../lib/provider";
+import { DecisionProvider } from "../lib/provider";
 import type { Skill } from "../lib/model";
 
 interface BenchmarkCase {
@@ -47,7 +47,7 @@ async function runOnlineBenchmark() {
     fs.readFileSync(benchmarkPath, "utf-8"),
   );
 
-  // Convert MetaTool tools into Jev Skill format
+  // Convert MetaTool tools into Skill format
   const candidateSkills: Skill[] = Object.entries(toolsJson).map(
     ([name, desc]) => ({
       name,
@@ -57,14 +57,14 @@ async function runOnlineBenchmark() {
   );
 
   console.log(`\n======================================================`);
-  console.log(`🌐 Starting MetaTool (ToolE) Online Benchmark on Jev`);
+  console.log(`🌐 Starting MetaTool (ToolE) Online Benchmark on OtherSkill`);
   console.log(`Dataset: MetaTool / ToolE (HuggingFace / GitHub)`);
   console.log(`Total Candidate Tools in Bank: ${candidateSkills.length}`);
   console.log(`Total Benchmark Test Cases: ${testcases.length}`);
   console.log(`Model: ${process.env.MODEL || "inception/mercury-decide:free"}`);
   console.log(`======================================================\n`);
 
-  const provider = new JevProvider();
+  const provider = new DecisionProvider();
   const results: CaseEvaluationResult[] = [];
   let passedCount = 0;
   let totalDurationMs = 0;

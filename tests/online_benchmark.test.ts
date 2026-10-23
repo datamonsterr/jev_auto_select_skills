@@ -1,7 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
-import { JevProvider } from "../lib/provider";
+import { DecisionProvider } from "../lib/provider";
 import type { Skill } from "../lib/model";
 
 describe("metatool online benchmark integration", () => {
@@ -40,7 +40,7 @@ describe("metatool online benchmark integration", () => {
     }
   });
 
-  it("evaluates a multi-tool query from MetaTool and correctly selects target tools with Jev", async () => {
+  it("evaluates a multi-tool query from MetaTool and correctly selects target tools with OtherSkill", async () => {
     const toolsJson: Record<string, string> = JSON.parse(
       fs.readFileSync(toolsPath, "utf-8"),
     );
@@ -70,7 +70,7 @@ describe("metatool online benchmark integration", () => {
       );
     }) as any;
 
-    const provider = new JevProvider({
+    const provider = new DecisionProvider({
       apiKey: "offline-test-key",
       fetchFn: mockFetch,
     });
