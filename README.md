@@ -138,7 +138,7 @@ otherskill setup --non-interactive --agent claude --scope global --max-skills 5 
 }
 ```
 
-(Real files contain absolute paths.) Setup also removes the legacy `hooks/claude.ts` / `skill_selector` entry and reports it as `removedLegacyHooks`.
+(Real files contain absolute paths.) Setup also removes the legacy `hooks/claude.ts`, `skill_selector` and `jev-skill-selector` entries and reports it as `removedLegacyHooks`.
 
 ## Update
 
